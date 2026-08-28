@@ -4,9 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       perl-version:
-        description: "Perl version to build"
+        description: "Perl version to build (defaults to the repository-supported release)"
         required: false
-        default: "5.42.0"
+        default: "5.44.0"
+      build-cpanfile:
+        description: "Install cpanfile modules and compile static XS extensions"
+        type: boolean
+        required: false
+        default: true
       exiftool-version:
         description: "Version of ExifTool to build"
         required: false
@@ -45,8 +50,11 @@ jobs:
 
       - name: Build zeroperl
         run: |
+          # Keep the workflow artifact equivalent to the default local build:
+          # cpanfile modules are copied to the prefix and their XS code is static.
           docker build \
             --build-arg PERL_VERSION=${{ inputs.perl-version }} \
+            --build-arg BUILD_CPANFILE=${{ inputs.build-cpanfile }} \
             --build-arg EXIFTOOL_VERSION=${{ inputs.exiftool-version }} \
             --build-arg BUILD_EXIFTOOL=${{ inputs.build-exiftool }} \
             --build-arg STACK_SIZE=${{ inputs.stack-size }} \
