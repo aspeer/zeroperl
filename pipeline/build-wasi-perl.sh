@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-PERL_VERSION="${PERL_VERSION:-5.42.0}"
+PERL_VERSION="${PERL_VERSION:-5.44.0}"
 URLPERL="https://www.cpan.org/src/5.0/perl-${PERL_VERSION}.tar.gz"
 WASI_SDK_PATH="${WASI_SDK_PATH:-/opt/wasi-sdk}"
 WASM_DIR="${WASM_DIR:-/build/wasm}"
@@ -28,6 +28,7 @@ cd "$WASM_DIR"
 # Apply patches
 chmod u+w ./ext/File-Glob/bsd_glob.c
 patch -p1 < "$REPO_DIR/patches/glob.patch"
+patch -p1 < "$REPO_DIR/patches/socket-wasi.patch"
 chmod u-w ./ext/File-Glob/bsd_glob.c
 
 # Configure

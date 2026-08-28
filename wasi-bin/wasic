@@ -15,6 +15,42 @@ def compile_with_wasi(args):
     If the environment variable `WASIC_FORCE_HOST` is set, the compilation
     will be redirected to the host compiler using the correct clang binary.
     """
+    # Module::Build is configured by the native Perl so it can run its
+    # compiler probe.  Its generated command retains the native CORE include;
+    # replace that include for the subsequent WASI compile.
+    wasi_perl_core = os.getenv("WASI_PERL_CORE")
+    if wasi_perl_core:
+        args = [
+            f"-I{wasi_perl_core}" if arg.endswith("/CORE") and "/build/native/" in arg else arg
+            for arg in args
+        ]
+        wasi_sdk_path = os.getenv('WASI_SDK_PATH', '/opt/wasi-sdk')
+        wasi_include = os.path.join(
+            wasi_sdk_path, 'share/wasi-sysroot/include/wasm32-wasi'
+        )
+        args = [
+            '-DBIG_TIME', '-DNO_MATHOMS', '-Wno-int-conversion',
+            '-Wno-implicit-function-declaration', '-D_WASI_EMULATED_PROCESS_CLOCKS',
+            '-D_WASI_EMULATED_GETPID', '-D_GNU_SOURCE', '-D_POSIX_C_SOURCE',
+            '-Wno-null-pointer-arithmetic', '-D_WASI_EMULATED_SIGNAL',
+            '-I/build/repo/stubs',
+            '-include', os.path.join(wasi_include, 'fcntl.h'),
+        ] + args
+
+        # Module::Build always links a shared object, even when asked for a
+        # static build. Its already-compiled WASI objects are exactly what the
+        # final Perl link needs, so package them as an archive at this point.
+        if '-shared' in args:
+            try:
+                output = args[args.index('-o') + 1]
+            except (ValueError, IndexError):
+                output = None
+            objects = [arg for arg in args if arg.endswith('.o')]
+            if output and objects:
+                check_call(['/usr/bin/ar', 'cr', output] + objects)
+                check_call([os.path.join(wasi_sdk_path, 'bin', 'llvm-ranlib'), output])
+                return
+
     # Clean up arguments by removing unwanted flags
     args = [arg for arg in args if arg not in {"cflags", "dflags"}]
 

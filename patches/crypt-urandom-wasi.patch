@@ -1,0 +1,46 @@
+--- a/Makefile.PL
++++ b/Makefile.PL
+@@ -5,7 +5,9 @@
+ 
+ 
+ my %optional;
+-if ($^O eq 'MSWin32') {
++if ($ENV{WASI_TARGET}) {
++	$optional{DEFINE} = q[-DHAVE_CRYPT_URANDOM_WASI];
++} elsif ($^O eq 'MSWin32') {
+ 	$optional{OBJECT} = q[];
+ 	$optional{C} = [];
+ 	$optional{MYEXTLIB} = q[];
+--- a/URandom.xs
++++ b/URandom.xs
+@@ -26,6 +26,7 @@
+ #else
+ #define GRND_NONBLOCK	0x0001
+ #endif
++#include <wasi/api.h>
+ #include <errno.h>
+ 
+ MODULE = Crypt::URandom  PACKAGE = Crypt::URandom  PREFIX = crypt_urandom_
+@@ -43,6 +44,14 @@
+         }
+         Newx(data, length + 1u, char);
+       GETRANDOM:
++#ifdef HAVE_CRYPT_URANDOM_WASI
++        if (__wasi_random_get((uint8_t *)data, (size_t)length) == 0) {
++            result = length;
++        } else {
++            errno = EIO;
++            result = -1;
++        }
++#else
+ #ifdef HAVE_CRYPT_URANDOM_NATIVE_GETRANDOM
+         result = getrandom(data, length, GRND_NONBLOCK);
+ #else
+@@ -67,6 +76,7 @@
+ #endif
+ #endif
+ #endif
++#endif
+         if (result != length) {
+             if (errno == EINTR) {
+                 goto GETRANDOM;

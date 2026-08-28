@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-PERL_VERSION="${PERL_VERSION:-5.42.0}"
+PERL_VERSION="${PERL_VERSION:-5.44.0}"
 URLPERL="https://www.cpan.org/src/5.0/perl-${PERL_VERSION}.tar.gz"
 NATIVE_DIR="${NATIVE_DIR:-/build/native}"
 NPROC="${NPROC:-$(nproc)}"
@@ -26,3 +26,7 @@ make install
 export PATH="$NATIVE_DIR/prefix/bin:$PATH"
 echo "yes" | cpan App::cpanminus
 cpanm Perl::Tidy
+
+if [ "${1:-}" = "cpanfile" ]; then
+    cpanm --installdeps --notest "$REPO_DIR"
+fi

@@ -45,31 +45,37 @@ RUN mkdir -p /zeroperl && chmod 777 /zeroperl
 
 FROM base AS native-perl
 
-ARG PERL_VERSION=5.42.0
+ARG PERL_VERSION=5.44.0
 ARG EXIFTOOL_VERSION=13.42
 ARG BUILD_EXIFTOOL=true
+ARG BUILD_CPANFILE=true
 
 ENV PERL_VERSION=${PERL_VERSION} \
     EXIFTOOL_VERSION=${EXIFTOOL_VERSION} \
     BUILD_EXIFTOOL=${BUILD_EXIFTOOL} \
+    BUILD_CPANFILE=${BUILD_CPANFILE} \
     NATIVE_DIR=/build/native \
     REPO_DIR=/build/repo
 
+COPY cpanfile /build/repo/
 COPY pipeline/build-native-perl.sh pipeline/build-exiftool.sh /build/repo/pipeline/
 RUN chmod +x /build/repo/pipeline/*.sh
 
 RUN /build/repo/pipeline/build-native-perl.sh
+RUN if [ "${BUILD_CPANFILE}" = "true" ]; then /build/repo/pipeline/build-native-perl.sh cpanfile; fi
 RUN [ "${BUILD_EXIFTOOL}" = "true" ] && /build/repo/pipeline/build-exiftool.sh || true
 
 
 FROM native-perl AS wasi-perl
 
-ARG PERL_VERSION=5.42.0
+ARG PERL_VERSION=5.44.0
 ARG BUILD_EXIFTOOL=true
+ARG BUILD_CPANFILE=true
 ARG TRIM=true
 
 ENV PERL_VERSION=${PERL_VERSION} \
     BUILD_EXIFTOOL=${BUILD_EXIFTOOL} \
+    BUILD_CPANFILE=${BUILD_CPANFILE} \
     TRIM=${TRIM} \
     WASM_DIR=/build/wasm
 
@@ -86,6 +92,8 @@ RUN mv /opt/binaryen/bin/wasm-opt /opt/binaryen/bin/wasm-opt-real && \
     /build/repo/pipeline/build-wasi-perl.sh && \
     mv /opt/binaryen/bin/wasm-opt-real /opt/binaryen/bin/wasm-opt
 
+RUN if [ "${BUILD_CPANFILE}" = "true" ]; then /build/repo/pipeline/build-wasi-cpan-xs.sh; fi
+
 RUN /build/repo/pipeline/prepare-prefix.sh
 
 
@@ -94,11 +102,13 @@ FROM wasi-perl AS final
 ARG STACK_SIZE=8388608
 ARG INITIAL_MEMORY=33554432
 ARG ASYNCIFY=true
+ARG BUILD_CPANFILE=true
 ARG WASM_OPT_FLAGS=""
 
 ENV STACK_SIZE=${STACK_SIZE} \
     INITIAL_MEMORY=${INITIAL_MEMORY} \
     ASYNCIFY=${ASYNCIFY} \
+    BUILD_CPANFILE=${BUILD_CPANFILE} \
     WASM_OPT_FLAGS=${WASM_OPT_FLAGS}
 
 COPY stubs/ /build/repo/stubs/

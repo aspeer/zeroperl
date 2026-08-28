@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-PERL_VERSION="${PERL_VERSION:-5.42.0}"
+PERL_VERSION="${PERL_VERSION:-5.44.0}"
 BUILD_EXIFTOOL="${BUILD_EXIFTOOL:-true}"
 TRIM="${TRIM:-true}"
 NATIVE_DIR="${NATIVE_DIR:-/build/native}"
@@ -9,6 +9,22 @@ REPO_DIR="${REPO_DIR:-/build/repo}"
 NPROC="${NPROC:-$(nproc)}"
 
 rm -rf /zeroperl/bin
+
+if [ "${BUILD_CPANFILE:-true}" = "true" ]; then
+    SITE_PERL="$NATIVE_DIR/prefix/lib/perl5/site_perl/$PERL_VERSION"
+    mkdir -p "/zeroperl/lib/$PERL_VERSION/wasm32-wasi"
+    cp -R "$SITE_PERL"/* "/zeroperl/lib/$PERL_VERSION/wasm32-wasi/"
+    for archdir in "$SITE_PERL"/*-*; do
+        [ -d "$archdir" ] || continue
+        cp -R "$archdir"/. "/zeroperl/lib/$PERL_VERSION/wasm32-wasi/"
+    done
+fi
+
+# The complete core POSIX extension is excluded for WASI, but zeroperl
+# provides its commonly used strftime entry point as a built-in XS function.
+install -Dm 644 "$REPO_DIR/stubs/POSIX.pm" \
+    "/zeroperl/lib/$PERL_VERSION/wasm32-wasi/POSIX.pm"
+
 find /zeroperl -type f \( -name "*.so" -o -name "*.a" -o -name "*.ld" -o -name "*.pod" -o -name "*.h" -o -executable \) -delete
 
 if [ "$BUILD_EXIFTOOL" = "true" ]; then
@@ -31,4 +47,3 @@ fi
 
 mkdir -p "$REPO_DIR/gen"
 node "$REPO_DIR/tools/sfs.js" -i /zeroperl -o "$REPO_DIR/gen/zeroperl.h" --prefix /zeroperl
-

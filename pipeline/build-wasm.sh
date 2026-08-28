@@ -7,8 +7,23 @@ REPO_DIR="${REPO_DIR:-/build/repo}"
 STACK_SIZE="${STACK_SIZE:-8388608}"
 INITIAL_MEMORY="${INITIAL_MEMORY:-33554432}"
 ASYNCIFY="${ASYNCIFY:-true}"
+BUILD_CPANFILE="${BUILD_CPANFILE:-true}"
 
 export PATH="$REPO_DIR/wasi-bin:$PATH"
+
+CPAN_XS_LIBS=""
+if [ "$BUILD_CPANFILE" = "true" ]; then
+    CPAN_XS_LIBS="
+    lib/auto/HTML/Parser/Parser.a
+    lib/auto/Clone/Clone.a
+    lib/auto/Cpanel/JSON/XS/XS.a
+    lib/auto/Crypt/URandom/URandom.a"
+    CPAN_XS_LIBS="$CPAN_XS_LIBS
+    lib/auto/XS/Parse/Sublike/Sublike.a
+    lib/auto/XS/Parse/Keyword/Keyword.a
+    lib/auto/Future/XS/XS.a
+    lib/auto/Future/AsyncAwait/AsyncAwait.a"
+fi
 
 # Use fake wasm-opt during compile/link to prevent post-link optimization
 mv /opt/binaryen/bin/wasm-opt /opt/binaryen/bin/wasm-opt-real
@@ -68,6 +83,7 @@ wasic \
     -Wl,--whole-archive libperl.a -Wl,--no-whole-archive \
     -Wl,--wrap=fopen -Wl,--wrap=open -Wl,--wrap=close -Wl,--wrap=read \
     -Wl,--wrap=lseek -Wl,--wrap=stat -Wl,--wrap=fstat \
+    lib/auto/mro/mro.a \
     lib/auto/File/Glob/Glob.a \
     lib/auto/Sys/Hostname/Hostname.a \
     lib/auto/PerlIO/via/via.a \
@@ -103,7 +119,11 @@ wasic \
     lib/auto/List/Util/Util.a \
     lib/auto/Fcntl/Fcntl.a \
     lib/auto/Opcode/Opcode.a \
+    lib/auto/B/B.a \
+    lib/auto/Socket/Socket.a \
     lib/auto/Time/HiRes/HiRes.a \
+    lib/auto/Storable/Storable.a \
+    $CPAN_XS_LIBS \
     $(cat ext.libs) \
     -lz -lbz2 \
     -lm -lwasi-emulated-signal -lwasi-emulated-getpid \

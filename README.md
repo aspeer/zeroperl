@@ -30,12 +30,12 @@ Output in `./output/`:
 
 **Docker:**
 ```bash
-docker build --build-arg PERL_VERSION=5.42.0 --build-arg BUILD_EXIFTOOL=false -t zeroperl .
+docker build --build-arg PERL_VERSION=5.44.0 --build-arg BUILD_EXIFTOOL=false -t zeroperl .
 ```
 
 **Apple Container:**
 ```bash
-container build --build-arg PERL_VERSION=5.42.0 --build-arg BUILD_EXIFTOOL=false -t zeroperl .
+container build --build-arg PERL_VERSION=5.44.0 --build-arg BUILD_EXIFTOOL=false -t zeroperl .
 ```
 
 <details>
@@ -43,9 +43,10 @@ container build --build-arg PERL_VERSION=5.42.0 --build-arg BUILD_EXIFTOOL=false
 
 | Arg | Default | |
 |-----|---------|--|
-| `PERL_VERSION` | `5.42.0` | Perl source version |
+| `PERL_VERSION` | `5.44.0` | Perl source version |
 | `EXIFTOOL_VERSION` | `13.42` | ExifTool version |
 | `BUILD_EXIFTOOL` | `true` | Include ExifTool |
+| `BUILD_CPANFILE` | `true` | Install cpanfile modules and compile their XS dependencies |
 | `STACK_SIZE` | `8388608` | WASM stack (bytes) |
 | `INITIAL_MEMORY` | `33554432` | WASM initial memory (bytes) |
 | `ASYNCIFY` | `true` | Enable asyncify |

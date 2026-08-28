@@ -1,0 +1,20 @@
+--- a/cpan/Socket/Socket.xs
++++ b/cpan/Socket/Socket.xs
+@@ -858,7 +858,7 @@ pack_sockaddr_un(pathname)
+ 	SV *	pathname
+     CODE:
+     {
+-#if defined(I_SYS_UN) || defined(WIN32)
++#if (defined(I_SYS_UN) || defined(WIN32)) && !defined(__wasi__)
+         struct sockaddr_un sun_ad; /* fear using sun */
+         STRLEN len;
+         char * pathname_pv;
+@@ -927,7 +927,7 @@ unpack_sockaddr_un(sun_sv)
+ 	SV *	sun_sv
+     CODE:
+     {
+-#if defined(I_SYS_UN) || defined(WIN32)
++#if (defined(I_SYS_UN) || defined(WIN32)) && !defined(__wasi__)
+         struct sockaddr_un addr;
+         STRLEN sockaddrlen;
+         char * sun_ad;

@@ -2206,6 +2206,7 @@ void zeroperl_result_free(zeroperl_result *result) {
 }
 
 EXTERN_C void boot_DynaLoader(pTHX_ CV *cv);
+EXTERN_C void boot_mro(pTHX_ CV *cv);
 EXTERN_C void boot_File__Glob(pTHX_ CV *cv);
 EXTERN_C void boot_Sys__Hostname(pTHX_ CV *cv);
 EXTERN_C void boot_PerlIO__via(pTHX_ CV *cv);
@@ -2241,7 +2242,41 @@ EXTERN_C void boot_Cwd(pTHX_ CV *cv);
 EXTERN_C void boot_List__Util(pTHX_ CV *cv);
 EXTERN_C void boot_Fcntl(pTHX_ CV *cv);
 EXTERN_C void boot_Opcode(pTHX_ CV *cv);
+EXTERN_C void boot_B(pTHX_ CV *cv);
+EXTERN_C void boot_Socket(pTHX_ CV *cv);
 EXTERN_C void boot_Time__HiRes(pTHX_ CV* cv);
+EXTERN_C void boot_Storable(pTHX_ CV *cv);
+EXTERN_C void boot_HTML__Parser(pTHX_ CV *cv);
+EXTERN_C void boot_Clone(pTHX_ CV *cv);
+EXTERN_C void boot_Cpanel__JSON__XS(pTHX_ CV *cv);
+EXTERN_C void boot_Crypt__URandom(pTHX_ CV *cv);
+EXTERN_C void boot_XS__Parse__Sublike(pTHX_ CV *cv);
+EXTERN_C void boot_XS__Parse__Keyword(pTHX_ CV *cv);
+EXTERN_C void boot_Future__XS(pTHX_ CV *cv);
+EXTERN_C void boot_Future__AsyncAwait(pTHX_ CV *cv);
+
+/* A deliberately small compatibility surface for applications that use
+ * POSIX::strftime.  This is the same Perl core helper used by ext/POSIX, but
+ * avoids bundling the rest of that WASI-incompatible extension. */
+static XS(xs_POSIX_strftime) {
+  dXSARGS;
+
+  if (items < 7 || items > 10) {
+    croak_xs_usage(cv,
+                   "fmt, sec, min, hour, mday, mon, year, wday = -1, "
+                   "yday = -1, isdst = 0");
+  }
+
+  SV *formatted = sv_strftime_ints(
+      ST(0), (int)SvIV(ST(1)), (int)SvIV(ST(2)), (int)SvIV(ST(3)),
+      (int)SvIV(ST(4)), (int)SvIV(ST(5)), (int)SvIV(ST(6)),
+      -(int)abs(items > 9 ? (int)SvIV(ST(9)) : 0));
+
+  /* POSIX::strftime returns an empty string for both an invalid format and
+   * an empty result, rather than exposing the helper's NULL failure value. */
+  ST(0) = formatted ? sv_2mortal(formatted) : sv_2mortal(newSVpvs(""));
+  XSRETURN(1);
+}
 
 static void xs_init(pTHX) {
   static const char file[] = __FILE__;
@@ -2249,6 +2284,7 @@ static void xs_init(pTHX) {
   PERL_UNUSED_CONTEXT;
 
   newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file);
+  newXS("mro::bootstrap", boot_mro, file);
   newXS("File::Glob::bootstrap", boot_File__Glob, file);
   newXS("Sys::Hostname::bootstrap", boot_Sys__Hostname, file);
   newXS("PerlIO::via::bootstrap", boot_PerlIO__via, file);
@@ -2284,5 +2320,17 @@ static void xs_init(pTHX) {
   newXS("List::Util::bootstrap", boot_List__Util, file);
   newXS("Fcntl::bootstrap", boot_Fcntl, file);
   newXS("Opcode::bootstrap", boot_Opcode, file);
+  newXS("B::bootstrap", boot_B, file);
+  newXS("Socket::bootstrap", boot_Socket, file);
+  newXS("POSIX::strftime", xs_POSIX_strftime, file);
   newXS("Time::HiRes::bootstrap", boot_Time__HiRes, file);
+  newXS("Storable::bootstrap", boot_Storable, file);
+  newXS("HTML::Parser::bootstrap", boot_HTML__Parser, file);
+  newXS("Clone::bootstrap", boot_Clone, file);
+  newXS("Cpanel::JSON::XS::bootstrap", boot_Cpanel__JSON__XS, file);
+  newXS("Crypt::URandom::bootstrap", boot_Crypt__URandom, file);
+  newXS("XS::Parse::Sublike::bootstrap", boot_XS__Parse__Sublike, file);
+  newXS("XS::Parse::Keyword::bootstrap", boot_XS__Parse__Keyword, file);
+  newXS("Future::XS::bootstrap", boot_Future__XS, file);
+  newXS("Future::AsyncAwait::bootstrap", boot_Future__AsyncAwait, file);
 }
