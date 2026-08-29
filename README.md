@@ -2,6 +2,10 @@ zeroperl is an experimental build of Perl5 in a sandboxed, self-contained WebAss
 
 Read the full blog [here](https://andrews.substack.com/p/zeroperl-sandboxed-perl-with-webassembly)
 
+## Note
+
+This is a fork of zeroperl with modules included that support WebDyne::PAGI as a wasm target. This version bumps the original zeroperl to 5.44 and statically compiles several modules not included in the version. See [wasm-WebDyne-PAGI](https://github.com/aspeer/wasm-WebDyne-PAGI) for futher information
+
 ## Build
 
 Requires Docker or Apple Container (macOS).

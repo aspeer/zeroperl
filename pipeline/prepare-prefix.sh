@@ -40,7 +40,10 @@ node "$REPO_DIR/tools/delete.js" "$REPO_DIR/tools/delete.txt" /zeroperl "$PERL_V
 if [ "$TRIM" = "true" ]; then
     export PATH="$NATIVE_DIR/prefix/bin:$PATH"
     find /zeroperl -type f \( -name '*.pl' -o -name '*.pm' \) -exec chmod u+w {} \;
-    find /zeroperl -type f \( -name '*.pl' -o -name '*.pm' \) -print0 | \
+    # Opcode.pm consumes its POD-style __DATA__ section at runtime to define
+    # named opcode sets, so deleting POD would break its optag initialisation.
+    find /zeroperl -type f \( -name '*.pl' -o -name '*.pm' \) \
+        ! -path "/zeroperl/lib/$PERL_VERSION/wasm32-wasi/Opcode.pm" -print0 | \
         xargs -0 -P "$NPROC" -I {} sh -c \
         "perltidy --delete-block-comments --delete-side-comments --delete-pod --backup-and-modify-in-place --backup-file-extension='/' '{}'"
 fi
