@@ -17,5 +17,9 @@
 - Made ExifTool opt-in and excluded it from all standard WebDyne artifacts.
 - Verified the complete ExifTool-free matrix with core, static Socket, SFS,
   and async-disposal gates.
+- Restored generated `unicore/Heavy.pl` when present so Perl 5.18.4 and 5.24.4
+  can load version feature bundles used by Future::IO and WebDyne::PAGI.
+- Cross-compiled Scalar-List-Utils 1.70 for Perl 5.18.4 so WebDyne::PAGI's
+  required `Sub::Util` and the statically linked `List::Util` remain paired.
 - Rejected the 5.44 mini candidate after its compressed size increased by
   7.3%, despite a 16.1% raw-size reduction.

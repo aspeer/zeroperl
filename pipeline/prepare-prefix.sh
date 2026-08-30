@@ -11,7 +11,7 @@ PERL_VERSION="${PERL_VERSION:-5.44.0}"
 #   - Copy ExifTool site-lib files into the prefix (if built)
 #   - Strip binaries, .so, .a, .pod, and headers
 #   - Remove dead code via delete.js (tools/delete.txt manifest)
-#   - Restore unicore/Heavy.pl for Perl < 5.18 if needed
+#   - Restore generated unicore/Heavy.pl when the Perl release requires it
 #   - Install File::Glob shim if missing
 #   - Strip unicore tables for full-shrink builds
 #   - Run perltidy over all .pm/.pl files (optional TRIM step)
@@ -81,6 +81,21 @@ if [ "${BUILD_CPANFILE:-true}" = "true" ]; then
             copy_site_file "$src" "${src#"$archdir"/}"
         done
     done
+
+    PERL_MINOR=$(echo "$PERL_VERSION" | cut -d. -f2)
+    if [ "$PERL_MINOR" -lt 24 ]; then
+        # Scalar-List-Utils is deliberately cross-compiled after the core
+        # Perl build for 5.18. Override the old core Perl sources with the
+        # same 1.70 sources as the replacement static List::Util archive.
+        for rel in List/Util.pm List/Util/XS.pm Sub/Util.pm Scalar/List/Utils.pm; do
+            for site_root in "$SITE_PERL/$NATIVE_ARCH" "$SITE_PERL"; do
+                [ -f "$site_root/$rel" ] || continue
+                install -Dm 644 "$site_root/$rel" \
+                    "/zeroperl/lib/$PERL_VERSION/wasm32-wasi/$rel"
+                break
+            done
+        done
+    fi
 fi
 
 # The complete core POSIX extension is excluded for WASI, but zeroperl
@@ -130,19 +145,15 @@ fi
 
 node "$REPO_DIR/tools/delete.js" "$REPO_DIR/tools/delete.txt" /zeroperl "$PERL_VERSION"
 
-# unicore/Heavy.pl is required by utf8_heavy.pl -> constant.pm on Perl < 5.18.
-# delete.js removes the entire unicore directory, but Heavy.pl must be
-# restored for versions where it shipped in core.
-# Perl 5.18+ restructured unicore and no longer has Heavy.pl.
-PERL_MAJOR=$(echo "$PERL_VERSION" | cut -d. -f1)
-PERL_MINOR=$(echo "$PERL_VERSION" | cut -d. -f2)
-if [ "$PERL_MAJOR" -eq 5 ] && [ "$PERL_MINOR" -lt 18 ]; then
-    HEAVY_SRC="$WASM_DIR/lib/$PERL_VERSION/unicore/Heavy.pl"
-    if [ -f "$HEAVY_SRC" ]; then
-        mkdir -p "/zeroperl/lib/$PERL_VERSION/unicore"
-        cp "$HEAVY_SRC" "/zeroperl/lib/$PERL_VERSION/unicore/Heavy.pl"
-        echo "Restored unicore/Heavy.pl for Perl $PERL_VERSION"
-    fi
+# delete.js removes the complete generated unicore tree. Perl 5.18 and 5.24
+# still load its generated Heavy.pl when a version feature bundle enables
+# Unicode semantics; later releases do not generate this file. Use the build
+# output itself as the compatibility test instead of guessing a version range.
+HEAVY_SRC="$WASM_DIR/lib/unicore/Heavy.pl"
+if [ -f "$HEAVY_SRC" ]; then
+    mkdir -p "/zeroperl/lib/$PERL_VERSION/unicore"
+    cp "$HEAVY_SRC" "/zeroperl/lib/$PERL_VERSION/unicore/Heavy.pl"
+    echo "Restored unicore/Heavy.pl for Perl $PERL_VERSION"
 fi
 
 if [ -f "$REPO_DIR/tools/file-glob-shim.pm" ] && \

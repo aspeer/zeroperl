@@ -91,6 +91,15 @@ build_static "Clone-0.50" "Clone.a" "lib/auto/Clone/Clone.a"
 fetch "https://www.cpan.org/authors/id/R/RU/RURBAN/Cpanel-JSON-XS-4.43.tar.gz"
 build_static "Cpanel-JSON-XS-4.43" "XS.a" "lib/auto/Cpanel/JSON/XS/XS.a"
 
+# WebDyne::PAGI requires Sub::Util. Perl 5.18 predates it, so pairing a
+# current Sub::Util.pm from the dependency resolver with the old core
+# List::Util XS object produces a load-time version mismatch. Later supported
+# Perls already ship a mutually compatible List::Util/Sub::Util pair.
+if [ "$PERL_MINOR" -lt 24 ]; then
+    fetch "https://www.cpan.org/authors/id/P/PE/PEVANS/Scalar-List-Utils-1.70.tar.gz"
+    build_static "Scalar-List-Utils-1.70" "Util.a" "lib/auto/List/Util/Util.a"
+fi
+
 fetch "https://www.cpan.org/authors/id/D/DD/DDICK/Crypt-URandom-0.55.tar.gz"
 cd "$WORK/Crypt-URandom-0.55"
 patch -p1 < "$REPO_DIR/patches/crypt-urandom-wasi.patch"

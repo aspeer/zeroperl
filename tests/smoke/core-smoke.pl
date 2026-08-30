@@ -14,6 +14,17 @@ my @errors;
 
 print "perl version: $^V\n";
 
+# Older supported Perls load their generated unicore/Heavy.pl when a version
+# feature bundle is enabled. Future::IO uses this form, so the generated core
+# file is part of the WebDyne runtime contract even though most ASCII-only
+# module smoke checks do not reach it.
+eval {
+    require 'utf8_heavy.pl';
+    my $swash = utf8->SWASHNEW('Any', '', 1, 0);
+    die "utf8::SWASHNEW" unless $swash;
+    1;
+} or push @errors, "version feature bundle/unicore: $@";
+
 # ── Required core surface ───────────────────────────────────────────────────
 
 # Digest::MD5 (XS, core since 5.8)
@@ -31,6 +42,16 @@ eval {
     die "List::Util::sum" unless $sum == 15;
     1;
 } or push @errors, "List::Util: $@";
+
+# Sub::Util is required by WebDyne::PAGI and must be paired with the same
+# Scalar-List-Utils release as the statically linked List::Util object.
+eval {
+    require Sub::Util;
+    List::Util->VERSION($Sub::Util::VERSION);
+    my $code = Sub::Util::set_subname('ZeroPerl::smoke', sub { 1 });
+    die "Sub::Util::set_subname" unless $code->();
+    1;
+} or push @errors, "Sub::Util: $@";
 
 # Cwd (XS, core since 5.4)
 eval {
