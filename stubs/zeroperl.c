@@ -16,11 +16,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
+
+// Compatibility: av_top_index was added in 5.18, older Perl uses av_len
+#ifndef av_top_index
+#define av_top_index(av) av_len(av)
+#endif
 
 #define STRINGIZE_HELPER(x) #x
 #define STRINGIZE(x) STRINGIZE_HELPER(x)
 #include <wasi/api.h>
+
+#include "sfs_runtime.h"
 
 //! Export macro for public API functions - combines export_name for WASI with
 //! visibility attribute
@@ -68,6 +76,15 @@ static char zero_perl_error_buf[1024] = {0};
 //! Host error message buffer (stores last host error)
 static char host_error_buf[1024] = {0};
 
+#define ZEROPERL_EMBEDDED_LIB_PREFIX                                           \
+  "/zeroperl/lib/" STRINGIZE(PERL_REVISION) "." STRINGIZE(PERL_VERSION) "."    \
+      STRINGIZE(PERL_SUBVERSION)
+#define ZEROPERL_EMBEDDED_ARCH_LIB ZEROPERL_EMBEDDED_LIB_PREFIX "/wasm32-wasi"
+
+#ifndef ZEROPERL_PERL5LIB_MAX
+#define ZEROPERL_PERL5LIB_MAX 4096
+#endif
+
 //! Environment variables
 extern char **environ;
 
@@ -84,277 +101,42 @@ extern int __real_stat(const char *restrict path,
                        struct stat *restrict statbuf);
 extern int __real_fstat(int fd, struct stat *statbuf);
 
-//! Maximum number of file descriptors to track
-#ifndef FD_MAX_TRACK
-#define FD_MAX_TRACK 32
-#endif
+static SfsRuntime sfs_runtime;
+static bool sfs_runtime_initialized = false;
 
-//! Maximum number of open SFS (Simple File System) files
-#ifndef SFS_MAX_OPEN_FILES
-#define SFS_MAX_OPEN_FILES 16
-#endif
-
-//! Tracks which file descriptors are in use
-static bool g_fd_in_use[FD_MAX_TRACK] = {false};
-
-//! Marks a file descriptor as in use (not thread-safe)
-static inline void fd_mark_in_use(int fd) {
-  if (fd >= 0 && fd < FD_MAX_TRACK) {
-    g_fd_in_use[fd] = true;
+static inline void sfs_runtime_ensure_initialized(void) {
+  if (!sfs_runtime_initialized) {
+    sfs_runtime_init(&sfs_runtime, SFS_BUILTIN_PREFIX);
+    sfs_runtime_initialized = true;
   }
 }
 
-//! Marks a file descriptor as free
-static inline void fd_mark_free(int fd) {
-  if (fd >= 0 && fd < FD_MAX_TRACK) {
-    g_fd_in_use[fd] = false;
-  }
-}
-
-//! Checks if a file descriptor is in use
-//! Out-of-range FDs are treated as in use
-static inline bool fd_is_in_use(int fd) {
-  return (fd >= 0 && fd < FD_MAX_TRACK) ? g_fd_in_use[fd] : true;
-}
-
-//! SFS entry structure for tracking open virtual files
-//! Each slot tracks an integer FD, a FILE* (via fmemopen), file size, and a
-//! "used" flag
-typedef struct {
-  bool used;
-  int fd;
-  FILE *fp;
-  size_t size;
-} SFS_Entry;
-
-//! Table of open SFS files
-static SFS_Entry sfs_table[SFS_MAX_OPEN_FILES];
-
-//! Starting FD offset for SFS (skips standard FDs 0-2)
-static int sfs_fd_start = 3;
-
-//! Result codes for SFS operations
-typedef enum { SFS_OK = 0, SFS_ERR = -1, SFS_NOT_OURS = -2 } SFS_Result;
-
-//! Result codes for stat calls
-typedef enum {
-  SFS_STAT_ERR = -1,    // SFS path but not found/error
-  SFS_STAT_OURS = 0,    // We handled it
-  SFS_STAT_NOT_OURS = 1 // Not an SFS path, use fallback
-} SFS_Stat_Result;
-
-//! Removes consecutive duplicate '/' from a path for canonicalization
-static void sfs_sanitize_path(char *dst, size_t dstsize, const char *src) {
-  size_t j = 0, limit = (dstsize > 0) ? (dstsize - 1) : 0;
-  for (size_t i = 0; src[i] != '\0' && j < limit; i++) {
-    if (i > 0 && src[i] == '/' && src[i - 1] == '/') {
-      continue;
-    }
-    dst[j++] = src[i];
-  }
-  if (dstsize > 0) {
-    dst[j] = '\0';
-  }
-}
-
-//! Checks if a path begins with SFS_BUILTIN_PREFIX
-static inline bool sfs_has_prefix(const char *path) {
-  size_t len = strlen(SFS_BUILTIN_PREFIX);
-  return (strncmp(path, SFS_BUILTIN_PREFIX, len) == 0);
-}
-
-//! Looks up a path in the SFS and returns its data if found
-//! Path is always sanitized before comparison
-static bool sfs_lookup_path(const char *path, const unsigned char **found_start,
-                            size_t *found_size) {
-  if (!sfs_has_prefix(path)) {
-    return false;
-  }
-
-  char sanitized[256];
-  sfs_sanitize_path(sanitized, sizeof(sanitized), path);
-
-  for (size_t i = 0; i < sfs_builtin_files_num; i++) {
-    if (strcmp(sanitized, sfs_entries[i].abspath) == 0) {
-      *found_start = sfs_entries[i].start;
-      *found_size = (size_t)(sfs_entries[i].end - sfs_entries[i].start);
-      return true;
-    }
-  }
-  return false;
-}
-
-//! Finds the next free descriptor in [sfs_fd_start..FD_MAX_TRACK-1]
-//! Forcibly exits if no free FDs are available
-static int sfs_allocate_fd(void) {
-  for (int fd = sfs_fd_start; fd < FD_MAX_TRACK; fd++) {
-    if (!fd_is_in_use(fd)) {
-      fd_mark_in_use(fd);
-      return fd;
-    }
-  }
-  __wasi_proc_exit(10);
-  return -1;
-}
-
-//! Finds an SFS table entry by file descriptor
-static SFS_Entry *sfs_find_by_fd(int fd) {
-  for (int i = 0; i < SFS_MAX_OPEN_FILES; i++) {
-    if (sfs_table[i].used && sfs_table[i].fd == fd) {
-      return &sfs_table[i];
-    }
-  }
-  return NULL;
-}
-
-//! Opens a path from SFS using fmemopen and allocates an FD
-static int sfs_open(const char *path, FILE **outfp) {
-  const unsigned char *start = NULL;
-  size_t size = 0;
-
-  if (!sfs_lookup_path(path, &start, &size)) {
-    errno = ENOENT;
-    if (outfp)
-      *outfp = NULL;
-    return -1;
-  }
-
-  FILE *fp = fmemopen((void *)start, size, "rb");
-  if (!fp) {
-    if (outfp)
-      *outfp = NULL;
-    return -1;
-  }
-
-  for (int i = 0; i < SFS_MAX_OPEN_FILES; i++) {
-    if (!sfs_table[i].used) {
-      int newfd = sfs_allocate_fd();
-      sfs_table[i].used = true;
-      sfs_table[i].fd = newfd;
-      sfs_table[i].fp = fp;
-      sfs_table[i].size = size;
-      if (outfp)
-        *outfp = fp;
-      return newfd;
-    }
-  }
-
-  fclose(fp);
-  errno = EMFILE;
-  if (outfp)
-    *outfp = NULL;
-  return -1;
-}
-
-//! Closes an SFS file descriptor and frees its slot
-static SFS_Result sfs_close(int fd) {
-  SFS_Entry *e = sfs_find_by_fd(fd);
-  if (!e) {
-    return SFS_NOT_OURS;
-  }
-  if (!e->fp) {
-    return SFS_ERR;
-  }
-
-  fclose(e->fp);
-  e->fp = NULL;
-  fd_mark_free(e->fd);
-  e->used = false;
-  e->fd = -1;
-  e->size = 0;
-  return SFS_OK;
-}
-
-//! Reads from in-memory data if FD is ours, returns -1 if not
-__attribute__((noinline)) static ssize_t sfs_read(int fd, void *buf,
-                                                  size_t count) {
-  SFS_Entry *e = sfs_find_by_fd(fd);
-  if (!e || !e->fp) {
-    return -1;
-  }
-  return (ssize_t)fread(buf, 1, count, e->fp);
-}
-
-//! Performs fseek/ftell if FD is ours
-static off_t sfs_lseek(int fd, off_t offset, int whence) {
-  SFS_Entry *e = sfs_find_by_fd(fd);
-  if (!e || !e->fp) {
-    return (off_t)-1;
-  }
-  if (fseek(e->fp, (long)offset, whence) != 0) {
-    return (off_t)-1;
-  }
-  long pos = ftell(e->fp);
-  if (pos < 0) {
-    return (off_t)-1;
-  }
-  return (off_t)pos;
-}
-
-//! Checks if a path exists in SFS - no fallback if path has our prefix
-static int sfs_access(const char *path) {
-  const unsigned char *start = NULL;
-  size_t size = 0;
-  if (sfs_lookup_path(path, &start, &size)) {
-    return 0;
-  }
-  errno = ENOENT;
-  return -1;
-}
-
-//! Path-based or FD-based stat operation
-//! If path != NULL: path-based. If path == NULL: FD-based
-static SFS_Stat_Result sfs_stat(const char *path, int fd, struct stat *stbuf) {
-  if (path) {
-    if (sfs_has_prefix(path)) {
-      const unsigned char *start = NULL;
-      size_t size = 0;
-      if (!sfs_lookup_path(path, &start, &size)) {
-        errno = ENOENT;
-        return SFS_STAT_ERR;
-      }
-      memset(stbuf, 0, sizeof(*stbuf));
-      stbuf->st_size = (off_t)size;
-      stbuf->st_mode = S_IFREG;
-      return SFS_STAT_OURS;
-    }
-    return SFS_STAT_NOT_OURS;
-  } else {
-    SFS_Entry *e = sfs_find_by_fd(fd);
-    if (!e) {
-      return SFS_STAT_NOT_OURS;
-    }
-    memset(stbuf, 0, sizeof(*stbuf));
-    stbuf->st_size = (off_t)e->size;
-    stbuf->st_mode = S_IFREG;
-    return SFS_STAT_OURS;
-  }
-}
 
 //! Wrapper for fopen: tries SFS first, then falls back to real fopen
 __attribute__((noinline)) FILE *__wrap_fopen(const char *path,
                                              const char *mode) {
-  if (sfs_has_prefix(path)) {
+  sfs_runtime_ensure_initialized();
+  if (sfs_runtime_has_prefix(&sfs_runtime, path)) {
     FILE *fp = NULL;
-    int sfd = sfs_open(path, &fp);
+    int sfd = sfs_runtime_open(&sfs_runtime, sfs_entries, sfs_builtin_files_num,
+                               path, &fp);
     if (sfd >= 0) {
       return fp;
     }
-    return NULL;
+    /* SFS doesn't have this file; fall through to real filesystem. */
   }
 
   FILE *realfp = __real_fopen(path, mode);
   if (realfp) {
     int realfd = fileno(realfp);
-    if (realfd >= 0 && realfd < FD_MAX_TRACK) {
-      fd_mark_in_use(realfd);
-    }
+    sfs_runtime_mark_fd_in_use(&sfs_runtime, realfd);
   }
   return realfp;
 }
 
 //! Wrapper for open: tries SFS first, then falls back to real open
 __attribute__((noinline)) int __wrap_open(const char *path, int flags, ...) {
+  sfs_runtime_ensure_initialized();
   va_list args;
   va_start(args, flags);
   int mode = 0;
@@ -363,31 +145,29 @@ __attribute__((noinline)) int __wrap_open(const char *path, int flags, ...) {
   }
   va_end(args);
 
-  if (sfs_has_prefix(path)) {
-    int sfd = sfs_open(path, NULL);
+  if (sfs_runtime_has_prefix(&sfs_runtime, path)) {
+    int sfd = sfs_runtime_open(&sfs_runtime, sfs_entries, sfs_builtin_files_num,
+                               path, NULL);
     if (sfd >= 0) {
       return sfd;
     }
-    return -1;
+    /* SFS doesn't have this file; fall through to real filesystem. */
   }
 
   int realfd = __real_open(path, flags, mode);
-  if (realfd >= 0 && realfd < FD_MAX_TRACK) {
-    fd_mark_in_use(realfd);
-  }
+  sfs_runtime_mark_fd_in_use(&sfs_runtime, realfd);
   return realfd;
 }
 
 //! Wrapper for close: tries SFS first, then falls back to real close
 __attribute__((noinline)) int __wrap_close(int fd) {
-  SFS_Result rc = sfs_close(fd);
+  sfs_runtime_ensure_initialized();
+  SFS_Result rc = sfs_runtime_close(&sfs_runtime, fd);
   if (rc == SFS_OK) {
     return 0;
   }
   if (rc == SFS_NOT_OURS) {
-    if (fd >= 0 && fd < FD_MAX_TRACK) {
-      fd_mark_free(fd);
-    }
+    sfs_runtime_mark_fd_free(&sfs_runtime, fd);
     return __real_close(fd);
   }
   return (int)rc;
@@ -395,8 +175,14 @@ __attribute__((noinline)) int __wrap_close(int fd) {
 
 //! Wrapper for access: tries SFS first, then falls back to real access
 __attribute__((noinline)) int __wrap_access(const char *path, int amode) {
-  if (sfs_has_prefix(path)) {
-    return sfs_access(path);
+  sfs_runtime_ensure_initialized();
+  if (sfs_runtime_has_prefix(&sfs_runtime, path)) {
+    int rc = sfs_runtime_access(&sfs_runtime, sfs_entries, sfs_builtin_files_num,
+                                path);
+    if (rc == 0) {
+      return 0;
+    }
+    /* SFS doesn't have this path; fall through to real filesystem. */
   }
   return __real_access(path, amode);
 }
@@ -404,31 +190,32 @@ __attribute__((noinline)) int __wrap_access(const char *path, int amode) {
 //! Wrapper for stat: tries SFS first, then falls back to real stat
 __attribute__((noinline)) int __wrap_stat(const char *restrict path,
                                           struct stat *restrict stbuf) {
-  SFS_Stat_Result rc = sfs_stat(path, -1, stbuf);
+  sfs_runtime_ensure_initialized();
+  SFS_Stat_Result rc = sfs_runtime_stat(&sfs_runtime, sfs_entries,
+                                        sfs_builtin_files_num, path, -1, stbuf);
   if (rc == SFS_STAT_OURS) {
     return 0;
   }
-  if (rc == SFS_STAT_ERR) {
-    return -1;
-  }
+  /* SFS_STAT_ERR: path has SFS prefix but file not in SFS; fall through. */
   return __real_stat(path, stbuf);
 }
 
 //! Wrapper for fstat: tries SFS first, then falls back to real fstat
 __attribute__((noinline)) int __wrap_fstat(int fd, struct stat *stbuf) {
-  SFS_Stat_Result rc = sfs_stat(NULL, fd, stbuf);
+  sfs_runtime_ensure_initialized();
+  SFS_Stat_Result rc = sfs_runtime_stat(&sfs_runtime, sfs_entries,
+                                        sfs_builtin_files_num, NULL, fd, stbuf);
   if (rc == SFS_STAT_OURS) {
     return 0;
   }
-  if (rc == SFS_STAT_ERR) {
-    return -1;
-  }
+  /* SFS_STAT_ERR or SFS_STAT_NOT_OURS: fall through to real fstat. */
   return __real_fstat(fd, stbuf);
 }
 
 //! Wrapper for read: tries SFS first, then falls back to real read
 __attribute__((noinline)) ssize_t __wrap_read(int fd, void *buf, size_t count) {
-  ssize_t r = sfs_read(fd, buf, count);
+  sfs_runtime_ensure_initialized();
+  ssize_t r = sfs_runtime_read(&sfs_runtime, fd, buf, count);
   if (r >= 0) {
     return r;
   }
@@ -437,7 +224,8 @@ __attribute__((noinline)) ssize_t __wrap_read(int fd, void *buf, size_t count) {
 
 //! Wrapper for lseek: tries SFS first, then falls back to real lseek
 __attribute__((noinline)) off_t __wrap_lseek(int fd, off_t offset, int whence) {
-  off_t pos = sfs_lseek(fd, offset, whence);
+  sfs_runtime_ensure_initialized();
+  off_t pos = sfs_runtime_lseek(&sfs_runtime, fd, offset, whence);
   if (pos >= 0) {
     return pos;
   }
@@ -446,16 +234,14 @@ __attribute__((noinline)) off_t __wrap_lseek(int fd, off_t offset, int whence) {
 
 //! Wrapper for fileno: checks SFS first, then falls back to real fileno
 __attribute__((noinline)) int __wrap_fileno(FILE *stream) {
-  for (int i = 0; i < SFS_MAX_OPEN_FILES; i++) {
-    if (sfs_table[i].used && sfs_table[i].fp == stream) {
-      return sfs_table[i].fd;
-    }
+  sfs_runtime_ensure_initialized();
+  int sfsfd = sfs_runtime_fileno(&sfs_runtime, stream);
+  if (sfsfd >= 0) {
+    return sfsfd;
   }
 
   int realfd = __real_fileno(stream);
-  if (realfd >= 0 && realfd < FD_MAX_TRACK) {
-    fd_mark_in_use(realfd);
-  }
+  sfs_runtime_mark_fd_in_use(&sfs_runtime, realfd);
   return realfd;
 }
 
@@ -550,6 +336,26 @@ typedef struct {
   } data;
 } zeroperl_context;
 
+typedef enum {
+  ZEROPERL_RELEASE_VALUE_DECREF,
+  ZEROPERL_RELEASE_VALUE_FREE,
+  ZEROPERL_RELEASE_ARRAY_CLEAR,
+  ZEROPERL_RELEASE_ARRAY_FREE,
+  ZEROPERL_RELEASE_HASH_DELETE,
+  ZEROPERL_RELEASE_HASH_CLEAR,
+  ZEROPERL_RELEASE_HASH_FREE,
+  ZEROPERL_RELEASE_RESULT_FREE,
+  ZEROPERL_RELEASE_INTERPRETER_FREE,
+  ZEROPERL_RELEASE_SHUTDOWN
+} zeroperl_release_type;
+
+typedef struct {
+  zeroperl_release_type type;
+  void *target;
+  const char *key;
+  int result;
+} zeroperl_release_context;
+
 //! Host-implemented function for calling back into the host environment
 ZEROPERL_IMPORT("call_host_function")
 zeroperl_value *host_call_function(int32_t func_id, int32_t argc,
@@ -613,6 +419,102 @@ const char *zeroperl_get_host_error(void) { return host_error_buf; }
 ZEROPERL_API("zeroperl_clear_host_error")
 void zeroperl_clear_host_error(void) { host_error_buf[0] = '\0'; }
 
+static bool zeroperl_env_list_contains_path(const char *list, const char *path) {
+  if (!list || !path || path[0] == '\0') {
+    return false;
+  }
+
+  size_t path_len = strlen(path);
+  const char *segment = list;
+  while (*segment != '\0') {
+    const char *end = strchr(segment, ':');
+    size_t len = end ? (size_t)(end - segment) : strlen(segment);
+    if (len == path_len && strncmp(segment, path, path_len) == 0) {
+      return true;
+    }
+    if (!end) {
+      break;
+    }
+    segment = end + 1;
+  }
+
+  return false;
+}
+
+static int zeroperl_append_env_segment(char *dst, size_t dst_size, size_t *used,
+                                       const char *segment) {
+  if (!segment || segment[0] == '\0') {
+    return 0;
+  }
+
+  size_t segment_len = strlen(segment);
+  size_t required = *used + segment_len + 1;
+  if (*used > 0) {
+    required++;
+  }
+  if (required > dst_size) {
+    errno = ENAMETOOLONG;
+    return -1;
+  }
+
+  if (*used > 0) {
+    dst[*used] = ':';
+    (*used)++;
+  }
+  memcpy(dst + *used, segment, segment_len + 1);
+  *used += segment_len;
+  return 0;
+}
+
+static int zeroperl_prepare_embedded_perl5lib(void) {
+  const char *existing = getenv("PERL5LIB");
+  bool has_arch = zeroperl_env_list_contains_path(existing,
+                                                  ZEROPERL_EMBEDDED_ARCH_LIB);
+  bool has_lib = zeroperl_env_list_contains_path(existing,
+                                                 ZEROPERL_EMBEDDED_LIB_PREFIX);
+  if (has_arch && has_lib) {
+    return 0;
+  }
+
+  char combined[ZEROPERL_PERL5LIB_MAX];
+  size_t used = 0;
+  combined[0] = '\0';
+
+  // Native Perl precedence: existing PERL5LIB comes first, followed by the
+  // embedded arch/lib paths.  This ensures user-supplied directories are
+  // searched before the bundled libraries.
+  if (existing && existing[0] != '\0' &&
+      zeroperl_append_env_segment(combined, sizeof(combined), &used, existing) !=
+          0) {
+    snprintf(zero_perl_error_buf, sizeof(zero_perl_error_buf),
+             "combined PERL5LIB exceeds %d bytes", ZEROPERL_PERL5LIB_MAX);
+    return -1;
+  }
+  if (!has_arch &&
+      zeroperl_append_env_segment(combined, sizeof(combined), &used,
+                                  ZEROPERL_EMBEDDED_ARCH_LIB) != 0) {
+    snprintf(zero_perl_error_buf, sizeof(zero_perl_error_buf),
+             "embedded PERL5LIB entry too long: %s", ZEROPERL_EMBEDDED_ARCH_LIB);
+    return -1;
+  }
+  if (!has_lib &&
+      zeroperl_append_env_segment(combined, sizeof(combined), &used,
+                                  ZEROPERL_EMBEDDED_LIB_PREFIX) != 0) {
+    snprintf(zero_perl_error_buf, sizeof(zero_perl_error_buf),
+             "embedded PERL5LIB entry too long: %s",
+             ZEROPERL_EMBEDDED_LIB_PREFIX);
+    return -1;
+  }
+
+  if (setenv("PERL5LIB", combined, 1) != 0) {
+    snprintf(zero_perl_error_buf, sizeof(zero_perl_error_buf),
+             "failed to set PERL5LIB: %s", strerror(errno));
+    return -1;
+  }
+
+  return 0;
+}
+
 //! XS callback that dispatches to host functions
 static XS(xs_host_dispatch) {
   dXSARGS;
@@ -666,9 +568,16 @@ static int zeroperl_init_callback(int argc, char **argv) {
   (void)argc;
   zeroperl_context *ctx = (zeroperl_context *)argv;
 
+  if (zeroperl_prepare_embedded_perl5lib() != 0) {
+    ctx->result = 1;
+    return 1;
+  }
+
   if (!zero_perl_system_initialized) {
     PERL_SYS_INIT3(&ctx->data.init.argc, &ctx->data.init.argv, &environ);
+#ifdef PERL_SYS_FPU_INIT
     PERL_SYS_FPU_INIT;
+#endif
     zero_perl_system_initialized = true;
   }
 
@@ -893,6 +802,11 @@ static int zeroperl_reset_callback(int argc, char **argv) {
     return -1;
   }
 
+  if (zeroperl_prepare_embedded_perl5lib() != 0) {
+    ctx->result = 1;
+    return 1;
+  }
+
   perl_destruct(zero_perl);
   perl_construct(zero_perl);
 
@@ -931,6 +845,127 @@ static int zeroperl_reset_callback(int argc, char **argv) {
   zero_perl_can_evaluate = true;
   ctx->result = 0;
   return 0;
+}
+
+/* Destructive Perl operations can invoke user DESTROY or tied magic. Run all
+ * such release paths under asyncjmp_rt_start so an asynchronous host callback
+ * can unwind and resume without corrupting the interpreter stack. */
+static int zeroperl_release_callback(int argc, char **argv) {
+  (void)argc;
+  zeroperl_release_context *ctx = (zeroperl_release_context *)argv;
+  ctx->result = 0;
+
+  switch (ctx->type) {
+  case ZEROPERL_RELEASE_VALUE_DECREF: {
+    zeroperl_value *val = (zeroperl_value *)ctx->target;
+    if (val && val->sv) {
+      dTHX;
+      SvREFCNT_dec(val->sv);
+    }
+    break;
+  }
+  case ZEROPERL_RELEASE_VALUE_FREE: {
+    zeroperl_value *val = (zeroperl_value *)ctx->target;
+    if (val) {
+      if (val->sv) {
+        dTHX;
+        SvREFCNT_dec(val->sv);
+        val->sv = NULL;
+      }
+      free(val);
+    }
+    break;
+  }
+  case ZEROPERL_RELEASE_ARRAY_CLEAR: {
+    zeroperl_array *arr = (zeroperl_array *)ctx->target;
+    if (arr && arr->av) {
+      dTHX;
+      av_clear(arr->av);
+    }
+    break;
+  }
+  case ZEROPERL_RELEASE_ARRAY_FREE: {
+    zeroperl_array *arr = (zeroperl_array *)ctx->target;
+    if (arr) {
+      if (arr->av) {
+        dTHX;
+        SvREFCNT_dec((SV *)arr->av);
+        arr->av = NULL;
+      }
+      free(arr);
+    }
+    break;
+  }
+  case ZEROPERL_RELEASE_HASH_DELETE: {
+    zeroperl_hash *hash = (zeroperl_hash *)ctx->target;
+    if (hash && hash->hv && ctx->key) {
+      dTHX;
+      const I32 key_length = (I32)strlen(ctx->key);
+      ctx->result = hv_exists(hash->hv, ctx->key, key_length) ? 1 : 0;
+      hv_delete(hash->hv, ctx->key, key_length, G_DISCARD);
+    }
+    break;
+  }
+  case ZEROPERL_RELEASE_HASH_CLEAR: {
+    zeroperl_hash *hash = (zeroperl_hash *)ctx->target;
+    if (hash && hash->hv) {
+      dTHX;
+      hv_clear(hash->hv);
+    }
+    break;
+  }
+  case ZEROPERL_RELEASE_HASH_FREE: {
+    zeroperl_hash *hash = (zeroperl_hash *)ctx->target;
+    if (hash) {
+      if (hash->hv) {
+        dTHX;
+        SvREFCNT_dec((SV *)hash->hv);
+        hash->hv = NULL;
+      }
+      free(hash);
+    }
+    break;
+  }
+  case ZEROPERL_RELEASE_RESULT_FREE: {
+    zeroperl_result *result = (zeroperl_result *)ctx->target;
+    if (result) {
+      if (result->values) {
+        for (int i = 0; i < result->count; i++) {
+          zeroperl_value *val = result->values[i];
+          if (val) {
+            if (val->sv) {
+              dTHX;
+              SvREFCNT_dec(val->sv);
+              val->sv = NULL;
+            }
+            free(val);
+          }
+        }
+        free(result->values);
+        result->values = NULL;
+      }
+      free(result);
+    }
+    break;
+  }
+  case ZEROPERL_RELEASE_INTERPRETER_FREE:
+  case ZEROPERL_RELEASE_SHUTDOWN: {
+    if (zero_perl) {
+      perl_destruct(zero_perl);
+      perl_free(zero_perl);
+      zero_perl = NULL;
+      zero_perl_can_evaluate = false;
+    }
+    if (ctx->type == ZEROPERL_RELEASE_SHUTDOWN &&
+        zero_perl_system_initialized) {
+      PERL_SYS_TERM();
+      zero_perl_system_initialized = false;
+    }
+    break;
+  }
+  }
+
+  return ctx->result;
 }
 
 //! Initialize the Perl interpreter
@@ -1029,12 +1064,11 @@ int zeroperl_run_file(const char *filepath, int argc, char **argv) {
 //! After this, you can call zeroperl_init() again for a fresh interpreter.
 ZEROPERL_API("zeroperl_free_interpreter")
 void zeroperl_free_interpreter(void) {
-  if (zero_perl) {
-    perl_destruct(zero_perl);
-    perl_free(zero_perl);
-    zero_perl = NULL;
-    zero_perl_can_evaluate = false;
-  }
+  zeroperl_release_context ctx = {.type = ZEROPERL_RELEASE_INTERPRETER_FREE,
+                                  .target = NULL,
+                                  .key = NULL,
+                                  .result = 0};
+  asyncjmp_rt_start(zeroperl_release_callback, 0, (char **)&ctx);
 }
 
 //! Complete system shutdown
@@ -1043,12 +1077,11 @@ void zeroperl_free_interpreter(void) {
 //! Should be called only once at program exit.
 ZEROPERL_API("zeroperl_shutdown")
 void zeroperl_shutdown(void) {
-  zeroperl_free_interpreter();
-
-  if (zero_perl_system_initialized) {
-    PERL_SYS_TERM();
-    zero_perl_system_initialized = false;
-  }
+  zeroperl_release_context ctx = {.type = ZEROPERL_RELEASE_SHUTDOWN,
+                                  .target = NULL,
+                                  .key = NULL,
+                                  .result = 0};
+  asyncjmp_rt_start(zeroperl_release_callback, 0, (char **)&ctx);
 }
 
 //! Clear the error state ($@)
@@ -1384,8 +1417,11 @@ void zeroperl_decref(zeroperl_value *val) {
     return;
   }
 
-  dTHX;
-  SvREFCNT_dec(val->sv);
+  zeroperl_release_context ctx = {.type = ZEROPERL_RELEASE_VALUE_DECREF,
+                                  .target = val,
+                                  .key = NULL,
+                                  .result = 0};
+  asyncjmp_rt_start(zeroperl_release_callback, 0, (char **)&ctx);
 }
 
 //! Free a value
@@ -1397,12 +1433,11 @@ void zeroperl_value_free(zeroperl_value *val) {
     return;
   }
 
-  if (val->sv) {
-    dTHX;
-    SvREFCNT_dec(val->sv);
-  }
-
-  free(val);
+  zeroperl_release_context ctx = {.type = ZEROPERL_RELEASE_VALUE_FREE,
+                                  .target = val,
+                                  .key = NULL,
+                                  .result = 0};
+  asyncjmp_rt_start(zeroperl_release_callback, 0, (char **)&ctx);
 }
 
 //! Create a new empty array
@@ -1524,8 +1559,11 @@ void zeroperl_array_clear(zeroperl_array *arr) {
     return;
   }
 
-  dTHX;
-  av_clear(arr->av);
+  zeroperl_release_context ctx = {.type = ZEROPERL_RELEASE_ARRAY_CLEAR,
+                                  .target = arr,
+                                  .key = NULL,
+                                  .result = 0};
+  asyncjmp_rt_start(zeroperl_release_callback, 0, (char **)&ctx);
 }
 
 //! Convert an array to a value
@@ -1584,12 +1622,11 @@ void zeroperl_array_free(zeroperl_array *arr) {
     return;
   }
 
-  if (arr->av) {
-    dTHX;
-    SvREFCNT_dec((SV *)arr->av);
-  }
-
-  free(arr);
+  zeroperl_release_context ctx = {.type = ZEROPERL_RELEASE_ARRAY_FREE,
+                                  .target = arr,
+                                  .key = NULL,
+                                  .result = 0};
+  asyncjmp_rt_start(zeroperl_release_callback, 0, (char **)&ctx);
 }
 
 //! Create a new empty hash
@@ -1670,15 +1707,11 @@ bool zeroperl_hash_delete(zeroperl_hash *hash, const char *key) {
     return false;
   }
 
-  dTHX;
-  SV *sv = hv_delete(hash->hv, key, strlen(key), 0);
-
-  if (sv) {
-    SvREFCNT_dec(sv);
-    return true;
-  }
-
-  return false;
+  zeroperl_release_context ctx = {.type = ZEROPERL_RELEASE_HASH_DELETE,
+                                  .target = hash,
+                                  .key = key,
+                                  .result = 0};
+  return asyncjmp_rt_start(zeroperl_release_callback, 0, (char **)&ctx) != 0;
 }
 
 //! Clear all entries from a hash
@@ -1688,8 +1721,11 @@ void zeroperl_hash_clear(zeroperl_hash *hash) {
     return;
   }
 
-  dTHX;
-  hv_clear(hash->hv);
+  zeroperl_release_context ctx = {.type = ZEROPERL_RELEASE_HASH_CLEAR,
+                                  .target = hash,
+                                  .key = NULL,
+                                  .result = 0};
+  asyncjmp_rt_start(zeroperl_release_callback, 0, (char **)&ctx);
 }
 
 //! Create a new hash iterator
@@ -1820,12 +1856,11 @@ void zeroperl_hash_free(zeroperl_hash *hash) {
     return;
   }
 
-  if (hash->hv) {
-    dTHX;
-    SvREFCNT_dec((SV *)hash->hv);
-  }
-
-  free(hash);
+  zeroperl_release_context ctx = {.type = ZEROPERL_RELEASE_HASH_FREE,
+                                  .target = hash,
+                                  .key = NULL,
+                                  .result = 0};
+  asyncjmp_rt_start(zeroperl_release_callback, 0, (char **)&ctx);
 }
 
 //! Create a new reference to a value
@@ -2193,18 +2228,66 @@ void zeroperl_result_free(zeroperl_result *result) {
     return;
   }
 
-  if (result->values) {
-    for (int i = 0; i < result->count; i++) {
-      if (result->values[i]) {
-        zeroperl_value_free(result->values[i]);
-      }
-    }
-    free(result->values);
-  }
-
-  free(result);
+  zeroperl_release_context ctx = {.type = ZEROPERL_RELEASE_RESULT_FREE,
+                                  .target = result,
+                                  .key = NULL,
+                                  .result = 0};
+  asyncjmp_rt_start(zeroperl_release_callback, 0, (char **)&ctx);
 }
 
+/* A deliberately small compatibility surface for applications that use
+ * POSIX::strftime. Keeping this implementation on the public C strftime API
+ * makes the facade portable across every Perl release in the build matrix. */
+static XS(xs_POSIX_strftime) {
+  dXSARGS;
+
+  if (items < 7 || items > 10) {
+    croak_xs_usage(cv,
+                   "fmt, sec, min, hour, mday, mon, year, wday = -1, "
+                   "yday = -1, isdst = 0");
+  }
+
+  STRLEN format_length;
+  const char *format = SvPV(ST(0), format_length);
+  struct tm when = {0};
+  when.tm_sec = (int)SvIV(ST(1));
+  when.tm_min = (int)SvIV(ST(2));
+  when.tm_hour = (int)SvIV(ST(3));
+  when.tm_mday = (int)SvIV(ST(4));
+  when.tm_mon = (int)SvIV(ST(5));
+  when.tm_year = (int)SvIV(ST(6));
+  when.tm_wday = items > 7 ? (int)SvIV(ST(7)) : -1;
+  when.tm_yday = items > 8 ? (int)SvIV(ST(8)) : -1;
+  when.tm_isdst = items > 9 ? (int)SvIV(ST(9)) : 0;
+
+  size_t capacity = format_length + 128;
+  if (capacity < 256) {
+    capacity = 256;
+  }
+  char *buffer;
+  Newx(buffer, capacity, char);
+  size_t length = 0;
+  while (capacity <= 65536) {
+    length = strftime(buffer, capacity, format, &when);
+    if (length > 0 || format_length == 0) {
+      break;
+    }
+    capacity *= 2;
+    Renew(buffer, capacity, char);
+  }
+
+  SV *formatted = newSVpvn(length > 0 ? buffer : "", length);
+  if (SvUTF8(ST(0))) {
+    SvUTF8_on(formatted);
+  }
+  Safefree(buffer);
+  ST(0) = sv_2mortal(formatted);
+  XSRETURN(1);
+}
+
+#ifdef ZEROPERL_USE_GENERATED_XS_INIT
+#include "xs_init.inc"
+#else
 EXTERN_C void boot_DynaLoader(pTHX_ CV *cv);
 EXTERN_C void boot_mro(pTHX_ CV *cv);
 EXTERN_C void boot_File__Glob(pTHX_ CV *cv);
@@ -2254,29 +2337,6 @@ EXTERN_C void boot_XS__Parse__Sublike(pTHX_ CV *cv);
 EXTERN_C void boot_XS__Parse__Keyword(pTHX_ CV *cv);
 EXTERN_C void boot_Future__XS(pTHX_ CV *cv);
 EXTERN_C void boot_Future__AsyncAwait(pTHX_ CV *cv);
-
-/* A deliberately small compatibility surface for applications that use
- * POSIX::strftime.  This is the same Perl core helper used by ext/POSIX, but
- * avoids bundling the rest of that WASI-incompatible extension. */
-static XS(xs_POSIX_strftime) {
-  dXSARGS;
-
-  if (items < 7 || items > 10) {
-    croak_xs_usage(cv,
-                   "fmt, sec, min, hour, mday, mon, year, wday = -1, "
-                   "yday = -1, isdst = 0");
-  }
-
-  SV *formatted = sv_strftime_ints(
-      ST(0), (int)SvIV(ST(1)), (int)SvIV(ST(2)), (int)SvIV(ST(3)),
-      (int)SvIV(ST(4)), (int)SvIV(ST(5)), (int)SvIV(ST(6)),
-      -(int)abs(items > 9 ? (int)SvIV(ST(9)) : 0));
-
-  /* POSIX::strftime returns an empty string for both an invalid format and
-   * an empty result, rather than exposing the helper's NULL failure value. */
-  ST(0) = formatted ? sv_2mortal(formatted) : sv_2mortal(newSVpvs(""));
-  XSRETURN(1);
-}
 
 static void xs_init(pTHX) {
   static const char file[] = __FILE__;
@@ -2334,3 +2394,4 @@ static void xs_init(pTHX) {
   newXS("Future::XS::bootstrap", boot_Future__XS, file);
   newXS("Future::AsyncAwait::bootstrap", boot_Future__AsyncAwait, file);
 }
+#endif

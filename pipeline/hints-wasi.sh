@@ -1,5 +1,11 @@
-# WASI hints for Perl cross-compilation
-# Based on actual WASM32 type sizes from wasi-sdk
+# WASI hints for Perl cross-compilation.
+#
+# This file is consumed by build-wasi-perl.sh, which substitutes
+# placeholders (__WASI_SDK_PATH__, __NATIVE_DIR__, etc.) and appends
+# version-specific overrides before passing it to Perl's Configure
+# as -Dhintfile=wasi.
+#
+# Based on actual WASM32 type sizes from wasi-sdk.
 
 # Architecture
 osname='wasi'
@@ -42,6 +48,12 @@ d_perl_lc_all_separator='define'
 perl_lc_all_separator=';'
 d_perl_lc_all_category_positions_init='define'
 perl_lc_all_category_positions_init='{ 0, 1, 2, 3, 4, 5 }'
+
+# Void support (modern compilers all support void)
+voidflags='15'
+
+# Header availability (cross-compilation can't detect these)
+i_time='define'
 
 # Memory/threading
 usemymalloc='n'

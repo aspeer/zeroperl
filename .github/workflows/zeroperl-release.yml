@@ -1,0 +1,140 @@
+name: zeroperl Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.1.0). Leave empty to skip release creation."
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: standard-5.18.4
+            perl-version: 5.18.4
+            shrink-mode: off
+            embed-prefix: true
+            build-exiftool: false
+          - name: standard-5.24.4
+            perl-version: 5.24.4
+            shrink-mode: off
+            embed-prefix: true
+            build-exiftool: false
+          - name: standard-5.36.3
+            perl-version: 5.36.3
+            shrink-mode: off
+            embed-prefix: true
+            build-exiftool: false
+          - name: standard-5.44.0
+            perl-version: 5.44.0
+            shrink-mode: off
+            embed-prefix: true
+            build-exiftool: false
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install verifier dependencies
+        run: npm --prefix tools ci
+
+      - name: Build zeroperl (${{ matrix.name }})
+        run: |
+          SFS_COMPRESS="false"
+          if [ "${{ matrix.shrink-mode }}" = "full" ]; then
+            SFS_COMPRESS="true"
+          fi
+
+          docker build \
+            --build-arg PERL_VERSION=${{ matrix.perl-version }} \
+            --build-arg BUILD_EXIFTOOL=${{ matrix.build-exiftool }} \
+            --build-arg BUILD_CPANFILE=true \
+            --build-arg TRIM=true \
+            --build-arg ZEROPERL_SHRINK=${{ matrix.shrink-mode }} \
+            --build-arg ZEROPERL_SFS_COMPRESS=${SFS_COMPRESS} \
+            --build-arg ZEROPERL_EMBED_PREFIX=${{ matrix.embed-prefix }} \
+            -t zeroperl:${{ matrix.name }} .
+
+      - name: Extract artifacts (${{ matrix.name }})
+        run: |
+          mkdir -p output/${{ matrix.name }}
+          docker run --rm -v $PWD/output:/output zeroperl:${{ matrix.name }} \
+            cp -r /artifacts/. /output/${{ matrix.name }}/
+          ls -la output/${{ matrix.name }}/
+
+      - name: Embedded @INC verifier (${{ matrix.name }})
+        run: node tools/verify-embedded-inc.mjs output/${{ matrix.name }}/zeroperl.wasm
+
+      - name: WASM runtime smoke (${{ matrix.name }})
+        run: node tools/wasm-smoke.mjs output/${{ matrix.name }}/zeroperl.wasm
+
+      - name: Socket XS smoke (${{ matrix.name }})
+        run: node tools/smoke-socket.mjs output/${{ matrix.name }}/zeroperl.wasm output/${{ matrix.name }}/perl-wasi-prefix
+
+      - name: Async disposal smoke (${{ matrix.name }})
+        run: node tools/smoke-asyncify-free.mjs output/${{ matrix.name }}/zeroperl.wasm output/${{ matrix.name }}/perl-wasi-prefix
+
+      - name: Upload WASM artifacts (${{ matrix.name }})
+        uses: actions/upload-artifact@v7
+        with:
+          name: wasm-${{ matrix.name }}
+          path: |
+            output/${{ matrix.name }}/zeroperl.wasm
+            output/${{ matrix.name }}/zeroperl_reactor.wasm
+            output/${{ matrix.name }}/config.h
+          if-no-files-found: error
+
+      - name: Upload Perl prefix (${{ matrix.name }})
+        uses: actions/upload-artifact@v7
+        with:
+          name: prefix-${{ matrix.name }}
+          path: output/${{ matrix.name }}/perl-wasi-prefix
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ inputs.tag != '' }}
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: release-assets
+          merge-multiple: false
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p assets
+          for dir in release-assets/wasm-*/; do
+            name=$(basename "$dir" | sed 's/^wasm-//')
+            if [ -f "$dir/zeroperl.wasm" ]; then
+              cp "$dir/zeroperl.wasm" "assets/${name}.wasm"
+            fi
+            for f in zeroperl_reactor.wasm config.h; do
+              if [ -f "$dir/$f" ]; then
+                cp "$dir/$f" "assets/${name}_${f}"
+              fi
+            done
+          done
+          echo "=== Release assets ==="
+          ls -lh assets/
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: Release ${{ inputs.tag }}
+          draft: false
+          files: assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

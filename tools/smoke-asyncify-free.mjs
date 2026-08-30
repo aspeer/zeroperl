@@ -48,6 +48,7 @@ const { instance } = await WebAssembly.instantiate(fs.readFileSync(wasmPath), {
       // During replay, the same import is called a second time. Its returned
       // value is the result of the original asynchronous host operation.
       assert.equal(wasm.asyncify_get_state(), 2, 'host callback must replay while rewinding');
+      wasm.asyncify_stop_rewind();
       resumed = true;
       return 0; // undef is sufficient for the test host function
     },
@@ -243,9 +244,11 @@ try {
     console.log(`Asyncify release probe OK: ${name}`);
   }
 } finally {
+  if (wasm && asyncifyData && wasm.asyncify_get_state() === 0) {
+    await invokeAsync(wasm.zeroperl_shutdown);
+  }
   if (makeProbeName) wasm.free(makeProbeName);
   if (holderName) wasm.free(holderName);
   if (keyName) wasm.free(keyName);
   if (asyncifyData) wasm.free(asyncifyData);
-  wasm.zeroperl_shutdown();
 }
