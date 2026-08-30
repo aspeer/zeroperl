@@ -18,44 +18,34 @@ curl -fsSL "$URLPERL" | tar -xzf - --strip-components=1 --directory="$NATIVE_DIR
 PERL_MAJOR=$(echo "$PERL_VERSION" | cut -d. -f1)
 PERL_MINOR=$(echo "$PERL_VERSION" | cut -d. -f2)
 
-if [ "$PERL_MAJOR" -lt 5 ] || { [ "$PERL_MAJOR" -eq 5 ] && [ "$PERL_MINOR" -lt 16 ]; }; then
-    echo "error: Perl $PERL_VERSION is not supported. Minimum supported version is 5.16.3." >&2
+if [ "$PERL_MAJOR" -lt 5 ] || { [ "$PERL_MAJOR" -eq 5 ] && [ "$PERL_MINOR" -lt 18 ]; }; then
+    echo "error: Perl $PERL_VERSION is not supported. Minimum supported release line is 5.18." >&2
     exit 1
 fi
 
 PERL_OPTIMIZE="-Oz"
 PERL_LIBS="-lm -lcrypt"
+PERL_CC="${PERL_CC:-cc}"
 
 cd "$NATIVE_DIR"
 
-
-# Build the static extension list based on Perl version.
-# Some extensions don't exist or are pure-Perl (no XS) in older Perl.
-# The native build needs a working perl with enough extensions to run
-# perltidy and Module::ScanDeps — it doesn't need every extension.
-
-# POSIX is needed by version.pm's pure-Perl fallback (vpp.pm)
-# Minimum supported version is 5.16.3; all extensions below are available.
-# 5.22+ removed Unicode::Normalize XS (it's pure-Perl now)
-#
-# NOTE: 're' is excluded for 5.38.x. It copies regcomp.c/regcomp_invlist.c
-# into its own build, duplicating symbols from libperl.a when statically linked.
-# Other versions build 're' as a shared library (no conflict).
-if [ "$PERL_MAJOR" -eq 5 ] && [ "$PERL_MINOR" -eq 38 ]; then
-    NATIVE_STATIC_EXT="mro File/Glob Sys/Hostname PerlIO/via PerlIO/encoding attributes Digest/MD5 Digest/SHA Math/BigInt/FastCalc Data/Dumper I18N/Langinfo Time/HiRes IO Hash/Util Filter/Util/Call Encode Compress/Raw/Zlib Compress/Raw/Bzip2 MIME/Base64 Cwd List/Util Fcntl Opcode POSIX Devel/Peek Sys/Syslog B IPC/SysV Socket Storable Hash/Util/FieldHash Time/Piece Unicode/Collate Encode/Unicode Encode/JP Encode/KR Encode/EBCDIC Encode/CN Encode/Symbol Encode/Byte Encode/TW PerlIO/mmap"
-else
-    NATIVE_STATIC_EXT="re mro File/Glob Sys/Hostname PerlIO/via PerlIO/encoding attributes Digest/MD5 Digest/SHA Math/BigInt/FastCalc Data/Dumper I18N/Langinfo Time/HiRes IO Hash/Util Filter/Util/Call Encode Compress/Raw/Zlib Compress/Raw/Bzip2 MIME/Base64 Cwd List/Util Fcntl Opcode POSIX Devel/Peek Sys/Syslog B IPC/SysV Socket Storable Hash/Util/FieldHash Time/Piece Unicode/Collate Encode/Unicode Encode/JP Encode/KR Encode/EBCDIC Encode/CN Encode/Symbol Encode/Byte Encode/TW PerlIO/mmap"
-fi
+# Perl 5.18's Linux ELF probe predates C99 and declares main() without a
+# return type. GCC 14 rejects that probe, which makes the hints select obsolete
+# dld/.o loading even though the host is ELF. Modernize only the probe itself.
 if [ "$PERL_MAJOR" -eq 5 ] && [ "$PERL_MINOR" -le 18 ]; then
-    NATIVE_STATIC_EXT="Unicode/Normalize $NATIVE_STATIC_EXT"
+    perl -pi -e 's/^main\(\) \{/int main() {/' hints/linux.sh
 fi
+
+
+# The host Perl is a build tool, not part of the WASM artifact. Let Configure
+# build its normal dynamically loadable core extensions so CPAN can safely
+# upgrade build-time XS dependencies. The target Perl remains fully static.
 
 sh +x ./Configure \
     -sde \
     -Dprefix="$NATIVE_DIR/prefix" \
     -Dusedevel \
     -Uversiononly \
-    -Dstatic_ext="$NATIVE_STATIC_EXT" \
     -Duselargefiles \
     -Uuse64bitint \
     -Uusethreads \
@@ -63,6 +53,13 @@ sh +x ./Configure \
     -Uusemultiplicity \
     -Uusesfio \
     -Uuseshrplib \
+    -Dusedl \
+    -Dd_dlopen \
+    -Ddlext=so \
+    -Dso=so \
+    -Dcccdlflags=-fPIC \
+    -Dccdlflags=-Wl,-E \
+    -Dlddlflags="-shared -L/usr/local/lib" \
     -Dcc="$PERL_CC" \
     -Doptimize="$PERL_OPTIMIZE" \
     -Dlibs="$PERL_LIBS" \
@@ -103,5 +100,11 @@ fi
 
 if [ "${BUILD_CPANFILE:-true}" = "true" ]; then
     echo "yes" | cpan App::cpanminus
-    cpanm --installdeps --notest "$REPO_DIR"
+    if ! cpanm --installdeps --notest "$REPO_DIR"; then
+        echo "error: cpanfile dependency installation failed; recent cpanm logs follow" >&2
+        find /root/.cpanm/work -name build.log -type f -exec \
+            grep -n -E 'error:|Error|ERROR|failed|FAIL|not supported|undefined' {} \; >&2
+        find /root/.cpanm/work -name build.log -type f -exec tail -n 200 {} \; >&2
+        exit 1
+    fi
 fi

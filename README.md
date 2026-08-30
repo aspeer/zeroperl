@@ -37,7 +37,8 @@ Output in `./output/`:
 - `zeroperl_reactor.wasm` — linker output (`-mexec-model=reactor`) before the wasm-opt asyncify pass
 - `config.h` — Perl/WASI `config.h` from the wasm build tree (useful for debugging toolchain mismatches)
 - `perl-wasi-prefix/` — Perl library prefix
-- `exiftool.min.pl` — minified ExifTool (if enabled)
+- `exiftool.min.pl` — minified ExifTool, only when explicitly enabled; it is
+  excluded from every standard WebDyne artifact
 
 ### Build args
 
@@ -64,7 +65,7 @@ Declared in [Dockerfile](Dockerfile) as `ARG` (pass with `--build-arg`).
 | --------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `PERL_VERSION`                          | `5.44.0`                                                | Perl source version; supported release artifacts use 5.18.4, 5.24.4, 5.36.3, and 5.44.0.            |
 | `EXIFTOOL_VERSION`                      | `13.55`                                                 | ExifTool release tag                                                                                 |
-| `BUILD_EXIFTOOL`                        | `true`                                                  | Build and ship ExifTool                                                                              |
+| `BUILD_EXIFTOOL`                        | `false`                                                 | Optionally build and ship ExifTool; it is not part of standard WebDyne artifacts                     |
 | `BUILD_CPANFILE`                        | `true`                                                  | Install WebDyne dependencies and cross-compile their XS components                                   |
 | `EXIFTOOL_WARMUP_MODE`                  | `curated`                                               | `curated` or `full`                                                                                  |
 | `STACK_SIZE`                            | `8388608`                                               | WASM stack (bytes), `final` stage                                                                   |
@@ -193,6 +194,25 @@ git clone https://github.com/aspeer/zeroperl-ts
 ```
 
 See the [zeroperl-ts README](https://github.com/aspeer/zeroperl-ts) for details.
+
+### Verified standard artifacts
+
+The Milestone 1 build matrix below uses `BUILD_EXIFTOOL=false`, retains the
+WebDyne dependency and static-XS surface, and embeds the Perl prefix. Each
+artifact passed the core, static Socket, and eight async-disposal probes.
+
+| Perl | `zeroperl.wasm` | gzip | `zeroperl_reactor.wasm` | SHA-256 (`zeroperl.wasm`) |
+| --- | ---: | ---: | ---: | --- |
+| 5.18.4 | 12,863,736 | 4,505,234 | 11,782,810 | `e0aedf050e69d69a30a02d8a60f5a89a8eed61c1022c44981ddbbc7b70c3866c` |
+| 5.24.4 | 13,282,859 | 4,538,613 | 12,094,587 | `052946649c1b3650cf358102391a151e1adb40e45406f3ddb389979e875f164e` |
+| 5.36.3 | 13,670,386 | 4,569,176 | 12,354,923 | `1545e9ebd1830af64ddbbb6d06db5fbf1bf417d6b66a6d615f2e2ed613d4ed16` |
+| 5.44.0 | 14,368,215 | 4,713,197 | 13,020,122 | `183aef1bc409c3894e30f4b3a3ef2850be3e708a8ec3c8cd26cdbbe8b58ee74a` |
+
+Sizes are bytes. The 5.44 safe mini experiment kept the same module and XS
+surface and enabled compressed SFS embedding. It produced a 12,050,075-byte
+WASM (16.1% smaller raw), but its gzip size increased to 5,055,576 bytes. It
+therefore failed the required 30% compressed-size reduction and no `-mini`
+artifact is produced.
 
 For an in-repo verification that the built wasm can load modules from the
 embedded `/zeroperl` prefix without mounting `output/perl-wasi-prefix`, run:

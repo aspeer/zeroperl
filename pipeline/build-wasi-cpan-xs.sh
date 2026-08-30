@@ -9,6 +9,14 @@ PERL_VERSION="${PERL_VERSION:-5.44.0}"
 NPROC="${NPROC:-$(nproc)}"
 WORK="${WORK:-/build/cpan-xs}"
 
+PERL_MINOR=$(echo "$PERL_VERSION" | cut -d. -f2)
+FUTURE_XS_VERSION=0.15
+if [ "$PERL_MINOR" -lt 24 ]; then
+    # Future::XS 0.08 and later require Perl 5.24. Version 0.07 is the
+    # newest upstream release compatible with the 5.18 target.
+    FUTURE_XS_VERSION=0.07
+fi
+
 export PATH="$REPO_DIR/wasi-bin:$PATH"
 # MakeMaker is configured against the target tree below. Module::Build itself
 # loads IO while generating its Build script, however, and miniperl cannot load
@@ -31,7 +39,11 @@ build_static() {
     destination="$3"
 
     cd "$WORK/$dist"
-    "$NATIVE_DIR/miniperl" -I"$WASM_DIR/lib" -I"$WASM_DIR" Makefile.PL LINKTYPE=static
+    # Older ExtUtils::MakeMaker releases load B while generating a Makefile.
+    # Use the matching full native Perl so native core XS modules remain
+    # available; target Config and module sources still come first in @INC,
+    # and wasimake performs the actual target compilation below.
+    "$NATIVE_DIR/perl" -I"$WASM_DIR/lib" -I"$WASM_DIR" Makefile.PL LINKTYPE=static
     wasimake make -j"$NPROC"
     mkdir -p "$(dirname "$WASM_DIR/$destination")"
     cp "$(find blib -type f -name "$archive" -print -quit)" "$WASM_DIR/$destination"
@@ -44,8 +56,13 @@ build_module_build_static() {
     destination="$3"
 
     cd "$WORK/$dist"
+    # Put installed site modules before the Perl source tree.  This matters on
+    # older releases whose bundled Module::Build is too old for current XS
+    # distributions, while cpanm has installed a compatible build-time copy.
     WASIC_FORCE_HOST=1 \
-    PERL5LIB="$NATIVE_DIR/lib:$NATIVE_DIR/prefix/lib/perl5/site_perl/$PERL_VERSION" \
+    WASIC_HOST_CC=/usr/bin/cc \
+    WASIC_HOST_CXX=/usr/bin/c++ \
+    PERL5LIB="$NATIVE_DIR/prefix/lib/perl5/site_perl/$PERL_VERSION:$NATIVE_DIR/lib" \
         "$NATIVE_DIR/perl" Build.PL \
         --config linktype=static \
         --config cc=wasic \
@@ -54,8 +71,8 @@ build_module_build_static() {
         --config installarchlib="$WASM_DIR" \
         --config extra_compiler_flags="-I$WASM_DIR/CORE"
     WASI_PERL_CORE="/zeroperl/lib/$PERL_VERSION/wasm32-wasi/CORE" \
-    PERL5LIB="$NATIVE_DIR/lib:$NATIVE_DIR/prefix/lib/perl5/site_perl/$PERL_VERSION" \
-        "$NATIVE_DIR/perl" Build
+    PERL5LIB="$NATIVE_DIR/prefix/lib/perl5/site_perl/$PERL_VERSION:$NATIVE_DIR/lib" \
+        "$NATIVE_DIR/perl" -MModule::Build Build
     mkdir -p "$(dirname "$WASM_DIR/$destination")"
     built_archive="$(find blib -type f -name "$archive" -print -quit)"
     if [ -z "$built_archive" ]; then
@@ -86,8 +103,8 @@ build_module_build_static "XS-Parse-Sublike-0.41" "Sublike.a" "lib/auto/XS/Parse
 fetch "https://www.cpan.org/authors/id/P/PE/PEVANS/XS-Parse-Keyword-0.49.tar.gz"
 build_module_build_static "XS-Parse-Keyword-0.49" "Keyword.a" "lib/auto/XS/Parse/Keyword/Keyword.a"
 
-fetch "https://www.cpan.org/authors/id/P/PE/PEVANS/Future-XS-0.15.tar.gz"
-build_module_build_static "Future-XS-0.15" "XS.a" "lib/auto/Future/XS/XS.a"
+fetch "https://cpan.metacpan.org/authors/id/P/PE/PEVANS/Future-XS-${FUTURE_XS_VERSION}.tar.gz"
+build_module_build_static "Future-XS-${FUTURE_XS_VERSION}" "XS.a" "lib/auto/Future/XS/XS.a"
 
 fetch "https://www.cpan.org/authors/id/P/PE/PEVANS/Future-AsyncAwait-0.71.tar.gz"
 build_module_build_static "Future-AsyncAwait-0.71" "AsyncAwait.a" "lib/auto/Future/AsyncAwait/AsyncAwait.a"

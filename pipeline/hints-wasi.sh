@@ -173,6 +173,17 @@ quadtype='long long'
 uquadtype='unsigned long long'
 quadkind='3'
 
+# Configure cannot execute its 64-bit printf probes while cross-compiling.
+# Supply the WASI libc formats explicitly; older Perl release lines otherwise
+# fall through to the non-portable %Ld family and break XS consumers such as
+# Data::Dumper.
+sPRId64='"lld"'
+sPRIi64='"lli"'
+sPRIu64='"llu"'
+sPRIo64='"llo"'
+sPRIx64='"llx"'
+sPRIXU64='"llX"'
+
 # Explicit type definitions
 i8type='signed char'
 u8type='unsigned char'
@@ -220,9 +231,9 @@ noextensions='POSIX Devel/Peek Sys/Syslog threads threads/shared IPC/SysV SDBM_F
 static_ext='mro B Socket Time/HiRes File/Glob Sys/Hostname PerlIO/via PerlIO/mmap PerlIO/encoding attributes Unicode/Normalize Unicode/Collate re Digest/MD5 Digest/SHA Math/BigInt/FastCalc Data/Dumper I18N/Langinfo Time/Piece IO Hash/Util/FieldHash Hash/Util Filter/Util/Call Encode/Unicode Encode Encode/JP Encode/KR Encode/EBCDIC Encode/CN Encode/Symbol Encode/Byte Encode/TW Compress/Raw/Zlib Compress/Raw/Bzip2 MIME/Base64 Cwd List/Util Fcntl Opcode Storable'
 
 # Compiler/linker flags
-ccflags='-DBIG_TIME -DNO_MATHOMS -Wno-int-conversion -Wno-implicit-function-declaration -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_GETPID -D_GNU_SOURCE -D_POSIX_C_SOURCE -Wno-null-pointer-arithmetic -D_WASI_EMULATED_SIGNAL -include __WASI_SDK_PATH__/share/wasi-sysroot/include/wasm32-wasi/fcntl.h -I__STUBS_DIR__'
+ccflags='-DBIG_TIME -Wno-int-conversion -Wno-implicit-function-declaration -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_GETPID -D_GNU_SOURCE -D_POSIX_C_SOURCE -Wno-null-pointer-arithmetic -D_WASI_EMULATED_SIGNAL -include __WASI_SDK_PATH__/share/wasi-sysroot/include/wasm32-wasi/fcntl.h -I__STUBS_DIR__'
 
-cppflags='-DBIG_TIME -DNO_MATHOMS -Wno-int-conversion -Wno-implicit-function-declaration -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_GETPID -D_GNU_SOURCE -D_POSIX_C_SOURCE -DSTANDARD_C -DPERL_USE_SAFE_PUTENV -D_WASI_EMULATED_SIGNAL -Wno-null-pointer-arithmetic -fno-strict-aliasing -pipe -fstack-protector-strong -include __WASI_SDK_PATH__/share/wasi-sysroot/include/wasm32-wasi/fcntl.h -I__STUBS_DIR__'
+cppflags='-DBIG_TIME -Wno-int-conversion -Wno-implicit-function-declaration -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_GETPID -D_GNU_SOURCE -D_POSIX_C_SOURCE -DSTANDARD_C -DPERL_USE_SAFE_PUTENV -D_WASI_EMULATED_SIGNAL -Wno-null-pointer-arithmetic -fno-strict-aliasing -pipe -fstack-protector-strong -include __WASI_SDK_PATH__/share/wasi-sysroot/include/wasm32-wasi/fcntl.h -I__STUBS_DIR__'
 
 ldflags='-static -lwasi-emulated-signal -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lwasi-emulated-mman'
 

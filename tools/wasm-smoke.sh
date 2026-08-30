@@ -64,7 +64,11 @@ decode_b64 "$SMOKE_SRC/sample.tiff.b64" "$SMOKE_TMP/sample.tiff"
 cp "$SMOKE_SRC/sample.xmp" "$SMOKE_TMP/sample.xmp"
 
 if [ "$USE_ARCH_LIB" -eq 1 ]; then
-    PERL5LIB="$ARCH_LIB:$PERL_LIB_BASE"
+    # This pre-link check uses the matching native build Perl because the WASM
+    # executable does not exist yet.  Prefer target module sources, then host
+    # XS objects built from the same core release, before CPAN-upgraded native
+    # site modules (which may have incompatible dual-life module versions).
+    PERL5LIB="$ARCH_LIB:$PERL_LIB_BASE:/build/native/lib"
 else
     PERL5LIB="$PERL_LIB_BASE"
     if [ -n "${PERL_SITE_BASE:-}" ]; then

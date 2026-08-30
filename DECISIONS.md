@@ -19,9 +19,25 @@ JavaScript/Perl marshalling and Asyncify-aware resource disposal belong in
 
 A mini artifact will only be retained if its compressed WASM is at least 30%
 smaller than the equivalent standard artifact while retaining required WebDyne
-modules. The experiment begins with Perl 5.44.0.
+modules. The Perl 5.44.0 safe experiment retained the standard module and XS
+surface and used compressed SFS embedding. It was 16.1% smaller raw but 7.3%
+larger after gzip, so Milestone 1 does not publish a mini artifact. Repairing
+the older trace-based XS-pruning path is out of scope because the product
+requirement is to retain required WebDyne XS and nearly all core XS modules.
 
 ## D005: POSIX compatibility surface
 
 The WASM runtime supplies the `POSIX::strftime` surface used by WebDyne without
 claiming support for the complete core `POSIX` XS module.
+
+## D006: Legacy XS ABI compatibility
+
+Perl 5.18, 5.24, and 5.36 retain the core mathoms compatibility layer because
+current WebDyne XS dependencies use legacy Perl ABI symbols on those releases.
+Newer releases continue to build with `NO_MATHOMS`.
+
+## D007: ExifTool is opt-in
+
+ExifTool is not part of the WebDyne runtime deliverable and is excluded from
+all standard artifacts. `BUILD_EXIFTOOL=true` remains available solely for
+special-purpose builds and is not a release gate.

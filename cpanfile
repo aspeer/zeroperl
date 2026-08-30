@@ -7,7 +7,12 @@ requires 'Env::Path';
 requires 'File::Temp';
 requires 'Future::AsyncAwait';
 requires 'Future::IO';
-requires 'Future::XS';
+if ( $] < 5.024 ) {
+    requires 'Future::XS', '== 0.07';
+}
+else {
+    requires 'Future::XS';
+}
 requires 'HTML::Element';
 requires 'HTML::Entities';
 requires 'HTML::Tagset';

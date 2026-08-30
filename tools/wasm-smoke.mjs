@@ -115,7 +115,7 @@ function assertStringOutput(label, stdout, stderr) {
   throw new Error(`${label} produced empty stdout\nstderr:\n${stderr}`);
 }
 
-async function runExifTool(perl, exiftoolScript, smokeFiles, args) {
+async function runExifTool(wasmBinary, exiftoolScript, smokeFiles, args, env) {
   const fileSystem = new MemoryFileSystem();
   fileSystem.addFile("/work/exiftool.min.pl", exiftoolScript);
   fileSystem.addFile("/work/sample.jpg", smokeFiles.sampleJpg);
@@ -126,7 +126,7 @@ async function runExifTool(perl, exiftoolScript, smokeFiles, args) {
   let stderr = "";
 
   const runPerl = await ZeroPerl.create({
-    fetch: perl._fetch,
+    fetch: async () => new Response(wasmBinary, { headers: { "content-type": "application/wasm" } }),
     fileSystem,
     stdout: (chunk) => {
       const text = decodeChunk(chunk);
@@ -136,6 +136,7 @@ async function runExifTool(perl, exiftoolScript, smokeFiles, args) {
       const text = decodeChunk(chunk);
       stderr += text;
     },
+    env,
   });
 
   try {
@@ -297,13 +298,13 @@ async function main() {
     };
 
     // ExifTool -ver
-    const versionRun = await runExifTool(perl, exiftoolScript, smokeFiles, ["-ver"]);
+    const versionRun = await runExifTool(wasmBinary, exiftoolScript, smokeFiles, ["-ver"], env);
     assertRunSuccess("exiftool -ver", versionRun.result, versionRun.stdout, versionRun.stderr);
     assertStringOutput("exiftool -ver", versionRun.stdout, versionRun.stderr);
     console.log("EXIFTOOL_VER_OK");
 
     // ExifTool -json sample.jpg
-    const jsonRun = await runExifTool(perl, exiftoolScript, smokeFiles, ["-json", "/work/sample.jpg"]);
+    const jsonRun = await runExifTool(wasmBinary, exiftoolScript, smokeFiles, ["-json", "/work/sample.jpg"], env);
     assertRunSuccess("exiftool -json sample.jpg", jsonRun.result, jsonRun.stdout, jsonRun.stderr);
     const jsonResult = parseJsonOutput("exiftool -json sample.jpg", jsonRun.stdout, jsonRun.stderr);
     if (!Array.isArray(jsonResult) || jsonResult.length !== 1) {
@@ -325,7 +326,7 @@ async function main() {
     console.log("EXIFTOOL_JPEG_OK");
 
     // ExifTool -json -FileType -MIMEType sample.jpg
-    const multipleArgsRun = await runExifTool(perl, exiftoolScript, smokeFiles, ["-json", "-FileType", "-MIMEType", "/work/sample.jpg"]);
+    const multipleArgsRun = await runExifTool(wasmBinary, exiftoolScript, smokeFiles, ["-json", "-FileType", "-MIMEType", "/work/sample.jpg"], env);
     assertRunSuccess("exiftool -json -FileType -MIMEType sample.jpg", multipleArgsRun.result, multipleArgsRun.stdout, multipleArgsRun.stderr);
     const multipleArgsResult = parseJsonOutput("exiftool -json -FileType -MIMEType sample.jpg", multipleArgsRun.stdout, multipleArgsRun.stderr);
     if (!Array.isArray(multipleArgsResult) || multipleArgsResult.length !== 1) {
@@ -344,7 +345,7 @@ async function main() {
     console.log("EXIFTOOL_SELECTED_OK");
 
     // ExifTool -json sample.tiff
-    const tiffRun = await runExifTool(perl, exiftoolScript, smokeFiles, ["-json", "/work/sample.tiff"]);
+    const tiffRun = await runExifTool(wasmBinary, exiftoolScript, smokeFiles, ["-json", "/work/sample.tiff"], env);
     assertRunSuccess("exiftool sample.tiff", tiffRun.result, tiffRun.stdout, tiffRun.stderr);
     const tiffResult = parseJsonOutput("exiftool sample.tiff", tiffRun.stdout, tiffRun.stderr);
     if (!Array.isArray(tiffResult) || tiffResult.length !== 1) {
@@ -360,7 +361,7 @@ async function main() {
     console.log("EXIFTOOL_TIFF_OK");
 
     // ExifTool -json sample.jpg sample.xmp
-    const sidecarRun = await runExifTool(perl, exiftoolScript, smokeFiles, ["-json", "/work/sample.jpg", "/work/sample.xmp"]);
+    const sidecarRun = await runExifTool(wasmBinary, exiftoolScript, smokeFiles, ["-json", "/work/sample.jpg", "/work/sample.xmp"], env);
     assertRunSuccess("exiftool sample.jpg sample.xmp", sidecarRun.result, sidecarRun.stdout, sidecarRun.stderr);
     const sidecarResult = parseJsonOutput("exiftool sample.jpg sample.xmp", sidecarRun.stdout, sidecarRun.stderr);
     if (!Array.isArray(sidecarResult) || sidecarResult.length !== 2) {

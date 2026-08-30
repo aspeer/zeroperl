@@ -49,7 +49,7 @@ FROM base AS native-perl
 
 ARG PERL_VERSION=5.44.0
 ARG EXIFTOOL_VERSION=13.55
-ARG BUILD_EXIFTOOL=true
+ARG BUILD_EXIFTOOL=false
 ARG BUILD_CPANFILE=true
 ARG EXIFTOOL_WARMUP_MODE=curated
 
@@ -72,7 +72,7 @@ RUN if [ "${BUILD_EXIFTOOL}" = "true" ]; then /build/repo/pipeline/build-exiftoo
 FROM native-perl AS wasi-perl
 
 ARG PERL_VERSION=5.44.0
-ARG BUILD_EXIFTOOL=true
+ARG BUILD_EXIFTOOL=false
 ARG BUILD_CPANFILE=true
 ARG TRIM=true
 ARG ZEROPERL_SHRINK=off
@@ -124,7 +124,9 @@ RUN node /build/repo/tests/sfs/test-generator.js
 
 RUN make -C /build/repo/tests/sfs test-sfs
 
-RUN if [ "$BUILD_EXIFTOOL" = "true" ]; then /build/repo/tools/wasm-smoke.sh /build/repo; fi
+RUN if [ "$BUILD_EXIFTOOL" = "true" ] && [ "$ZEROPERL_EMBED_PREFIX" = "true" ]; then \
+      /build/repo/tools/wasm-smoke.sh /build/repo; \
+    fi
 
 
 FROM wasi-perl AS final

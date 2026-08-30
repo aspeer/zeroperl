@@ -24,8 +24,8 @@ export PATH="$REPO_DIR/wasi-bin:$PATH"
 PERL_MAJOR=$(echo "$PERL_VERSION" | cut -d. -f1)
 PERL_MINOR=$(echo "$PERL_VERSION" | cut -d. -f2)
 
-if [ "$PERL_MAJOR" -lt 5 ] || { [ "$PERL_MAJOR" -eq 5 ] && [ "$PERL_MINOR" -lt 16 ]; }; then
-    echo "error: Perl $PERL_VERSION is not supported. Minimum supported version is 5.16.3." >&2
+if [ "$PERL_MAJOR" -lt 5 ] || { [ "$PERL_MAJOR" -eq 5 ] && [ "$PERL_MINOR" -lt 18 ]; }; then
+    echo "error: Perl $PERL_VERSION is not supported. Minimum supported release line is 5.18." >&2
     exit 1
 fi
 
@@ -55,6 +55,16 @@ sed -e "s|__STUBS_DIR__|$REPO_DIR/stubs|g" \
     -e "s|__WASI_SDK_VERSION__|wasi-sdk-$WASI_VERSION|g" \
     "$REPO_DIR/pipeline/hints-wasi.sh" > "$WASM_DIR/hints/wasi.sh"
 
+# Current Cpanel::JSON::XS uses Perl's legacy utf8n_to_uvuni ABI through
+# 5.36, then switches to the replacement API. Retain Perl's small mathoms
+# compatibility layer for those supported older releases.
+if [ "$PERL_MAJOR" -gt 5 ] || { [ "$PERL_MAJOR" -eq 5 ] && [ "$PERL_MINOR" -gt 36 ]; }; then
+    cat >> "$WASM_DIR/hints/wasi.sh" << 'HINTS_NO_MATHOMS'
+ccflags="$ccflags -DNO_MATHOMS"
+cppflags="$cppflags -DNO_MATHOMS"
+HINTS_NO_MATHOMS
+fi
+
 # 5.38.x: PL_cur_locale_obj referenced under wrong #ifdef guard in perl.c
 # and locale.c — prevent USE_POSIX_2008_LOCALE from being defined.
 # Also remove 're' from static_ext: regcomp.c symbols duplicated in re.a
@@ -80,10 +90,11 @@ ccflags="$ccflags -Wno-return-mismatch"
 cppflags="$cppflags -Wno-return-mismatch"
 HINTS_OLD_FLAGS
 
-    # Extension list: all OLD_PERL versions use the same set
-    # (POSIX, Socket, etc. need sys/wait.h and other WASI-missing headers)
-    WASI_STATIC_EXT="mro Time/HiRes File/Glob Sys/Hostname PerlIO/via PerlIO/encoding attributes Unicode/Normalize re Digest/MD5 Digest/SHA Math/BigInt/FastCalc Data/Dumper I18N/Langinfo IO Hash/Util Filter/Util/Call Encode Compress/Raw/Zlib Compress/Raw/Bzip2 MIME/Base64 Cwd List/Util Fcntl Opcode Unicode/Collate Time/Piece Hash/Util/FieldHash PerlIO/mmap"
-    WASI_NOEXT="POSIX Socket Devel/Peek Sys/Syslog B Storable threads threads/shared IPC/SysV SDBM_File File/DosGlob Errno"
+    # Keep the broadly useful core XS set available on 5.18 as well. Socket's
+    # unsupported Unix-domain and resolver branches are handled by the narrow
+    # WASI source transform above; B and Storable need no platform facade.
+    WASI_STATIC_EXT="mro B Socket Time/HiRes File/Glob Sys/Hostname PerlIO/via PerlIO/encoding attributes Unicode/Normalize re Digest/MD5 Digest/SHA Math/BigInt/FastCalc Data/Dumper I18N/Langinfo IO Hash/Util Filter/Util/Call Encode Compress/Raw/Zlib Compress/Raw/Bzip2 MIME/Base64 Cwd List/Util Fcntl Opcode Unicode/Collate Time/Piece Hash/Util/FieldHash PerlIO/mmap Storable"
+    WASI_NOEXT="POSIX Devel/Peek Sys/Syslog threads threads/shared IPC/SysV SDBM_File File/DosGlob Errno"
 
     cat >> "$WASM_DIR/hints/wasi.sh" << HINTS
 # 5.18 and earlier overrides (built for $PERL_VERSION)
@@ -126,7 +137,7 @@ perl "$REPO_DIR/patches/patch_glob.pl"
 chmod u-w ./ext/File-Glob/bsd_glob.c
 
 if [ -f ./cpan/Socket/Socket.xs ]; then
-    patch -p1 < "$REPO_DIR/patches/socket-wasi.patch"
+    perl "$REPO_DIR/patches/patch_socket.pl"
 fi
 
 # patch earlier versions of perl
@@ -331,4 +342,27 @@ else
         mkdir -p /zeroperl/lib/$PERL_VERSION/wasm32-wasi
         cp lib/Config.pm lib/Config_heavy.pl /zeroperl/lib/$PERL_VERSION/wasm32-wasi/ 2>/dev/null || true
     fi
+fi
+
+# Perl 5.18's install target can create the destination directory and then
+# stop on a host-executed WASM utility.  The directory's existence therefore
+# does not prove that core module sources paired with the static extensions
+# were installed.  Complete that partial install from the target source tree
+# before native site dependencies are overlaid by prepare-prefix.sh.
+if [ "$OLD_PERL" = 1 ]; then
+    mkdir -p "/zeroperl/lib/$PERL_VERSION"
+    cp -r "$WASM_DIR/lib/." "/zeroperl/lib/$PERL_VERSION/"
+fi
+
+# Cross-version make install behavior is inconsistent: older releases can
+# create the target library directory before failing on a host-executed WASM
+# utility, which bypasses the manual library fallback above but leaves no CORE
+# headers for subsequent static CPAN XS builds. Establish the installed target
+# header layout explicitly. prepare-prefix.sh removes these development files
+# from the final embedded runtime after all XS compilation is complete.
+TARGET_CORE="/zeroperl/lib/$PERL_VERSION/wasm32-wasi/CORE"
+mkdir -p "$TARGET_CORE"
+cp "$WASM_DIR"/*.h "$TARGET_CORE/"
+if [ -f "$WASM_DIR/libperl.a" ]; then
+    cp "$WASM_DIR/libperl.a" "$TARGET_CORE/"
 fi

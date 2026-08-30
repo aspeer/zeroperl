@@ -1,24 +1,20 @@
 #!/usr/bin/perl
 # Core smoke test — exercises core Perl modules available across all
-# supported Perl versions (5.16.3+) in the zeroperl WASM build.
+# supported Perl versions (5.18.4+) in the zeroperl WASM build.
 # Prints "CORE_SMOKE_OK" on success, dies with diagnostics on failure.
 #
-# Modules are tested in tiers:
-#   Tier 1 — must work on every version (strict, warnings, Digest::MD5, etc.)
-#   Tier 2 — version/feature-dependent (File::Spec, Data::Dumper, IO::File, etc.)
-#            tested conditionally; failures are errors only when the feature
-#            should be present.
+# Standard and mini WebDyne artifacts retain these core modules. A missing or
+# unusable module is therefore a compatibility failure, not a skip.
 
 use strict;
 use warnings;
 $| = 1;
 
 my @errors;
-my @skipped;
 
 print "perl version: $^V\n";
 
-# ── Tier 1: universal core ──────────────────────────────────────────────────
+# ── Required core surface ───────────────────────────────────────────────────
 
 # Digest::MD5 (XS, core since 5.8)
 eval {
@@ -80,30 +76,46 @@ eval {
     1;
 } or push @errors, "regex/string: $@";
 
-# ── Tier 2: version-conditional ──────────────────────────────────────────────
-
-# File::Spec — core since 5.5, but may be stripped by wasm-opt in full-shrink
-# builds or missing from the embedded SFS.
+# File::Spec — core since 5.5.
 eval {
     require File::Spec;
     my $cat = File::Spec->catfile('a', 'b', 'c');
     die "File::Spec->catfile" unless $cat && $cat =~ m{a};
     1;
-} or do {
-    push @skipped, "File::Spec";
-};
+} or push @errors, "File::Spec: $@";
 
-# Data::Dumper — core since 5.6, but depends on constant.pm which depends on
-# unicore/Heavy.pl (via utf8_heavy.pl) on Perl < 5.18.  The unicore directory
-# is trimmed from the prefix in some builds.
+# Numeric formatting is used while loading and running Data::Dumper. Keep a
+# separate diagnostic here so a libc/Configure regression is not misreported
+# as a module-loading failure.
 eval {
-    require Data::Dumper;
-    my $s = Data::Dumper::Dumper([1, 2, 3]);
-    die "Data::Dumper" unless $s && $s =~ /\d/;
+    my $s = sprintf('%.6g', 5.021_010);
+    die "sprintf" unless length $s;
     1;
-} or do {
-    push @skipped, "Data::Dumper";
+} or push @errors, "numeric formatting: $@";
+
+# Data::Dumper — core since 5.6 and a required static XS module. Test loading,
+# the pure-Perl implementation and the XS implementation independently.
+my $dumper_loaded = eval {
+    require Data::Dumper;
+    1;
 };
+push @errors, "Data::Dumper load: $@" unless $dumper_loaded;
+
+if ($dumper_loaded) {
+    eval {
+        local $Data::Dumper::Useperl = 1;
+        my $s = Data::Dumper::Dumper([1, 2, 3]);
+        die "Data::Dumper pure Perl" unless $s && $s =~ /\d/;
+        1;
+    } or push @errors, "Data::Dumper pure Perl: $@";
+
+    eval {
+        local $Data::Dumper::Useperl = 0;
+        my $s = Data::Dumper::Dumper([1, 2, 3]);
+        die "Data::Dumper XS" unless $s && $s =~ /\d/;
+        1;
+    } or push @errors, "Data::Dumper XS: $@";
+}
 
 # IO::File — core since 5.4, but new_tmpfile does not work in WASI (no tmpdir).
 # Test file I/O via in-memory write/read on an explicit file path instead.
@@ -119,30 +131,24 @@ eval {
     $fh->close;
     die "IO::File roundtrip" unless $line eq "test\n";
     1;
-} or do {
-    push @skipped, "IO::File";
-};
+} or push @errors, "IO::File: $@";
 
-# Encode — core since 5.8, but depends on unicore/Heavy.pl on older perls.
+# Encode — core since 5.8 and retained in WebDyne artifacts.
 eval {
     require Encode;
     my $enc = Encode::encode('UTF-8', 'hello');
     my $dec = Encode::decode('UTF-8', $enc);
     die "Encode roundtrip" unless $dec eq 'hello';
     1;
-} or do {
-    push @skipped, "Encode";
-};
+} or push @errors, "Encode: $@";
 
-# File::Glob — core since 5.6, may be stripped or unavailable.
+# File::Glob — core since 5.6 and a required static XS module.
 eval {
     require File::Glob;
     my @files = File::Glob::bsd_glob('*');
     die "File::Glob" unless @files >= 0;
     1;
-} or do {
-    push @skipped, "File::Glob";
-};
+} or push @errors, "File::Glob: $@";
 
 # ── Report ───────────────────────────────────────────────────────────────────
 
@@ -153,6 +159,3 @@ if (@errors) {
 }
 
 print "CORE_SMOKE_OK\n";
-if (@skipped) {
-    print "CORE_SMOKE_SKIPPED: ", join(', ', @skipped), "\n";
-}

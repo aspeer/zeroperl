@@ -8,6 +8,18 @@ from subprocess import check_call, CalledProcessError
 logger = logging.getLogger('wasic')
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
+
+def needs_no_mathoms():
+    """Match the Perl core build's legacy-ABI boundary."""
+    version = os.getenv('PERL_VERSION', '5.44.0').split('.')
+    try:
+        major, minor = int(version[0]), int(version[1])
+    except (ValueError, IndexError):
+        raise RuntimeError(
+            f"invalid PERL_VERSION for WASI compilation: {os.getenv('PERL_VERSION')}"
+        )
+    return major > 5 or (major == 5 and minor > 36)
+
 def compile_with_wasi(args):
     """
     Compile source files for the WASI environment.
@@ -28,8 +40,9 @@ def compile_with_wasi(args):
         wasi_include = os.path.join(
             wasi_sdk_path, 'share/wasi-sysroot/include/wasm32-wasi'
         )
+        compatibility_flags = ['-DNO_MATHOMS'] if needs_no_mathoms() else []
         args = [
-            '-DBIG_TIME', '-DNO_MATHOMS', '-Wno-int-conversion',
+            '-DBIG_TIME', *compatibility_flags, '-Wno-int-conversion',
             '-Wno-implicit-function-declaration', '-D_WASI_EMULATED_PROCESS_CLOCKS',
             '-D_WASI_EMULATED_GETPID', '-D_GNU_SOURCE', '-D_POSIX_C_SOURCE',
             '-Wno-null-pointer-arithmetic', '-D_WASI_EMULATED_SIGNAL',
@@ -51,8 +64,14 @@ def compile_with_wasi(args):
                 check_call([os.path.join(wasi_sdk_path, 'bin', 'llvm-ranlib'), output])
                 return
 
-    # Clean up arguments by removing unwanted flags
-    args = [arg for arg in args if arg not in {"cflags", "dflags"}]
+    # Clean up arguments by removing placeholders and host-only ABI flags.
+    # Older native Perls record -fpcc-struct-return in Config; Module::Build
+    # carries that setting into the target command even though WebAssembly has
+    # no corresponding ABI mode.
+    args = [
+        arg for arg in args
+        if arg not in {"cflags", "dflags", "-fpcc-struct-return"}
+    ]
 
     # Check for the WASIC_FORCE_HOST environment variable
     if os.getenv("WASIC_FORCE_HOST"):
@@ -83,7 +102,10 @@ def compile_with_host(args):
     """
     Compile source files for the host environment using the correct clang binary.
     """
-    compiler = '/usr/bin/clang++' if any(arg.endswith('.cpp') for arg in args) else '/usr/bin/clang'
+    if any(arg.endswith('.cpp') for arg in args):
+        compiler = os.getenv('WASIC_HOST_CXX', '/usr/bin/clang++')
+    else:
+        compiler = os.getenv('WASIC_HOST_CC', '/usr/bin/clang')
 
     cmd = [compiler] + args
 

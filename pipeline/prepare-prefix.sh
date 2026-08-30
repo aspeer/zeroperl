@@ -17,7 +17,7 @@ PERL_VERSION="${PERL_VERSION:-5.44.0}"
 #   - Run perltidy over all .pm/.pl files (optional TRIM step)
 #   - Generate the SFS header (zeroperl.h) via sfs.js
 
-BUILD_EXIFTOOL="${BUILD_EXIFTOOL:-true}"
+BUILD_EXIFTOOL="${BUILD_EXIFTOOL:-false}"
 TRIM="${TRIM:-true}"
 NATIVE_DIR="${NATIVE_DIR:-/build/native}"
 REPO_DIR="${REPO_DIR:-/build/repo}"
@@ -36,13 +36,50 @@ fi
 
 rm -rf /zeroperl/bin
 
+copy_site_file() {
+    src="$1"
+    rel="$2"
+    target_arch="/zeroperl/lib/$PERL_VERSION/wasm32-wasi"
+    target_core="/zeroperl/lib/$PERL_VERSION"
+
+    # The native dependency resolver may upgrade a core XS distribution (for
+    # example Encode on Perl 5.24).  Its .pm file must not shadow the version
+    # paired with the statically linked target object.  New CPAN modules have
+    # no target-core counterpart and are copied normally.
+    if [ -e "$target_arch/$rel" ] || [ -e "$target_core/$rel" ]; then
+        return
+    fi
+    mkdir -p "$(dirname "$target_arch/$rel")"
+    cp "$src" "$target_arch/$rel"
+}
+
 if [ "${BUILD_CPANFILE:-true}" = "true" ]; then
     SITE_PERL="$NATIVE_DIR/prefix/lib/perl5/site_perl/$PERL_VERSION"
+    NATIVE_ARCH=$("$NATIVE_DIR/prefix/bin/perl" -MConfig -e 'print $Config{archname}')
     mkdir -p "/zeroperl/lib/$PERL_VERSION/wasm32-wasi"
-    cp -R "$SITE_PERL"/* "/zeroperl/lib/$PERL_VERSION/wasm32-wasi/"
-    for archdir in "$SITE_PERL"/*-*; do
+
+    # Copy architecture-independent site files without descending into the
+    # native architecture directories at the root of site_perl.
+    for entry in "$SITE_PERL"/*; do
+        [ -e "$entry" ] || continue
+        [ "$entry" != "$SITE_PERL/$NATIVE_ARCH" ] || continue
+        if [ -d "$entry" ]; then
+            find "$entry" -type f | while IFS= read -r src; do
+                copy_site_file "$src" "${src#"$SITE_PERL"/}"
+            done
+        elif [ -f "$entry" ]; then
+            copy_site_file "$entry" "${entry#"$SITE_PERL"/}"
+        fi
+    done
+
+    # Flatten native architecture directories, but retain the same core-file
+    # collision rule.  Their .so files are removed below after companion Perl
+    # sources for deliberately cross-compiled XS modules have been retained.
+    for archdir in "$SITE_PERL/$NATIVE_ARCH"; do
         [ -d "$archdir" ] || continue
-        cp -R "$archdir"/. "/zeroperl/lib/$PERL_VERSION/wasm32-wasi/"
+        find "$archdir" -type f | while IFS= read -r src; do
+            copy_site_file "$src" "${src#"$archdir"/}"
+        done
     done
 fi
 
@@ -62,10 +99,8 @@ copy_traced_site_files() {
             "lib/$PERL_VERSION/wasm32-wasi/"*)
                 src_rel=${relpath#lib/$PERL_VERSION/wasm32-wasi/}
                 src_path="$site_root/$src_rel"
-                dst_path="/zeroperl/$relpath"
                 [ -f "$src_path" ] || continue
-                mkdir -p "$(dirname "$dst_path")"
-                cp "$src_path" "$dst_path"
+                copy_site_file "$src_path" "$src_rel"
                 ;;
         esac
     done < "$list_file"
@@ -76,8 +111,12 @@ if [ "$BUILD_EXIFTOOL" = "true" ]; then
     mkdir -p "/zeroperl/lib/$PERL_VERSION/wasm32-wasi/File"
     mkdir -p "/zeroperl/lib/$PERL_VERSION/wasm32-wasi/Image"
     if [ "$ZEROPERL_SHRINK" = "off" ]; then
-        cp -R "$SITE_PERL/File/"* "/zeroperl/lib/$PERL_VERSION/wasm32-wasi/File/" 2>/dev/null || true
-        cp -R "$SITE_PERL/Image/"* "/zeroperl/lib/$PERL_VERSION/wasm32-wasi/Image/"
+        for tree in File Image; do
+            [ -d "$SITE_PERL/$tree" ] || continue
+            find "$SITE_PERL/$tree" -type f | while IFS= read -r src; do
+                copy_site_file "$src" "${src#"$SITE_PERL"/}"
+            done
+        done
     else
         if [ ! -s "$REPO_DIR/gen/traced-files.txt" ]; then
             echo "error: missing or empty traced file list: $REPO_DIR/gen/traced-files.txt" >&2

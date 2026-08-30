@@ -12,13 +12,14 @@ PERL_VERSION="${PERL_VERSION:-5.44.0}"
 PERL_MAJOR=$(echo "$PERL_VERSION" | cut -d. -f1)
 PERL_MINOR=$(echo "$PERL_VERSION" | cut -d. -f2)
 
-if [ "$PERL_MAJOR" -lt 5 ] || { [ "$PERL_MAJOR" -eq 5 ] && [ "$PERL_MINOR" -lt 16 ]; }; then
-    echo "error: Perl $PERL_VERSION is not supported. Minimum supported version is 5.16.3." >&2
+if [ "$PERL_MAJOR" -lt 5 ] || { [ "$PERL_MAJOR" -eq 5 ] && [ "$PERL_MINOR" -lt 18 ]; }; then
+    echo "error: Perl $PERL_VERSION is not supported. Minimum supported release line is 5.18." >&2
     exit 1
 fi
 
-# -DNO_MATHOMS exists in 5.20+
-if [ "$PERL_MAJOR" -gt 5 ] || { [ "$PERL_MAJOR" -eq 5 ] && [ "$PERL_MINOR" -ge 20 ]; }; then
+# Perl 5.36 and earlier retain mathoms for the legacy XS ABI used by current
+# WebDyne dependencies such as Cpanel::JSON::XS.
+if [ "$PERL_MAJOR" -gt 5 ] || { [ "$PERL_MAJOR" -eq 5 ] && [ "$PERL_MINOR" -gt 36 ]; }; then
     NO_MATHOMS="-DNO_MATHOMS"
 else
     NO_MATHOMS=""
