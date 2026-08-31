@@ -228,7 +228,7 @@ d_readdir64_r='undef'
 noextensions='POSIX Devel/Peek Sys/Syslog threads threads/shared IPC/SysV SDBM_File File/DosGlob'
 
 # Static extensions to build
-static_ext='mro B Socket Time/HiRes File/Glob Sys/Hostname PerlIO/via PerlIO/mmap PerlIO/encoding attributes Unicode/Normalize Unicode/Collate re Digest/MD5 Digest/SHA Math/BigInt/FastCalc Data/Dumper I18N/Langinfo Time/Piece IO Hash/Util/FieldHash Hash/Util Filter/Util/Call Encode/Unicode Encode Encode/JP Encode/KR Encode/EBCDIC Encode/CN Encode/Symbol Encode/Byte Encode/TW Compress/Raw/Zlib Compress/Raw/Bzip2 MIME/Base64 Cwd List/Util Fcntl Opcode Storable'
+static_ext='mro B Socket Time/HiRes File/Glob Sys/Hostname PerlIO/via PerlIO/mmap PerlIO/encoding PerlIO/scalar attributes Unicode/Normalize Unicode/Collate re Digest/MD5 Digest/SHA Math/BigInt/FastCalc Data/Dumper I18N/Langinfo Time/Piece IO Hash/Util/FieldHash Hash/Util Filter/Util/Call Encode/Unicode Encode Encode/JP Encode/KR Encode/EBCDIC Encode/CN Encode/Symbol Encode/Byte Encode/TW Compress/Raw/Zlib Compress/Raw/Bzip2 MIME/Base64 Cwd List/Util Fcntl Opcode Storable'
 
 # Compiler/linker flags
 ccflags='-DBIG_TIME -Wno-int-conversion -Wno-implicit-function-declaration -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_GETPID -D_GNU_SOURCE -D_POSIX_C_SOURCE -Wno-null-pointer-arithmetic -D_WASI_EMULATED_SIGNAL -include __WASI_SDK_PATH__/share/wasi-sysroot/include/wasm32-wasi/fcntl.h -I__STUBS_DIR__'

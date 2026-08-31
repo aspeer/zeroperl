@@ -9,8 +9,9 @@ PERL_VERSION="${PERL_VERSION:-5.44.0}"
 # configures for cross-compilation, builds libperl.a and the perl binary,
 # and installs into /zeroperl.
 #
-# Supports the WebDyne release matrix (5.18.4, 5.24.4, 5.36.3 and
-# 5.44.0), with version-specific workarounds for the 5.18 build.
+# Supports the qualified WebDyne release matrix (5.18.4, 5.36.3 and 5.44.0),
+# with version-specific workarounds for the 5.18 build. Perl 5.24.4 can build
+# but is not qualified because real WebDyne async control flow traps.
 URLPERL="https://www.cpan.org/src/5.0/perl-${PERL_VERSION}.tar.gz"
 WASI_SDK_PATH="${WASI_SDK_PATH:-/opt/wasi-sdk}"
 WASM_DIR="${WASM_DIR:-/build/wasm}"
@@ -63,6 +64,11 @@ if [ "$PERL_MAJOR" -gt 5 ] || { [ "$PERL_MAJOR" -eq 5 ] && [ "$PERL_MINOR" -gt 3
 ccflags="$ccflags -DNO_MATHOMS"
 cppflags="$cppflags -DNO_MATHOMS"
 HINTS_NO_MATHOMS
+
+    # PerlIO::scalar is folded into the interpreter after 5.36 and no longer
+    # produces a standalone static archive. Older releases need it explicitly
+    # for WebDyne::Compile's scalar-backed PSP source handles.
+    perl -pi -e 's/ PerlIO\/scalar\b//' "$WASM_DIR/hints/wasi.sh"
 fi
 
 # 5.38.x: PL_cur_locale_obj referenced under wrong #ifdef guard in perl.c
@@ -76,7 +82,7 @@ d_uselocale='undef'
 d_duplocale='undef'
 d_freelocale='undef'
 d_querylocale='undef'
-static_ext='mro Time/HiRes File/Glob Sys/Hostname PerlIO/via PerlIO/mmap PerlIO/encoding attributes Unicode/Collate Digest/MD5 Digest/SHA Math/BigInt/FastCalc Data/Dumper I18N/Langinfo Time/Piece IO Hash/Util/FieldHash Hash/Util Filter/Util/Call Encode/Unicode Encode Encode/JP Encode/KR Encode/EBCDIC Encode/CN Encode/Symbol Encode/Byte Encode/TW Compress/Raw/Zlib Compress/Raw/Bzip2 MIME/Base64 Cwd List/Util Fcntl Opcode'
+static_ext='mro Time/HiRes File/Glob Sys/Hostname PerlIO/via PerlIO/mmap PerlIO/encoding PerlIO/scalar attributes Unicode/Collate Digest/MD5 Digest/SHA Math/BigInt/FastCalc Data/Dumper I18N/Langinfo Time/Piece IO Hash/Util/FieldHash Hash/Util Filter/Util/Call Encode/Unicode Encode Encode/JP Encode/KR Encode/EBCDIC Encode/CN Encode/Symbol Encode/Byte Encode/TW Compress/Raw/Zlib Compress/Raw/Bzip2 MIME/Base64 Cwd List/Util Fcntl Opcode'
 HINTS_538
 fi
 
@@ -93,7 +99,7 @@ HINTS_OLD_FLAGS
     # Keep the broadly useful core XS set available on 5.18 as well. Socket's
     # unsupported Unix-domain and resolver branches are handled by the narrow
     # WASI source transform above; B and Storable need no platform facade.
-    WASI_STATIC_EXT="mro B Socket Time/HiRes File/Glob Sys/Hostname PerlIO/via PerlIO/encoding attributes Unicode/Normalize re Digest/MD5 Digest/SHA Math/BigInt/FastCalc Data/Dumper I18N/Langinfo IO Hash/Util Filter/Util/Call Encode Compress/Raw/Zlib Compress/Raw/Bzip2 MIME/Base64 Cwd List/Util Fcntl Opcode Unicode/Collate Time/Piece Hash/Util/FieldHash PerlIO/mmap Storable"
+    WASI_STATIC_EXT="mro B Socket Time/HiRes File/Glob Sys/Hostname PerlIO/via PerlIO/encoding PerlIO/scalar Tie/Hash/NamedCapture attributes Unicode/Normalize re Digest/MD5 Digest/SHA Math/BigInt/FastCalc Data/Dumper I18N/Langinfo IO Hash/Util Filter/Util/Call Encode Compress/Raw/Zlib Compress/Raw/Bzip2 MIME/Base64 Cwd List/Util Fcntl Opcode Unicode/Collate Time/Piece Hash/Util/FieldHash PerlIO/mmap Storable"
     WASI_NOEXT="POSIX Devel/Peek Sys/Syslog threads threads/shared IPC/SysV SDBM_File File/DosGlob Errno"
 
     cat >> "$WASM_DIR/hints/wasi.sh" << HINTS

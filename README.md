@@ -1,15 +1,18 @@
 zeroperl is an experimental build of Perl 5 in a sandboxed, self-contained WebAssembly module.
-This WebDyne integration fork builds the last patch releases of four supported
-release lines: **5.18.4**, **5.24.4**, **5.36.3**, and **5.44.0**.
+This WebDyne integration fork builds the last patch releases of three qualified
+release lines: **5.18.4**, **5.36.3**, and **5.44.0**.
 
 Read the full blog [here](https://andrews.substack.com/p/zeroperl-sandboxed-perl-with-webassembly)
 
 ## Note
 
 This is the canonical ZeroPerl runtime for WebDyne::PAGI WASM targets. It
-consolidates upstream fork improvements and statically compiles the XS modules
-needed by WebDyne. See [wasm-WebDyne-PAGI](https://github.com/aspeer/wasm-WebDyne-PAGI)
-for the Cloudflare integration.
+consolidates upstream fork improvements, embeds WebDyne 3.023 and PAGI::Tools
+0.002002 with their runtime dependencies, and statically compiles the XS
+modules needed by WebDyne. A normal PSP application therefore does not need a
+separate Perl library archive. See
+[wasm-WebDyne-PAGI](https://github.com/aspeer/wasm-WebDyne-PAGI) for the
+Cloudflare integration.
 
 ## Build
 
@@ -63,7 +66,7 @@ Declared in [Dockerfile](Dockerfile) as `ARG` (pass with `--build-arg`).
 
 | Arg                                     | Default                                                 | Notes                                                                                                |
 | --------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `PERL_VERSION`                          | `5.44.0`                                                | Perl source version; supported release artifacts use 5.18.4, 5.24.4, 5.36.3, and 5.44.0.            |
+| `PERL_VERSION`                          | `5.44.0`                                                | Perl source version; qualified release artifacts use 5.18.4, 5.36.3, and 5.44.0.                    |
 | `EXIFTOOL_VERSION`                      | `13.55`                                                 | ExifTool release tag                                                                                 |
 | `BUILD_EXIFTOOL`                        | `false`                                                 | Optionally build and ship ExifTool; it is not part of standard WebDyne artifacts                     |
 | `BUILD_CPANFILE`                        | `true`                                                  | Install WebDyne dependencies and cross-compile their XS components                                   |
@@ -124,7 +127,7 @@ Shrink implementation notes:
 ./build.sh run
 
 # Another supported release
-PERL_VERSION=5.24.4 ./build.sh run
+PERL_VERSION=5.36.3 ./build.sh run
 
 # Override versions
 PERL_VERSION=5.44.0 ZLIB_VERSION=1.3.2 EXIFTOOL_VERSION=13.55 ./build.sh run full
@@ -197,22 +200,28 @@ See the [zeroperl-ts README](https://github.com/aspeer/zeroperl-ts) for details.
 
 ### Verified standard artifacts
 
-The Milestone 1 build matrix below uses `BUILD_EXIFTOOL=false`, retains the
-WebDyne dependency and static-XS surface, and embeds the Perl prefix. Each
-artifact passed the core, static Socket, and eight async-disposal probes.
+The Milestone 1 build matrix below uses `BUILD_EXIFTOOL=false` and embeds the
+complete WebDyne/PAGI runtime and Perl prefix. Each artifact passed the core,
+static Socket, embedded-module, eight async-disposal, and persistent Worker
+render probes.
 
 | Perl | `zeroperl.wasm` | gzip | `zeroperl_reactor.wasm` | SHA-256 (`zeroperl.wasm`) |
 | --- | ---: | ---: | ---: | --- |
-| 5.18.4 | 12,863,736 | 4,505,234 | 11,782,810 | `e0aedf050e69d69a30a02d8a60f5a89a8eed61c1022c44981ddbbc7b70c3866c` |
-| 5.24.4 | 13,282,859 | 4,538,613 | 12,094,587 | `052946649c1b3650cf358102391a151e1adb40e45406f3ddb389979e875f164e` |
-| 5.36.3 | 13,670,386 | 4,569,176 | 12,354,923 | `1545e9ebd1830af64ddbbb6d06db5fbf1bf417d6b66a6d615f2e2ed613d4ed16` |
-| 5.44.0 | 14,368,215 | 4,713,197 | 13,020,122 | `183aef1bc409c3894e30f4b3a3ef2850be3e708a8ec3c8cd26cdbbe8b58ee74a` |
+| 5.18.4 | 13,534,404 | 4,672,831 | 12,496,642 | `eb9efcf72027f89fcdaffd8aceda694fec258f437d17645c3c320c6e8d0cfe36` |
+| 5.36.3 | 14,182,812 | 4,691,822 | 12,943,244 | `4dece6f6b2c2d5c85db5ab9ae589ce752b86b1ffe548abd8bbeb86ee8c8d6a27` |
+| 5.44.0 | 14,869,096 | 4,844,199 | 13,604,090 | `654ad9f2c8c53125d79f8bac11a1256745c4cb805339b1ae2b4c096aa23f89aa` |
 
 Sizes are bytes. The 5.44 safe mini experiment kept the same module and XS
 surface and enabled compressed SFS embedding. It produced a 12,050,075-byte
 WASM (16.1% smaller raw), but its gzip size increased to 5,055,576 bytes. It
 therefore failed the required 30% compressed-size reduction and no `-mini`
 artifact is produced.
+
+Perl 5.24.4 is intentionally not qualified. Its low-level async probes pass,
+but a real WebDyne::Chain/Template request reproducibly traps in
+`_asyncjmp_longjmp` at both the original 32 KiB and expanded 64 KiB capture
+buffer sizes. The 64 KiB buffer remains because all retained versions pass and
+the additional capture headroom is useful for deeper WebDyne page call stacks.
 
 For an in-repo verification that the built wasm can load modules from the
 embedded `/zeroperl` prefix without mounting `output/perl-wasi-prefix`, run:
@@ -222,10 +231,9 @@ npm --prefix tools ci
 node tools/verify-embedded-inc.mjs output/zeroperl.wasm
 ```
 
-This verifier uses the local `zeroperl-ts` submodule (`./zeroperl-ts`) to instantiate the local wasm artifact
-directly, inspects `@INC`, and requires `Image::ExifTool` modules without
-providing the extracted prefix tree. It assumes the build was produced with
-`BUILD_EXIFTOOL=true`.
+This verifier uses the local `zeroperl-ts` submodule (`./zeroperl-ts`) to
+instantiate the local wasm artifact directly, inspects `@INC`, and requires
+WebDyne and WebDyne::PAGI without providing the extracted prefix tree.
 
 ## Usage
 

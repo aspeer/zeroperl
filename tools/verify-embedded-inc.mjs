@@ -79,8 +79,10 @@ async function main() {
       print "__INC_END__\\n";
 
       require File::Glob;
-      require Image::ExifTool;
-      require Image::ExifTool::XMP;
+      require WebDyne;
+      require WebDyne::PAGI;
+      WebDyne->VERSION('3.023');
+      WebDyne::PAGI->VERSION('3.023');
 
       print "__MODULE_OK__\\n";
     `);

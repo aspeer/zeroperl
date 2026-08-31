@@ -7,7 +7,11 @@
 // Keep context between try/catch callbacks so two adjacent function-pointer
 // parameters are not easily swapped at call sites.
 #ifndef WASM_SETJMP_STACK_BUFFER_SIZE
-#define WASM_SETJMP_STACK_BUFFER_SIZE 32768
+// WebDyne::PAGI can cross setjmp/longjmp with a considerably deeper Perl
+// call stack than the small examples used by the original runtime.  Keep
+// enough Asyncify capture space for complex pages without changing the
+// separate 8 MiB WebAssembly execution stack.
+#define WASM_SETJMP_STACK_BUFFER_SIZE 65536
 #endif
 
 struct __asyncjmp_asyncify_jmp_buf

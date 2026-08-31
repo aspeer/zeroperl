@@ -18,12 +18,14 @@ print "perl version: $^V\n";
 # feature bundle is enabled. Future::IO uses this form, so the generated core
 # file is part of the WebDyne runtime contract even though most ASCII-only
 # module smoke checks do not reach it.
-eval {
-    require 'utf8_heavy.pl';
-    my $swash = utf8->SWASHNEW('Any', '', 1, 0);
-    die "utf8::SWASHNEW" unless $swash;
-    1;
-} or push @errors, "version feature bundle/unicore: $@";
+if ($] < 5.026) {
+    eval {
+        require 'utf8_heavy.pl';
+        my $swash = utf8->SWASHNEW('Any', '', 1, 0);
+        die "utf8::SWASHNEW" unless $swash;
+        1;
+    } or push @errors, "version feature bundle/unicore: $@";
+}
 
 # ── Required core surface ───────────────────────────────────────────────────
 
@@ -170,6 +172,31 @@ eval {
     die "File::Glob" unless @files >= 0;
     1;
 } or push @errors, "File::Glob: $@";
+
+# The standard WebDyne artifact is self-contained: WebDyne and its PAGI
+# adapter must load from the embedded prefix without a consumer-side Perl
+# library archive. Full request rendering is exercised by the Worker smoke.
+eval {
+    require WebDyne;
+    require WebDyne::PAGI;
+    require WebDyne::Session;
+    WebDyne->VERSION('3.023');
+    WebDyne::PAGI->VERSION('3.023');
+    WebDyne::Session->VERSION('3.023');
+    1;
+} or push @errors, "WebDyne::PAGI: $@";
+
+# WebDyne::Compile opens PSP source through the scalar PerlIO layer. This is
+# a distinct core XS extension on older Perls and therefore must be linked
+# explicitly into every supported artifact.
+eval {
+    my $source = "scalar PerlIO layer OK\n";
+    open my $fh, '<', \$source or die "open scalar source: $!";
+    my $line = <$fh>;
+    close $fh or die "close scalar source: $!";
+    die "scalar source content mismatch" unless $line eq $source;
+    1;
+} or push @errors, "PerlIO::scalar: $@";
 
 # ── Report ───────────────────────────────────────────────────────────────────
 

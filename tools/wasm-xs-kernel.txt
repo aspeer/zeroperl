@@ -26,10 +26,12 @@ Math/BigInt/FastCalc
 Opcode
 PerlIO/encoding
 PerlIO/mmap
+PerlIO/scalar
 PerlIO/via
 Sys/Hostname
 Time/HiRes
 Time/Piece
+Tie/Hash/NamedCapture
 Unicode/Collate
 Unicode/Normalize
 attributes

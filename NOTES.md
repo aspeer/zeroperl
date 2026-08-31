@@ -6,14 +6,19 @@
   pipeline scripts, and build documentation.
 - A successful 5.44.0 build produces `zeroperl.wasm`,
   `zeroperl_reactor.wasm`, `config.h`, and `perl-wasi-prefix/` in `output/`.
-- The prefix is part of the runtime artifact: it contains the Perl `.pm`
-  files and must be mounted at `/zeroperl` by the WASI host.
+- The prefix is embedded in `zeroperl.wasm`. The extracted
+  `perl-wasi-prefix/` is retained for inventory, comparison, and optional
+  application-module staging; a consumer does not mount it for normal use.
+- Qualified standard artifacts are Perl 5.18.4, 5.36.3, and 5.44.0. Perl
+  5.24.4 is excluded because real WebDyne Chain/Template execution traps in
+  `_asyncjmp_longjmp` even though its low-level async probes pass.
 
 ## cpanfile and XS support
 
-- `BUILD_CPANFILE` (default `true`) installs the project `cpanfile` into the
-  native prefix, copies its Perl modules into the WASI prefix, builds the
-  needed XS distributions as static archives, and links them into the wasm.
+- `BUILD_CPANFILE` (default `true`) installs the project `cpanfile`, including
+  WebDyne 3.023 and PAGI::Tools 0.002002, into the native prefix; copies its
+  runtime modules into the WASI prefix; builds the needed XS distributions as
+  static archives; and links and embeds the complete prefix in the wasm.
 - The static CPAN XS extensions are HTML::Parser, Clone, Cpanel::JSON::XS,
   Crypt::URandom, XS::Parse::Sublike, XS::Parse::Keyword, Future::XS, and
   Future::AsyncAwait. Future::IO is pure Perl and is included through the
@@ -27,6 +32,10 @@
 
 - The static wasm link and XS bootstrap registry include mro, B, Socket,
   Storable, and the CPAN XS extensions above.
+- PerlIO::scalar is linked explicitly through Perl 5.36 for
+  WebDyne::Compile's scalar-backed source handles. Perl 5.44 folds this layer
+  into the interpreter. Perl 5.18 also links Tie::Hash::NamedCapture, required
+  through WebDyne::Session's Crypt::URandom dependency path.
 - Socket is built as a static core extension. The Socket WASI patch disables
   the Unix-domain socket pack/unpack code because WASI does not provide a
   complete `sockaddr_un` definition.
@@ -48,12 +57,15 @@
   node tools/smoke-asyncify-free.mjs --case=value_free
   ```
 
-  The current runtime intentionally fails this probe with `RuntimeError:
-  unreachable`; no Asyncify release-path fix has been included yet. The test
-  is the regression coverage to run after that fix.
+  All eight release paths pass on each qualified standard artifact.
 
 ## Verified build
 
-- The complete Docker build for Perl 5.44.0 completed with ExifTool disabled.
-- The resulting wasm passed the Socket and mro static-bootstrap runtime
-  checks under Node WASI.
+- Complete Perl 5.18.4, 5.36.3, and 5.44.0 builds completed with ExifTool
+  disabled and the WebDyne/PAGI runtime embedded.
+- Each resulting wasm passed the core and static-XS smoke, embedded `@INC`,
+  all eight async-disposal probes, and a 115-request persistent Worker
+  Chain/Template regression with an empty optional-module archive.
+- The Asyncify capture buffer is 64 KiB. This did not repair Perl 5.24.4, but
+  it passed every retained version and provides headroom for complex pages;
+  the WebAssembly execution stack remains a separate 8 MiB allocation.
