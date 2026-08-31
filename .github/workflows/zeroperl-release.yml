@@ -21,11 +21,6 @@ jobs:
             shrink-mode: off
             embed-prefix: true
             build-exiftool: false
-          - name: standard-5.24.4
-            perl-version: 5.24.4
-            shrink-mode: off
-            embed-prefix: true
-            build-exiftool: false
           - name: standard-5.36.3
             perl-version: 5.36.3
             shrink-mode: off

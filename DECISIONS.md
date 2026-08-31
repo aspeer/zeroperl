@@ -2,13 +2,16 @@
 
 ## D001: Supported Perl release lines
 
-Standard artifacts target the last releases of Perl 5.18, 5.24, 5.36, and
-5.44: 5.18.4, 5.24.4, 5.36.3, and 5.44.0.
+Qualified standard artifacts target Perl 5.18.4, 5.36.3, and 5.44.0. Perl
+5.24.4 is excluded because real WebDyne Chain/Template execution traps in
+`_asyncjmp_longjmp` with both 32 KiB and 64 KiB capture buffers, despite
+passing the low-level async probes.
 
 ## D002: WebDyne compatibility takes precedence
 
-The canonical runtime statically builds the XS modules required by WebDyne and
-WebDyne::PAGI. Generic PAGI compatibility is useful but is not a release gate.
+The canonical runtime embeds WebDyne 3.023, WebDyne::PAGI, PAGI::Tools
+0.002002, their runtime dependencies, and the XS modules they require. Generic
+PAGI compatibility is useful but is not a release gate.
 
 ## D003: Bridge ownership
 
@@ -41,3 +44,10 @@ Newer releases continue to build with `NO_MATHOMS`.
 ExifTool is not part of the WebDyne runtime deliverable and is excluded from
 all standard artifacts. `BUILD_EXIFTOOL=true` remains available solely for
 special-purpose builds and is not a release gate.
+
+## D008: Asyncify capture headroom
+
+The setjmp/Asyncify capture buffer is 64 KiB. It is separate from the 8 MiB
+WebAssembly execution stack. Although the increase did not repair Perl 5.24.4,
+it passed all retained versions and provides headroom for deeper WebDyne page
+call stacks.

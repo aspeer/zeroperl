@@ -243,12 +243,12 @@ Verification layers:
   [tools/wasm-smoke.sh](tools/wasm-smoke.sh) runs inside the container and fails the build if `gen/wasm-missing-paths.txt` is non-empty.
 - **Final-stage embedded smoke** (`final` stage): when `ZEROPERL_EMBED_PREFIX=true`,
   [tools/wasm-smoke.mjs](tools/wasm-smoke.mjs) runs against `/build/wasm/zeroperl.wasm` inside the image (optional `exiftool.min.pl` argument when `BUILD_EXIFTOOL=true`).
-- **Embedded runtime verifier** (CI / local): `node tools/verify-embedded-inc.mjs output/zeroperl.wasm` (after `npm --prefix tools ci`) uses the local `./zeroperl-ts` submodule to instantiate the built wasm directly, verifies the embedded `/zeroperl` paths are present in `@INC`, and loads ExifTool modules without mounting `output/perl-wasi-prefix`.
+- **Embedded runtime verifier** (CI / local): `node tools/verify-embedded-inc.mjs output/zeroperl.wasm` (after `npm --prefix tools ci`) uses the local `./zeroperl-ts` submodule to instantiate the built wasm directly, verifies the embedded `/zeroperl` paths are present in `@INC`, and loads WebDyne and WebDyne::PAGI without mounting `output/perl-wasi-prefix`.
 - Extract and compare tracked `gen/` artifacts from container output.
 - Determinism check by rebuilding wasi-perl and comparing hash manifests. Run locally with [tools/check-wasm-shrink-determinism.sh](tools/check-wasm-shrink-determinism.sh) (requires a container environment with native prefix present).
 - Run prefix smoke matrix via [tools/wasm-smoke.sh](tools/wasm-smoke.sh).
 - Release builds use the same workflow for parallel standard artifact generation
-  across Perl 5.18.4, 5.24.4, 5.36.3, and 5.44.0.
+  across Perl 5.18.4, 5.36.3, and 5.44.0.
 
 ```mermaid
 flowchart LR
