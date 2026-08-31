@@ -200,6 +200,7 @@ static void test_open_read_stat_compressed(void) {
        SFS_STAT_OURS);
   T_EQ((size_t)st.st_size, sizeof(raw) - 1);
   T_EQ((st.st_mode & S_IFMT), S_IFREG);
+  T_EQ(st.st_mtime, 1);
   memset(&st, 0, sizeof(st));
   T_EQ(sfs_runtime_stat(&runtime, entries, 1,
             "/zeroperl//lib/site_perl/Image/ExifTool.pm", -1,
@@ -207,6 +208,7 @@ static void test_open_read_stat_compressed(void) {
     SFS_STAT_OURS);
   T_EQ((size_t)st.st_size, sizeof(raw) - 1);
   T_EQ((st.st_mode & S_IFMT), S_IFREG);
+  T_EQ(st.st_mtime, 1);
 
   FILE *fp = NULL;
   int fd = sfs_runtime_open(&runtime, entries, 1,
@@ -222,6 +224,7 @@ static void test_open_read_stat_compressed(void) {
   T_EQ(sfs_runtime_stat(&runtime, entries, 1, NULL, fd, &st), SFS_STAT_OURS);
   T_EQ((size_t)st.st_size, sizeof(raw) - 1);
   T_EQ((st.st_mode & S_IFMT), S_IFREG);
+  T_EQ(st.st_mtime, 1);
 
   T_EQ(sfs_runtime_close(&runtime, fd), SFS_OK);
 

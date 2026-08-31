@@ -209,7 +209,7 @@ render probes.
 | --- | ---: | ---: | ---: | --- |
 | 5.18.4 | 13,534,404 | 4,672,831 | 12,496,642 | `eb9efcf72027f89fcdaffd8aceda694fec258f437d17645c3c320c6e8d0cfe36` |
 | 5.36.3 | 14,182,812 | 4,691,822 | 12,943,244 | `4dece6f6b2c2d5c85db5ab9ae589ce752b86b1ffe548abd8bbeb86ee8c8d6a27` |
-| 5.44.0 | 14,869,096 | 4,844,199 | 13,604,090 | `654ad9f2c8c53125d79f8bac11a1256745c4cb805339b1ae2b4c096aa23f89aa` |
+| 5.44.0 | 14,869,138 | 4,844,215 | 13,604,111 | `d84676e4728bab51f99818b48023af434453f175d29194e74630ac97000dcec3` |
 
 Sizes are bytes. The 5.44 safe mini experiment kept the same module and XS
 surface and enabled compressed SFS embedding. It produced a 12,050,075-byte
@@ -222,6 +222,9 @@ but a real WebDyne::Chain/Template request reproducibly traps in
 `_asyncjmp_longjmp` at both the original 32 KiB and expanded 64 KiB capture
 buffer sizes. The 64 KiB buffer remains because all retained versions pass and
 the additional capture headroom is useful for deeper WebDyne page call stacks.
+
+During implementation iteration, rebuild and test Perl 5.44.0 only. Rebuild
+the other qualified release lines after the final runtime pattern is stable.
 
 For an in-repo verification that the built wasm can load modules from the
 embedded `/zeroperl` prefix without mounting `output/perl-wasi-prefix`, run:

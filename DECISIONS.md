@@ -51,3 +51,11 @@ The setjmp/Asyncify capture buffer is 64 KiB. It is separate from the 8 MiB
 WebAssembly execution stack. Although the increase did not repair Perl 5.24.4,
 it passed all retained versions and provides headroom for deeper WebDyne page
 call stacks.
+
+## D009: Embedded files have a stable nonzero modification time
+
+Embedded SFS entries are immutable and report `st_mtime = 1`. A zero value is
+ambiguous to callers that use a truthy modification time to distinguish a
+successful `stat`; WebDyne does this when compiling its built-in index page.
+The fixed epoch sentinel preserves deterministic artifacts without inventing a
+build-time timestamp.

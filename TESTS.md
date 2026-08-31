@@ -28,3 +28,22 @@ capture buffers, so it is not a qualified standard artifact.
 The safe 5.44 mini candidate passed the same runtime gates, but gzip size grew
 from 4,713,197 to 5,055,576 bytes. It failed the 30% reduction requirement and
 was rejected.
+
+## Embedded WebDyne index regression
+
+The Perl 5.44.0 standard artifact was rebuilt after embedded SFS files were
+given a deterministic nonzero modification time. The generator tests and all
+164 native SFS runtime assertions passed in the container build, as did the
+core/module smoke. With the rebuilt artifact staged in `wasm-WebDyne-PAGI`, an
+unchanged `WEBDYNE_INDEX = "1"` rendered the embedded
+`WebDyne/index.psp` at `/` with HTTP 200. The cold request completed in 0.91
+seconds and a second request on the same interpreter completed in 0.029
+seconds.
+
+Artifact evidence:
+
+- `zeroperl.wasm`: 14,869,138 bytes; gzip 4,844,215 bytes;
+  SHA-256 `d84676e4728bab51f99818b48023af434453f175d29194e74630ac97000dcec3`.
+- `zeroperl_reactor.wasm`: 13,604,111 bytes.
+- ExifTool was disabled and no older Perl variant was rebuilt for this
+  iteration.

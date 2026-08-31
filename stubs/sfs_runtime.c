@@ -289,6 +289,10 @@ SFS_Stat_Result sfs_runtime_stat(SfsRuntime *runtime,
     memset(stbuf, 0, sizeof(*stbuf));
     stbuf->st_size = (off_t)sfs_entry_effective_size(entry);
     stbuf->st_mode = S_IFREG;
+    // Embedded SFS entries are immutable, but a zero mtime is commonly
+    // interpreted as a failed stat. Use a stable epoch sentinel so callers
+    // can distinguish a real embedded file without making builds vary by time.
+    stbuf->st_mtime = 1;
     return SFS_STAT_OURS;
   }
 
@@ -299,6 +303,7 @@ SFS_Stat_Result sfs_runtime_stat(SfsRuntime *runtime,
   memset(stbuf, 0, sizeof(*stbuf));
   stbuf->st_size = (off_t)entry->size;
   stbuf->st_mode = S_IFREG;
+  stbuf->st_mtime = 1;
   return SFS_STAT_OURS;
 }
 
