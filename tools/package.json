@@ -6,6 +6,6 @@
     "verify:embedded-inc": "node verify-embedded-inc.mjs"
   },
   "devDependencies": {
-    "@6over3/zeroperl-ts": "file:../zeroperl-ts"
+    "@aspeer/zeroperl-ts": "file:../zeroperl-ts"
   }
 }

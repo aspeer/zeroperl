@@ -153,7 +153,7 @@ container build --target final -t zeroperl .
 
 This repo vendors `zeroperl-ts` as a git submodule at `./zeroperl-ts`. You must
 initialize submodules before running any in-repo `npm install` or `npm ci` that
-resolves the local `zeroperl-ts` package via `file:./zeroperl-ts` (root) or
+resolves the private `@aspeer/zeroperl-ts` package via `file:./zeroperl-ts` (root) or
 `file:../zeroperl-ts` (`tools/`).
 
 Clone with submodules:
