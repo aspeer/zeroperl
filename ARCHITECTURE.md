@@ -4,12 +4,14 @@ This document explains how zeroperl is assembled, what runs at runtime, and how 
 
 ## Purpose
 
-zeroperl packages a Perl interpreter and a curated Perl prefix into a single WASM runtime artifact set:
+zeroperl packages a Perl interpreter and a curated Perl prefix into a
+versioned WebDyne runtime artifact set. For example, Perl 5.44.0 build 1 is:
 
-- `output/zeroperl.wasm`
-- `output/zeroperl_reactor.wasm`
-- `output/perl-wasi-prefix/`
-- optional `output/exiftool.min.pl`
+- `output/5.44.0/zeroperl-webdyne-5.44.0-1.wasm`
+- `output/5.44.0/zeroperl-webdyne-reactor-5.44.0-1.wasm`
+- `output/5.44.0/perl-wasi-prefix-5.44.0-1/`
+- `output/5.44.0/config-5.44.0-1.h`
+- a manifest and SHA-256 checksum list for the build
 
 The build is orchestrated primarily by [Dockerfile](Dockerfile) and scripts in [pipeline/](pipeline).
 
@@ -233,8 +235,11 @@ flowchart TD
 
 ## Verification and CI Architecture
 
-Primary CI workflow:
-[.github/workflows/zeroperl-release.yml](.github/workflows/zeroperl-release.yml).
+Primary CI workflows are
+[zeroperl-webdyne-release.yml](.github/workflows/zeroperl-webdyne-release.yml)
+for one qualified Perl/build tuple and
+[zeroperl-webdyne-npm.yml](.github/workflows/zeroperl-webdyne-npm.yml) for
+packaging those exact released bytes. The npm workflow does not rebuild WASM.
 
 Verification layers:
 
@@ -243,12 +248,13 @@ Verification layers:
   [tools/wasm-smoke.sh](tools/wasm-smoke.sh) runs inside the container and fails the build if `gen/wasm-missing-paths.txt` is non-empty.
 - **Final-stage embedded smoke** (`final` stage): when `ZEROPERL_EMBED_PREFIX=true`,
   [tools/wasm-smoke.mjs](tools/wasm-smoke.mjs) runs against `/build/wasm/zeroperl.wasm` inside the image (optional `exiftool.min.pl` argument when `BUILD_EXIFTOOL=true`).
-- **Embedded runtime verifier** (CI / local): `node tools/verify-embedded-inc.mjs output/zeroperl.wasm` (after `npm --prefix tools ci`) uses the local `./zeroperl-ts` submodule to instantiate the built wasm directly, verifies the embedded `/zeroperl` paths are present in `@INC`, and loads WebDyne and WebDyne::PAGI without mounting `output/perl-wasi-prefix`.
+- **Embedded runtime verifier** (CI / local): `node tools/verify-embedded-inc.mjs output/5.44.0/zeroperl-webdyne-5.44.0-1.wasm` (after `npm --prefix tools ci`) uses the local `./zeroperl-ts` submodule to instantiate the built wasm directly, verifies the embedded `/zeroperl` paths are present in `@INC`, and loads WebDyne and WebDyne::PAGI without mounting the extracted prefix.
 - Extract and compare tracked `gen/` artifacts from container output.
 - Determinism check by rebuilding wasi-perl and comparing hash manifests. Run locally with [tools/check-wasm-shrink-determinism.sh](tools/check-wasm-shrink-determinism.sh) (requires a container environment with native prefix present).
 - Run prefix smoke matrix via [tools/wasm-smoke.sh](tools/wasm-smoke.sh).
-- Release builds use the same workflow for parallel standard artifact generation
-  across Perl 5.18.4, 5.36.3, and 5.44.0.
+- Each release workflow invocation builds and promotes exactly one supported
+  Perl version and WebDyne build number. This keeps tags, archives, attestations,
+  and npm candidates independently immutable.
 
 ```mermaid
 flowchart LR

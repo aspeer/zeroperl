@@ -18,30 +18,37 @@ Cloudflare integration.
 
 Requires Docker or Apple Container (macOS).
 
-**Docker:**
+The supported local entry point builds, verifies, and extracts one versioned
+WebDyne artifact set:
 
 ```bash
-docker build -t zeroperl .
-mkdir -p output
-docker run --rm -v $(pwd)/output:/output zeroperl cp -r /artifacts/. /output/
+./build.sh run off
+PERL_VERSION=5.36.3 ./build.sh run off
 ```
 
-**Apple Container (macOS):**
+Default build numbers come from `release/versions.json`. Increment the selected
+version there for a new immutable build, or override it for an experiment:
 
 ```bash
-container build -t zeroperl .
-mkdir -p output
-container run --rm zeroperl sh -c 'cd /artifacts && tar cf - .' | tar xf - -C output
+PERL_VERSION=5.44.0 BUILD_NUMBER=2 ./build.sh run off
 ```
 
-Output in `./output/`:
+Perl 5.44.0 build 1 produces:
 
-- `zeroperl.wasm` — wasm-opt output from `zeroperl_reactor.wasm` (asyncify-instrumented when `ASYNCIFY=true`; see `pipeline/build-wasm.sh`)
-- `zeroperl_reactor.wasm` — linker output (`-mexec-model=reactor`) before the wasm-opt asyncify pass
-- `config.h` — Perl/WASI `config.h` from the wasm build tree (useful for debugging toolchain mismatches)
-- `perl-wasi-prefix/` — Perl library prefix
-- `exiftool.min.pl` — minified ExifTool, only when explicitly enabled; it is
-  excluded from every standard WebDyne artifact
+```text
+output/5.44.0/
+  zeroperl-webdyne-5.44.0-1.wasm
+  zeroperl-webdyne-reactor-5.44.0-1.wasm
+  config-5.44.0-1.h
+  perl-wasi-prefix-5.44.0-1/
+  manifest-5.44.0-1.json
+  SHA256SUMS-5.44.0-1
+```
+
+The normal WASM is the Asyncify-instrumented output. The reactor file is the
+linker output before that pass. The extracted prefix is retained for inventory,
+comparison, and optional external mounting even though standard builds embed
+it in the normal WASM.
 
 ### Build args
 
@@ -124,13 +131,13 @@ Shrink implementation notes:
 
 ```bash
 # Default (Perl 5.44.0, no shrink)
-./build.sh run
+./build.sh run off
 
 # Another supported release
-PERL_VERSION=5.36.3 ./build.sh run
+PERL_VERSION=5.36.3 ./build.sh run off
 
-# Override versions
-PERL_VERSION=5.44.0 ZLIB_VERSION=1.3.2 EXIFTOOL_VERSION=13.55 ./build.sh run full
+# Explicit build-number override
+PERL_VERSION=5.44.0 BUILD_NUMBER=2 ./build.sh run off
 ```
 
 ### Iterating on stubs/zeroperl.c
@@ -227,11 +234,13 @@ During implementation iteration, rebuild and test Perl 5.44.0 only. Rebuild
 the other qualified release lines after the final runtime pattern is stable.
 
 For an in-repo verification that the built wasm can load modules from the
-embedded `/zeroperl` prefix without mounting `output/perl-wasi-prefix`, run:
+embedded `/zeroperl` prefix without mounting the extracted versioned prefix,
+run:
 
 ```bash
 npm --prefix tools ci
-node tools/verify-embedded-inc.mjs output/zeroperl.wasm
+node tools/verify-embedded-inc.mjs \
+  output/5.44.0/zeroperl-webdyne-5.44.0-1.wasm
 ```
 
 This verifier uses the local `zeroperl-ts` submodule (`./zeroperl-ts`) to

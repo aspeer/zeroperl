@@ -4,9 +4,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { WASI } from 'node:wasi';
 
-const wasmPath = path.resolve(process.argv[2] ?? 'output/zeroperl.wasm');
+const perlVersion = process.env.PERL_VERSION ?? '5.44.0';
+const versions = JSON.parse(
+  fs.readFileSync(new URL('../release/versions.json', import.meta.url), 'utf8'),
+);
+const buildNumber = process.env.BUILD_NUMBER ?? versions[perlVersion]?.build;
+if (!buildNumber) throw new Error(`Unsupported Perl version: ${perlVersion}`);
+const releaseId = `${perlVersion}-${buildNumber}`;
+const wasmPath = path.resolve(
+  process.argv[2] ?? `output/${perlVersion}/zeroperl-webdyne-${releaseId}.wasm`,
+);
 const prefixPath = path.resolve(
-  process.argv[3] ?? 'output/perl-wasi-prefix',
+  process.argv[3] ?? `output/${perlVersion}/perl-wasi-prefix-${releaseId}`,
 );
 
 if (!fs.existsSync(wasmPath)) {

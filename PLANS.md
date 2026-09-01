@@ -7,5 +7,14 @@
    the 30% compressed-size gate and the WebDyne compatibility checks.
 4. Supply the verified artifacts to `zeroperl-ts` and the Cloudflare
    `wasm-WebDyne-PAGI` integration.
+5. [x] Define versioned local output names and independent build numbers for
+   each retained Perl release.
+6. [x] Replace the legacy matrix release design with per-version GitHub release
+   and npm-candidate workflows whose publishing steps are guarded or disabled.
+7. [ ] Validate the new workflows on GitHub in nonpublishing mode.
+8. [ ] Configure the public binary distribution repository and npm Trusted
+   Publisher after their external names and permissions are supplied.
 
-Release publication, pushes, and repository merges require separate approval.
+Release creation, npm publication, and repository merges require separate
+approval. Feature-branch pushes and nonpublishing workflow runs are approved
+for the current release-pipeline work.

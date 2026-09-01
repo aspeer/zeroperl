@@ -12,9 +12,18 @@ const args = process.argv.slice(2);
 const caseArg = args.find((arg) => arg.startsWith('--case='));
 const requestedCase = caseArg?.slice('--case='.length);
 const positionalArgs = args.filter((arg) => !arg.startsWith('--case='));
-const wasmPath = path.resolve(positionalArgs[0] ?? 'output/zeroperl.wasm');
+const perlVersion = process.env.PERL_VERSION ?? '5.44.0';
+const versions = JSON.parse(
+  fs.readFileSync(new URL('../release/versions.json', import.meta.url), 'utf8'),
+);
+const buildNumber = process.env.BUILD_NUMBER ?? versions[perlVersion]?.build;
+if (!buildNumber) throw new Error(`Unsupported Perl version: ${perlVersion}`);
+const releaseId = `${perlVersion}-${buildNumber}`;
+const wasmPath = path.resolve(
+  positionalArgs[0] ?? `output/${perlVersion}/zeroperl-webdyne-${releaseId}.wasm`,
+);
 const prefixPath = path.resolve(
-  positionalArgs[1] ?? 'output/perl-wasi-prefix',
+  positionalArgs[1] ?? `output/${perlVersion}/perl-wasi-prefix-${releaseId}`,
 );
 
 if (!fs.existsSync(wasmPath)) throw new Error(`WASM file not found: ${wasmPath}`);

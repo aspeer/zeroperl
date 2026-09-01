@@ -59,3 +59,21 @@ ambiguous to callers that use a truthy modification time to distinguish a
 successful `stat`; WebDyne does this when compiling its built-in index page.
 The fixed epoch sentinel preserves deterministic artifacts without inventing a
 build-time timestamp.
+
+## D010: Version artifacts by Perl release and WebDyne build
+
+Each supported Perl release line has an independently incremented positive
+WebDyne build number. Local outputs retain the exact Perl version and build
+number in every public filename. A release tag uses
+`v<perl-version>-webdyne.<build-number>` and cannot be overwritten with
+different bytes.
+
+The npm package name contains the Perl version, for example
+`@webdyne/zeroperl-webdyne-5.44.0`. Its SemVer major is the WebDyne build
+number, so build 1 publishes as `1.0.0` and may be selected as `@1`. npm
+packaging consumes qualified release bytes and does not rebuild the runtime.
+
+GitHub attestations and SHA-256 manifests provide binary provenance and
+integrity. Platform-specific executable signing is not applicable to a WASM
+module. npm Trusted Publishing remains disabled until the package namespace
+and OIDC publisher are configured.

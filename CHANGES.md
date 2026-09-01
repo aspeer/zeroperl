@@ -1,5 +1,15 @@
 # Changes
 
+## Versioned WebDyne distribution pipeline
+
+- Added independent build numbers and versioned output directories for each
+  qualified Perl release.
+- Added manifests and SHA-256 checksum lists to every local artifact set.
+- Replaced the legacy multi-version workflow with a guarded, per-version
+  GitHub release candidate pipeline and signed build-provenance attestations.
+- Added a separate npm candidate workflow that consumes qualified release
+  bytes, validates a strict package allowlist, and leaves publication disabled.
+
 ## Milestone 1: runtime consolidation
 
 - Consolidated multi-version, shrink, SFS, and build-pipeline improvements.

@@ -10,6 +10,12 @@ Each supported standard artifact must pass:
 - SFS generator and native runtime tests; and
 - the `zeroperl-ts` bridge suite for the bundled default artifact.
 
+Release-pipeline validation additionally requires shell and workflow linting,
+SHA-256 verification after every packaging boundary, structural validation of
+both WASM files, an exact npm tarball file allowlist, npm publication dry-run,
+and GitHub build-provenance attestations. Initial workflow runs must keep
+GitHub Release and npm publication disabled.
+
 The mini experiment must pass the same relevant runtime checks and demonstrate
 at least a 30% reduction in compressed WASM size.
 

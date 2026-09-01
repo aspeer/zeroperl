@@ -4,10 +4,10 @@
 
 - The default Perl source version is now **5.44.0** in the Docker build,
   pipeline scripts, and build documentation.
-- A successful 5.44.0 build produces `zeroperl.wasm`,
-  `zeroperl_reactor.wasm`, `config.h`, and `perl-wasi-prefix/` in `output/`.
-- The prefix is embedded in `zeroperl.wasm`. The extracted
-  `perl-wasi-prefix/` is retained for inventory, comparison, and optional
+- A successful 5.44.0 build 1 produces versioned normal/reactor WASM files,
+  config header, prefix directory, manifest, and checksums in `output/5.44.0/`.
+- The prefix is embedded in the normal WASM. The extracted versioned prefix is
+  retained for inventory, comparison, and optional
   application-module staging; a consumer does not mount it for normal use.
 - Qualified standard artifacts are Perl 5.18.4, 5.36.3, and 5.44.0. Perl
   5.24.4 is excluded because real WebDyne Chain/Template execution traps in

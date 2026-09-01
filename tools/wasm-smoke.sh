@@ -2,6 +2,10 @@
 set -e
 
 ROOT="${1:-.}"
+PERL_VERSION="${PERL_VERSION:-5.44.0}"
+BUILD_NUMBER="${BUILD_NUMBER:-1}"
+RELEASE_ID="${PERL_VERSION}-${BUILD_NUMBER}"
+LOCAL_OUTPUT="$ROOT/output/$PERL_VERSION"
 SMOKE_SRC="$ROOT/tests/smoke"
 SMOKE_TMP="${TMPDIR:-/tmp}/zeroperl-smoke.$$"
 LOG_FILE="$SMOKE_TMP/smoke.log"
@@ -26,11 +30,11 @@ if [ -f "/build/repo/exiftool.min.pl" ] && [ -d "/zeroperl/lib" ] && [ -x "/buil
     EXIFTOOL_SCRIPT="/build/repo/exiftool.min.pl"
     PERL_LIB_BASE="$(find_perl_lib_base /zeroperl/lib)"
     USE_ARCH_LIB=1
-elif [ -f "$ROOT/output/exiftool.min.pl" ] && [ -d "$ROOT/output/perl-wasi-prefix/lib" ]; then
+elif [ -f "$LOCAL_OUTPUT/exiftool-$RELEASE_ID.min.pl" ] && [ -d "$LOCAL_OUTPUT/perl-wasi-prefix-$RELEASE_ID/lib" ]; then
     PERL_BIN="${PERL_BIN:-perl}"
-    EXIFTOOL_SCRIPT="$ROOT/output/exiftool.min.pl"
-    PERL_LIB_BASE="$(find_perl_lib_base "$ROOT/output/perl-wasi-prefix/lib")"
-    PERL_SITE_BASE="$(find_perl_lib_base "$ROOT/output/perl-wasi-prefix/lib/site_perl" 2>/dev/null || true)"
+    EXIFTOOL_SCRIPT="$LOCAL_OUTPUT/exiftool-$RELEASE_ID.min.pl"
+    PERL_LIB_BASE="$(find_perl_lib_base "$LOCAL_OUTPUT/perl-wasi-prefix-$RELEASE_ID/lib")"
+    PERL_SITE_BASE="$(find_perl_lib_base "$LOCAL_OUTPUT/perl-wasi-prefix-$RELEASE_ID/lib/site_perl" 2>/dev/null || true)"
     USE_ARCH_LIB=0
 else
     echo "error: unsupported layout; expected either wasi build container layout or local output artifacts" >&2

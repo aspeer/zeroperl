@@ -1,0 +1,209 @@
+name: ZeroPerl WebDyne release
+
+on:
+  workflow_dispatch:
+    inputs:
+      perl_version:
+        description: Qualified Perl release to build
+        required: true
+        type: choice
+        default: 5.44.0
+        options:
+          - 5.44.0
+          - 5.36.3
+          - 5.18.4
+      build_number:
+        description: Optional build-number override; normally use release/versions.json
+        required: false
+        type: string
+        default: ""
+      publish_release:
+        description: Create the immutable GitHub tag and Release after validation
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zeroperl-webdyne-${{ inputs.perl_version }}-${{ inputs.build_number || 'configured' }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and qualify Perl ${{ inputs.perl_version }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    outputs:
+      artifact_name: ${{ steps.metadata.outputs.artifact_name }}
+      archive_name: ${{ steps.metadata.outputs.archive_name }}
+      build_number: ${{ steps.metadata.outputs.build_number }}
+      release_id: ${{ steps.metadata.outputs.release_id }}
+      release_tag: ${{ steps.metadata.outputs.release_tag }}
+    steps:
+      - name: Check out the pinned source and bridge
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Configure Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Resolve and validate release metadata
+        id: metadata
+        env:
+          PERL_VERSION: ${{ inputs.perl_version }}
+          BUILD_NUMBER_OVERRIDE: ${{ inputs.build_number }}
+        run: |
+          set -euo pipefail
+          build_number="$(node tools/release-metadata.mjs build-number "$PERL_VERSION" "$BUILD_NUMBER_OVERRIDE")"
+          release_id="${PERL_VERSION}-${build_number}"
+          release_tag="v${PERL_VERSION}-webdyne.${build_number}"
+          artifact_name="zeroperl-webdyne-${release_id}-release"
+          archive_name="zeroperl-webdyne-${release_id}.tar.gz"
+          {
+            echo "build_number=$build_number"
+            echo "release_id=$release_id"
+            echo "release_tag=$release_tag"
+            echo "artifact_name=$artifact_name"
+            echo "archive_name=$archive_name"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "PERL_VERSION=$PERL_VERSION"
+            echo "BUILD_NUMBER=$build_number"
+            echo "RELEASE_ID=$release_id"
+            echo "RELEASE_TAG=$release_tag"
+            echo "ARTIFACT_NAME=$artifact_name"
+            echo "ARCHIVE_NAME=$archive_name"
+          } >> "$GITHUB_ENV"
+
+      - name: Install verifier dependencies
+        run: npm --prefix tools ci
+
+      - name: Build the standard WebDyne runtime
+        env:
+          BUILD_EXIFTOOL: "false"
+          ZEROPERL_EMBED_PREFIX: "true"
+          ZEROPERL_NO_CACHE: "false"
+        run: ./build.sh run off
+
+      - name: Verify versioned build products
+        run: |
+          set -euo pipefail
+          artifact_dir="output/${PERL_VERSION}"
+          wasm="${artifact_dir}/zeroperl-webdyne-${RELEASE_ID}.wasm"
+          reactor="${artifact_dir}/zeroperl-webdyne-reactor-${RELEASE_ID}.wasm"
+          prefix="${artifact_dir}/perl-wasi-prefix-${RELEASE_ID}"
+          checksums="${artifact_dir}/SHA256SUMS-${RELEASE_ID}"
+          (cd "$artifact_dir" && shasum -a 256 -c "$(basename "$checksums")")
+          node tools/verify-embedded-inc.mjs "$wasm"
+          node tools/wasm-smoke.mjs "$wasm"
+          node tools/smoke-socket.mjs "$wasm" "$prefix"
+          node tools/smoke-asyncify-free.mjs "$wasm" "$prefix"
+          node --input-type=module - "$wasm" "$reactor" <<'NODE'
+          import { readFile } from "node:fs/promises";
+          for (const path of process.argv.slice(2)) {
+            if (!WebAssembly.validate(await readFile(path))) {
+              throw new Error(`Invalid WebAssembly binary: ${path}`);
+            }
+          }
+          NODE
+
+      - name: Assemble deterministic release and distribution trees
+        run: |
+          set -euo pipefail
+          artifact_dir="output/${PERL_VERSION}"
+          archive_base="zeroperl-webdyne-${RELEASE_ID}"
+          release_dir="dist/github/${RELEASE_ID}"
+          archive_root="${release_dir}/${archive_base}"
+          distribution_dir="dist/distribution-repository/dist/${PERL_VERSION}"
+          mkdir -p "$archive_root" "$distribution_dir"
+          cp "$artifact_dir/zeroperl-webdyne-${RELEASE_ID}.wasm" "$archive_root/"
+          cp "$artifact_dir/zeroperl-webdyne-reactor-${RELEASE_ID}.wasm" "$archive_root/"
+          cp "$artifact_dir/config-${RELEASE_ID}.h" "$archive_root/"
+          cp -R "$artifact_dir/perl-wasi-prefix-${RELEASE_ID}" "$archive_root/"
+          cp "$artifact_dir/manifest-${RELEASE_ID}.json" "$archive_root/"
+          cp "$artifact_dir/SHA256SUMS-${RELEASE_ID}" "$archive_root/"
+          cp LICENSE "$archive_root/"
+          source_date_epoch="$(git show -s --format=%ct HEAD)"
+          tar --sort=name \
+            --mtime="@${source_date_epoch}" \
+            --owner=0 --group=0 --numeric-owner \
+            -czf "${release_dir}/${ARCHIVE_NAME}" \
+            -C "$release_dir" "$archive_base"
+          (
+            cd "$release_dir"
+            shasum -a 256 "$ARCHIVE_NAME" > "${ARCHIVE_NAME}.sha256"
+          )
+          cp "$artifact_dir/zeroperl-webdyne-${RELEASE_ID}.wasm" "$distribution_dir/"
+          cp "$artifact_dir/zeroperl-webdyne-reactor-${RELEASE_ID}.wasm" "$distribution_dir/"
+          cp "$artifact_dir/manifest-${RELEASE_ID}.json" "$distribution_dir/"
+          cp "$artifact_dir/SHA256SUMS-${RELEASE_ID}" "$distribution_dir/"
+
+      - name: Attest release binaries and archive
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: |
+            output/${{ inputs.perl_version }}/zeroperl-webdyne-${{ steps.metadata.outputs.release_id }}.wasm
+            output/${{ inputs.perl_version }}/zeroperl-webdyne-reactor-${{ steps.metadata.outputs.release_id }}.wasm
+            dist/github/${{ steps.metadata.outputs.release_id }}/${{ steps.metadata.outputs.archive_name }}
+
+      - name: Upload qualified release bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ steps.metadata.outputs.artifact_name }}
+          path: |
+            dist/github/${{ steps.metadata.outputs.release_id }}/
+            dist/distribution-repository/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    if: ${{ inputs.publish_release }}
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - name: Download qualified release bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: qualified-release
+
+      - name: Refuse to replace an existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists and will not be replaced" >&2
+            exit 1
+          fi
+
+      - name: Create immutable GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.build.outputs.release_id }}
+          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+          ARCHIVE_NAME: ${{ needs.build.outputs.archive_name }}
+        run: |
+          set -euo pipefail
+          release_dir="qualified-release/github/${RELEASE_ID}"
+          gh release create "$RELEASE_TAG" \
+            "$release_dir/$ARCHIVE_NAME" \
+            "$release_dir/${ARCHIVE_NAME}.sha256" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "ZeroPerl WebDyne ${RELEASE_ID}" \
+            --generate-notes
