@@ -16,6 +16,12 @@ both WASM files, an exact npm tarball file allowlist, npm publication dry-run,
 and GitHub build-provenance attestations. Initial workflow runs must keep
 GitHub Release and npm publication disabled.
 
+The first Perl 5.44.0 release dry run completed successfully in GitHub Actions
+run `33537280381`; its GitHub Release job was skipped. npm candidate run
+`33538766245` consumed that exact qualified artifact, passed its publish dry
+run and provenance attestation, and executed only the deliberately disabled
+publication message.
+
 The mini experiment must pass the same relevant runtime checks and demonstrate
 at least a 30% reduction in compressed WASM size.
 

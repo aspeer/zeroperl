@@ -103,7 +103,7 @@ jobs:
             )
             if [ "${run_fields[0]}" != "success" ] || \
                [ "${run_fields[1]}" != "workflow_dispatch" ] || \
-               [ "${run_fields[3]}" != "zeroperl" ]; then
+               [ "${run_fields[3]}" != "ZeroPerl WebDyne release" ]; then
               echo "Source run is not a successful ZeroPerl WebDyne release dispatch" >&2
               exit 1
             fi

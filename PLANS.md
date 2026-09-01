@@ -11,7 +11,7 @@
    each retained Perl release.
 6. [x] Replace the legacy matrix release design with per-version GitHub release
    and npm-candidate workflows whose publishing steps are guarded or disabled.
-7. [ ] Validate the new workflows on GitHub in nonpublishing mode.
+7. [x] Validate the new workflows on GitHub in nonpublishing mode.
 8. [ ] Configure the public binary distribution repository and npm Trusted
    Publisher after their external names and permissions are supplied.
 
