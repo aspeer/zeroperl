@@ -179,7 +179,7 @@ if [ -f "${STAGING_DIR}/exiftool.min.pl" ]; then
 fi
 
 SOURCE_REVISION="$(git rev-parse HEAD)"
-SUBMODULE_REVISION="$(git -C zeroperl-ts rev-parse HEAD)"
+SUBMODULE_REVISION="$(git rev-parse HEAD:zeroperl-ts)"
 if [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
   SOURCE_DIRTY="true"
 else

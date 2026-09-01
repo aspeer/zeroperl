@@ -158,10 +158,11 @@ container build --target final -t zeroperl .
 
 ## Node tooling & submodule setup
 
-This repo vendors `zeroperl-ts` as a git submodule at `./zeroperl-ts`. You must
-initialize submodules before running any in-repo `npm install` or `npm ci` that
-resolves the private `@aspeer/zeroperl-ts` package via `file:./zeroperl-ts` (root) or
-`file:../zeroperl-ts` (`tools/`).
+This repo vendors the canonical development `zeroperl-ts` source as a git
+submodule at `./zeroperl-ts`. Initialize it before running the root package or
+editing and testing the bridge in place. Release-build verifier tooling instead
+uses a public bridge commit pinned in `tools/package-lock.json`, so clean CI
+builders do not need credentials for the private canonical bridge remote.
 
 Clone with submodules:
 
@@ -175,8 +176,8 @@ Or, if you already cloned without submodules:
 git submodule update --init --recursive
 ```
 
-Without `./zeroperl-ts` present, npm installs will fail because the local
-`file:` dependency cannot be resolved.
+Without `./zeroperl-ts` present, root-level npm installs and bridge development
+will fail because the root package retains its local `file:` dependency.
 
 > **Windows note:** `npm file:` dependencies create symlinks under
 > `node_modules`. On Windows, symlink creation may require Developer Mode or an

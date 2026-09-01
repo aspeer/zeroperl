@@ -6,6 +6,6 @@
     "verify:embedded-inc": "node verify-embedded-inc.mjs"
   },
   "devDependencies": {
-    "@aspeer/zeroperl-ts": "file:../zeroperl-ts"
+    "@aspeer/zeroperl-ts": "https://github.com/lbe/zeroperl-ts/archive/88b3310259b5c8633390e881c6590dfa81eab8e9.tar.gz"
   }
 }

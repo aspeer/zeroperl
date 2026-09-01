@@ -88,9 +88,9 @@ ENV PERL_VERSION=${PERL_VERSION} \
     ZEROPERL_EMBED_PREFIX=${ZEROPERL_EMBED_PREFIX} \
     WASM_DIR=/build/wasm
 
-# Copy package files first for npm cache layer
-# zeroperl-ts must be present because tools/package.json references it via file:../zeroperl-ts
-COPY zeroperl-ts/ /build/repo/zeroperl-ts/
+# Copy package files first for npm cache layer. The verifier-only bridge is
+# pinned to a public commit so clean release builders do not require the
+# development submodule or credentials for its private canonical remote.
 COPY tools/package.json tools/package-lock.json /build/repo/tools/
 RUN cd /build/repo/tools && npm ci
 
