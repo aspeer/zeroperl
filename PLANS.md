@@ -22,6 +22,9 @@
 11. [x] Split the Worker into a portable runtime and Fetch transport with a
     small default Cloudflare adapter; adopt `/app`, `/perl5`, and writable
     `/tmp` VFS conventions and optional root-cpanfile installation.
+12. [x] Add explicit npm extension discovery and interpreter/request lifecycle
+    hooks; integrate the separately packaged `@webdyne/webdyne-cloudflare`
+    extension without making D1 part of the core runtime.
 
 Release creation, npm publication, and repository merges require separate
 approval. Feature-branch pushes and nonpublishing workflow runs are approved

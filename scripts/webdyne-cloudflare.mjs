@@ -7,10 +7,15 @@ import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildApplicationArchives } from "./build-vfs.mjs";
 import { installCpanDependencies } from "./install-cpan.mjs";
+import {
+  extensionConfiguration,
+  extensionWorkerSource,
+  resolveWebDyneExtensions,
+} from "./extensions.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const distributionPackage = JSON.parse(await readFile(resolve(packageRoot, "package.json"), "utf8"));
-const distributionName = distributionPackage.name ?? "@webdyne/zeroperl-webdyne-5.44.0";
+const distributionName = distributionPackage.name ?? "@webdyne/webdyne-zeroperl-5.44.0";
 const distributionVersion = distributionPackage.version ?? "development";
 
 async function exists(path) {
@@ -119,6 +124,7 @@ async function readProject(projectRoot) {
   const packageJson = JSON.parse(await readFile(packagePath, "utf8"));
   const webdyne = assertObject(packageJson.webdyne, "package.json webdyne");
   const cloudflare = assertObject(webdyne.cloudflare, "package.json webdyne.cloudflare");
+  const extensions = extensionConfiguration(webdyne.extensions);
   const libraries = webdyne.perlLibrary === undefined
     ? []
     : Array.isArray(webdyne.perlLibrary) ? webdyne.perlLibrary : [webdyne.perlLibrary];
@@ -129,6 +135,7 @@ async function readProject(projectRoot) {
     packageJson,
     webdyne,
     cloudflare,
+    extensions,
     defaults: {
       appDirectory: webdyne.appDirectory ?? "app",
       entry: webdyne.entry ?? "app.psp",
@@ -153,6 +160,8 @@ async function build(projectRoot, project, options) {
   if (!(await exists(entryPath))) throw new Error(`WebDyne entry page does not exist: ${options.entry}`);
 
   const libraries = [...options.libraries];
+  const extensions = await resolveWebDyneExtensions(projectRoot, project.packageJson, project.extensions);
+  libraries.push(...extensions.map(({ perlLibrary }) => relative(projectRoot, perlLibrary)));
   const installedCpanLibrary = await installCpanDependencies({ projectRoot, outputDirectory });
   if (installedCpanLibrary) libraries.push(relative(projectRoot, installedCpanLibrary));
 
@@ -164,15 +173,19 @@ async function build(projectRoot, project, options) {
     embeddedFiles: await readEmbeddedFiles(),
   });
 
+  const extensionSource = extensionWorkerSource(extensions);
   const entrySource = `import { createCloudflareWorker } from ${JSON.stringify(`${distributionName}/cloudflare`)};
 import zeroperlModule from ${JSON.stringify(`${distributionName}/zeroperl.wasm`)};
 import appVfsArchive from "./app-vfs.tar.gz";
 import perlLibraryVfsArchive from "./perl-lib-vfs.tar.gz";
+${extensionSource.imports}
+${extensionSource.declaration}
 
 export default createCloudflareWorker({
   zeroperlModule,
   appVfsArchive,
   perlLibraryVfsArchive,
+  extensions: webdyneExtensions,
 });
 `;
   await writeFile(resolve(outputDirectory, "worker.js"), entrySource);
@@ -182,10 +195,33 @@ export default createCloudflareWorker({
   console.log(
     `Built ${appDirectory}/${options.entry} for ${distributionName}@${distributionVersion} in ${options.output}`,
   );
-  return { outputDirectory, appDirectory };
+  return { outputDirectory, appDirectory, extensions };
 }
 
-async function generatedWranglerConfig(projectRoot, project, options, outputDirectory) {
+function cloudflareD1Databases(value) {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new TypeError("package.json webdyne.cloudflare.d1Databases must be an array");
+  return value.map((database, index) => {
+    const item = assertObject(database, `webdyne.cloudflare.d1Databases[${index}]`);
+    if (!/^[A-Z_][A-Z0-9_]*$/.test(item.binding ?? "")) {
+      throw new TypeError(`Invalid D1 binding name at webdyne.cloudflare.d1Databases[${index}]`);
+    }
+    if (typeof item.databaseName !== "string" || item.databaseName.length === 0
+      || typeof item.databaseId !== "string" || item.databaseId.length === 0) {
+      throw new TypeError(`D1 database ${item.binding} requires databaseName and databaseId`);
+    }
+    return {
+      binding: item.binding,
+      database_name: item.databaseName,
+      database_id: item.databaseId,
+      ...(typeof item.previewDatabaseId === "string" && item.previewDatabaseId.length > 0
+        ? { preview_database_id: item.previewDatabaseId }
+        : {}),
+    };
+  });
+}
+
+export async function generatedWranglerConfig(projectRoot, project, options, outputDirectory) {
   if (options.wranglerConfig) {
     const explicit = safeProjectPath(projectRoot, options.wranglerConfig, "Wrangler configuration");
     if (!(await exists(explicit))) throw new Error(`Wrangler configuration does not exist: ${options.wranglerConfig}`);
@@ -210,6 +246,9 @@ async function generatedWranglerConfig(projectRoot, project, options, outputDire
       { type: "Text", globs: ["**/*.pl", "**/*.pm"], fallthrough: false },
       { type: "Data", globs: ["**/*.tar.gz"], fallthrough: false },
     ],
+    ...(project.cloudflare.d1Databases === undefined
+      ? {}
+      : { d1_databases: cloudflareD1Databases(project.cloudflare.d1Databases) }),
   };
   await writeFile(generatedConfig, `${JSON.stringify(config, null, 2)}\n`);
   return generatedConfig;
@@ -238,7 +277,9 @@ function runWrangler(arguments_, projectRoot) {
 }
 
 export async function main(argv = process.argv.slice(2), projectRoot = process.cwd()) {
-  const root = resolve(projectRoot);
+  // Canonicalize once so package-manager symlinks and macOS' /var -> /private/var
+  // alias cannot make a resolved extension appear to escape the project root.
+  const root = await realpath(resolve(projectRoot));
   const project = await readProject(root);
   const options = parseArguments([...argv], project.defaults);
   const built = await build(root, project, options);

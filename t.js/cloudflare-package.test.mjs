@@ -7,7 +7,11 @@ import test from "node:test";
 import { gunzipSync } from "fflate";
 import { unpackTar } from "modern-tar";
 import { buildApplicationArchives } from "../scripts/build-vfs.mjs";
-import { main as cloudflareMain } from "../scripts/webdyne-cloudflare.mjs";
+import {
+  generatedWranglerConfig,
+  main as cloudflareMain,
+} from "../scripts/webdyne-cloudflare.mjs";
+import { createExtensionManager } from "../js/runtime/extensions.js";
 import { webdyneRuntimeConfig } from "../js/runtime/config.js";
 import { buildPagiScope, createFetchPagiTransport } from "../js/transport/fetch-pagi.js";
 
@@ -42,6 +46,43 @@ test("the portable runtime uses the new VFS roots and temporary directory", () =
       TMPDIR: "/tmp",
     },
   });
+});
+
+test("runtime extensions register per interpreter and clean up request scopes in reverse order", () => {
+  const events = [];
+  const manager = createExtensionManager([
+    {
+      name: "first",
+      register: (perl) => events.push(`register:first:${perl.id}`),
+      attachScope: ({ scope }) => {
+        scope.extensions.first = true;
+        events.push("attach:first");
+        return () => events.push("release:first");
+      },
+    },
+    {
+      name: "second",
+      register: (perl) => events.push(`register:second:${perl.id}`),
+      attachScope: () => {
+        events.push("attach:second");
+        return { release: () => events.push("release:second") };
+      },
+    },
+  ]);
+  manager.register({ id: 7 });
+  const scope = { extensions: {} };
+  const release = manager.attachScope({ scope, bindings: {}, request: {} });
+  assert.equal(scope.extensions.first, true);
+  release();
+  release();
+  assert.deepEqual(events, [
+    "register:first:7",
+    "register:second:7",
+    "attach:first",
+    "attach:second",
+    "release:second",
+    "release:first",
+  ]);
 });
 
 test("the portable Fetch transport completes an ordinary PAGI response", async () => {
@@ -135,8 +176,10 @@ test("application and Pure-Perl trees receive stable VFS roots", async () => {
 test("package.json can override the default application directory", async () => {
   const root = await mkdtemp(join(tmpdir(), "webdyne-config-test-"));
   try {
-    await mkdir(join(root, "site"), { recursive: true });
+    await mkdir(join(root, "site/assets/icons"), { recursive: true });
     await writeFile(join(root, "site/home.psp"), "<html>home</html>\n");
+    await writeFile(join(root, "site/assets/site.css"), "body {}\n");
+    await writeFile(join(root, "site/assets/icons/webdyne.txt"), "nested asset\n");
     await writeFile(join(root, "package.json"), `${JSON.stringify({
       name: "custom-webdyne-app",
       private: true,
@@ -146,9 +189,90 @@ test("package.json can override the default application directory", async () => 
     await cloudflareMain(["build"], root);
     assert.deepEqual(await archiveNames(join(root, ".webdyne/app-vfs.tar.gz")), [
       "app",
+      "app/assets",
+      "app/assets/icons",
+      "app/assets/icons/webdyne.txt",
+      "app/assets/site.css",
       "app/home.psp",
     ]);
     assert.match(await readFile(join(root, ".webdyne/worker.js"), "utf8"), /createCloudflareWorker/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("declared npm extensions contribute Perl modules and static Worker imports", async () => {
+  const root = await mkdtemp(join(tmpdir(), "webdyne-extension-test-"));
+  try {
+    const extensionRoot = join(root, "node_modules/@webdyne/example-extension");
+    await mkdir(join(root, "app"), { recursive: true });
+    await mkdir(join(extensionRoot, "lib/Example"), { recursive: true });
+    await writeFile(join(root, "app/app.psp"), "<html>extension</html>\n");
+    await writeFile(join(extensionRoot, "lib/Example/Extension.pm"), "package Example::Extension; 1;\n");
+    await writeFile(join(extensionRoot, "cloudflare.js"), "export function createExampleExtension() { return {}; }\n");
+    await writeFile(join(extensionRoot, "webdyne-extension.json"), `${JSON.stringify({
+      schemaVersion: 1,
+      perlLibrary: "lib",
+      providers: {
+        cloudflare: { module: "./cloudflare", factory: "createExampleExtension" },
+      },
+    }, null, 2)}\n`);
+    await writeFile(join(extensionRoot, "package.json"), `${JSON.stringify({
+      name: "@webdyne/example-extension",
+      version: "1.0.0",
+      type: "module",
+      exports: {
+        "./cloudflare": "./cloudflare.js",
+        "./webdyne-extension.json": "./webdyne-extension.json",
+      },
+    }, null, 2)}\n`);
+    await writeFile(join(root, "package.json"), `${JSON.stringify({
+      name: "extension-consumer",
+      private: true,
+      dependencies: { "@webdyne/example-extension": "1.0.0" },
+      webdyne: {
+        extensions: {
+          "@webdyne/example-extension": { enabled: true },
+        },
+      },
+    }, null, 2)}\n`);
+
+    await cloudflareMain(["build"], root);
+    assert.deepEqual(await archiveNames(join(root, ".webdyne/perl-lib-vfs.tar.gz")), [
+      "perl5/lib",
+      "perl5/lib/Example",
+      "perl5/lib/Example/Extension.pm",
+    ]);
+    const generatedWorker = await readFile(join(root, ".webdyne/worker.js"), "utf8");
+    assert.match(generatedWorker, /@webdyne\/example-extension\/cloudflare/);
+    assert.match(generatedWorker, /createExampleExtension as webdyneExtensionFactory0/);
+    assert.match(generatedWorker, /webdyneExtensionFactory0\(\{"enabled":true\}\)/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("generated Cloudflare configuration validates and emits D1 databases", async () => {
+  const root = await mkdtemp(join(tmpdir(), "webdyne-d1-config-test-"));
+  try {
+    await mkdir(join(root, ".webdyne"), { recursive: true });
+    const path = await generatedWranglerConfig(root, {
+      packageJson: { name: "d1-consumer" },
+      webdyne: {},
+      cloudflare: {
+        d1Databases: [{
+          binding: "DB",
+          databaseName: "webdyne-time",
+          databaseId: "00000000-0000-0000-0000-000000000001",
+        }],
+      },
+    }, { entry: "app.psp" }, join(root, ".webdyne"));
+    const config = JSON.parse(await readFile(path, "utf8"));
+    assert.deepEqual(config.d1_databases, [{
+      binding: "DB",
+      database_name: "webdyne-time",
+      database_id: "00000000-0000-0000-0000-000000000001",
+    }]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

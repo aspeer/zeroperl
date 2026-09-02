@@ -184,6 +184,7 @@ jobs:
             echo package/index.js
             echo package/js/provider/cloudflare.js
             echo package/js/runtime/config.js
+            echo package/js/runtime/extensions.js
             echo package/js/runtime/perl-filesystem.js
             echo package/js/runtime/webdyne-runtime.js
             echo package/js/transport/fetch-pagi.js
@@ -193,6 +194,7 @@ jobs:
             echo package/manifest.json
             echo package/package.json
             echo package/scripts/build-vfs.mjs
+            echo package/scripts/extensions.mjs
             echo package/scripts/install-cpan.mjs
             echo package/scripts/webdyne-cloudflare.mjs
             echo "package/zeroperl-webdyne-${RELEASE_ID}.wasm"
@@ -222,7 +224,7 @@ jobs:
       - name: Upload npm package candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: zeroperl-webdyne-npm-${{ env.RELEASE_ID }}
+          name: webdyne-zeroperl-npm-${{ env.RELEASE_ID }}
           path: |
             dist/npm/${{ env.RELEASE_ID }}/package/
             dist/npm/${{ env.RELEASE_ID }}/tarball/*.tgz
@@ -232,6 +234,6 @@ jobs:
 
       - name: npm publication is deliberately disabled
         run: |
-          echo "Validated npm candidate: @webdyne/zeroperl-webdyne-${PERL_VERSION}@${BUILD_NUMBER}.0.0"
+          echo "Validated npm candidate: @webdyne/webdyne-zeroperl-${PERL_VERSION}@${BUILD_NUMBER}.0.0"
           echo "Future command: npm publish \"${PACKAGE_DIR}\" --access public"
           echo "No package was published."

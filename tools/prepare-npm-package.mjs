@@ -80,7 +80,7 @@ if ((await sha256(reactorPath)) !== manifest.artifacts.reactor.sha256) {
   fail(`Reactor checksum does not match ${options.manifest}`);
 }
 
-const packageName = `@webdyne/zeroperl-webdyne-${perlVersion}`;
+const packageName = `@webdyne/webdyne-zeroperl-${perlVersion}`;
 const packageVersion = `${buildNumber}.0.0`;
 const wasmName = basename(options.wasm);
 const reactorName = basename(options.reactor);
@@ -110,6 +110,7 @@ const packageJson = {
     ".": "./index.js",
     "./cloudflare": "./js/provider/cloudflare.js",
     "./runtime": "./js/runtime/webdyne-runtime.js",
+    "./runtime/extensions": "./js/runtime/extensions.js",
     "./transport/fetch": "./js/transport/fetch-pagi.js",
     "./worker": "./js/worker.js",
     "./zeroperl.wasm": `./${wasmName}`,
@@ -189,6 +190,12 @@ tree; commit \`cpanfile.snapshot\` for reproducible dependencies. Native Perl
 extensions are rejected because host binaries cannot execute inside the Wasm
 runtime. Runtime helpers and dependencies use \`/perl5\`, while \`/tmp\` is
 writable and exposed to Perl as \`TMPDIR=/tmp\`.
+
+Optional provider packages are direct dependencies enabled through
+\`webdyne.extensions\`. The build reads their exported declarative manifests,
+adds their Pure-Perl files to \`/perl5/lib\`, and statically imports the selected
+Cloudflare adapters. Every regular file below the configured application
+directory is recursively included in VFS \`/app\`.
 `;
 
 await Promise.all([

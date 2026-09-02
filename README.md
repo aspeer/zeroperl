@@ -18,11 +18,11 @@ files without another WebDyne checkout.
 ## Cloudflare package usage
 
 The npm package for Perl 5.44.0 build 1 is
-`@webdyne/zeroperl-webdyne-5.44.0@1`. Put the complete application tree below
+`@webdyne/webdyne-zeroperl-5.44.0@1`. Put the complete application tree below
 `app/`, including the default `app/app.psp`, then install the runtime:
 
 ```bash
-npm install @webdyne/zeroperl-webdyne-5.44.0@1
+npm install @webdyne/webdyne-zeroperl-5.44.0@1
 ```
 
 The package includes its qualified Wrangler version. Add these convenient
@@ -71,17 +71,44 @@ reproducible deployments. Native extensions are rejected because host binaries
 cannot run in WASM. Byte-identical modules already embedded in ZeroPerl are
 omitted from the application library archive.
 
+Optional WebDyne extensions are direct npm dependencies enabled explicitly in
+`webdyne.extensions`. For example, a D1 application installs
+`@webdyne/webdyne-cloudflare@1` and configures:
+
+```json
+{
+  "webdyne": {
+    "extensions": {
+      "@webdyne/webdyne-cloudflare": {
+        "d1Bindings": ["DB"]
+      }
+    },
+    "cloudflare": {
+      "d1Databases": [{
+        "binding": "DB",
+        "databaseName": "webdyne-time",
+        "databaseId": "CLOUDFLARE-DATABASE-ID"
+      }]
+    }
+  }
+}
+```
+
+The builder reads the package's declarative extension manifest, mounts its
+Perl modules at `/perl5/lib`, and emits a static provider import. It does not
+scan undeclared dependencies or execute npm installation hooks.
+
 For local package testing, prepare and pack the npm candidate, then install the
 tarball rather than a linked package directory:
 
 ```bash
 node tools/prepare-npm-package.mjs \
   --source output/5.44.0 \
-  --destination output/5.44.0/npm/zeroperl-webdyne-5.44.0-1 \
+  --destination output/5.44.0/npm/webdyne-zeroperl-5.44.0-1 \
   --manifest manifest-5.44.0-1.json \
   --wasm zeroperl-webdyne-5.44.0-1.wasm \
   --reactor zeroperl-webdyne-reactor-5.44.0-1.wasm
-npm pack output/5.44.0/npm/zeroperl-webdyne-5.44.0-1 \
+npm pack output/5.44.0/npm/webdyne-zeroperl-5.44.0-1 \
   --pack-destination output/5.44.0/npm/tarball
 ```
 

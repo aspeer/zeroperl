@@ -169,8 +169,8 @@ The versioned npm package is self-contained at the application boundary:
 
 - `js/zeroperl.js` is the generated browser build of the canonical
   `zeroperl-ts` bridge;
-- `js/runtime/` owns the persistent interpreter, VFS construction, and
-  provider-neutral WebDyne configuration;
+- `js/runtime/` owns the persistent interpreter, VFS construction,
+  provider-neutral WebDyne configuration, and extension lifecycle;
 - `js/transport/fetch-pagi.js` maps Fetch requests and PAGI HTTP/SSE events,
   with WebSocket operations supplied as an injected capability;
 - `js/provider/cloudflare.js` is the default provider and is the only layer
@@ -188,11 +188,22 @@ Cloudflare is the supported and default provider. The boundaries permit a
 future provider adapter without placing Cloudflare APIs in the runtime core;
 Cloudflare-service adapters such as D1 are not core execution dependencies.
 
+Optional npm extensions are explicit direct application dependencies. Each
+exports a declarative `webdyne-extension.json` naming its Perl library and
+provider factory. `scripts/extensions.mjs` resolves metadata without executing
+package code, adds the Perl tree to `/perl5/lib`, and emits a static import for
+Wrangler. At runtime `js/runtime/extensions.js` registers each extension once
+per interpreter generation, attaches it to a request scope, and runs cleanup
+exactly once in reverse order. The first implementation is the separately
+versioned `@webdyne/webdyne-cloudflare` D1 extension.
+
 The application repository owns its PSP files and bindings. Its `app/` tree is
 mounted at VFS `/app`; a `package.json` override may select another source
 directory without changing that stable virtual path. The generated entrypoint
 statically imports the qualified WASM from the installed package and supplies
-the application and library archives to `createCloudflareWorker()`.
+the application and library archives to `createCloudflareWorker()`. Application
+archive construction is recursive: PSP pages, static assets, templates, and
+nested support files are all retained below `/app`.
 
 The virtual filesystem has four application roots alongside `/dev`:
 

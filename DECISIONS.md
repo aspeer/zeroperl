@@ -76,7 +76,7 @@ number in every public filename. A release tag uses
 different bytes.
 
 The npm package name contains the Perl version, for example
-`@webdyne/zeroperl-webdyne-5.44.0`. Its SemVer major is the WebDyne build
+`@webdyne/webdyne-zeroperl-5.44.0`. Its SemVer major is the WebDyne build
 number, so build 1 publishes as `1.0.0` and may be selected as `@1`. npm
 packaging consumes qualified release bytes and does not rebuild the runtime.
 
@@ -100,3 +100,17 @@ default. The source directory is configurable, but it always mounts at VFS
 and `/perl5/lib`; `/tmp` is writable and exposed as `TMPDIR`. The package may
 generate Wrangler configuration during an explicit build/dev/check/deploy
 command, but installation itself has no deployment side effects.
+
+## D012: Resolve provider extensions explicitly from npm
+
+The runtime package does not embed optional Cloudflare services. Applications
+name extensions under `webdyne.extensions` and must also declare them as direct
+production dependencies. A versioned manifest identifies the package's Perl
+library and static provider export; dependency scanning and npm install hooks
+are deliberately avoided.
+
+The provider-neutral lifecycle registers host functions for every interpreter
+generation and attaches request capabilities with guaranteed cleanup. The
+Cloudflare deployment helper may translate provider-owned configuration such
+as `d1Databases` into Wrangler fields without moving that behavior into the
+portable runtime.

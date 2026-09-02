@@ -35,6 +35,16 @@ and separate WebSocket text and binary echo requests. A control run against the
 previous Worker isolated and corrected a bootstrap load-order regression before
 these protocol checks were accepted.
 
+The npm-extension integration added 12 JavaScript contract tests, including
+recursive retention of nested files under a configured application directory,
+static provider imports, extension Perl-library mounting, interpreter/request
+lifecycle cleanup, and generated D1 configuration. The independent
+`psp-WebDyne-Time` consumer installed the renamed
+`@webdyne/webdyne-zeroperl-5.44.0@1.0.0` tarball together with
+`@webdyne/webdyne-cloudflare@1.0.0`; its Wrangler dry run passed and a live
+local request rendered a D1 `datetime('now')` result through the packaged Perl
+and JavaScript extension surfaces.
+
 The mini experiment must pass the same relevant runtime checks and demonstrate
 at least a 30% reduction in compressed WASM size.
 

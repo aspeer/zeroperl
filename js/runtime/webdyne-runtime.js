@@ -1,6 +1,7 @@
 import { ZeroPerl } from "../zeroperl.js";
 import { createPerlFileSystem } from "./perl-filesystem.js";
 import { webdyneRuntimeConfig } from "./config.js";
+import { createExtensionManager } from "./extensions.js";
 import {
   buildPagiScope,
   createDisconnectDispatcher,
@@ -33,6 +34,7 @@ export function createWebDyneRuntime({
   appVfsArchive,
   perlLibraryVfsArchive,
   webSocketAdapter,
+  extensions = [],
 }) {
   if (!(zeroperlModule instanceof WebAssembly.Module)) {
     throw new TypeError("zeroperlModule must be an imported WebAssembly.Module");
@@ -45,6 +47,7 @@ export function createWebDyneRuntime({
   }
 
   const assets = { appVfsArchive, perlLibraryVfsArchive };
+  const extensionManager = createExtensionManager(extensions);
   let perlFileSystemPromise;
   let persistentRuntimePromise;
   let persistentPerl;
@@ -251,6 +254,7 @@ export function createWebDyneRuntime({
     try {
       persistentPerl = perl;
       registerPersistentHostFunctions(perl);
+      extensionManager.register(perl);
       const bootstrapJson = JSON.stringify({ applicationConfig, perlEnv });
       const configure = await perl.eval(
         `require JSON::PP;
@@ -388,7 +392,14 @@ export function createWebDyneRuntime({
 
   function dispatch(request, bindings = {}) {
     const scope = buildPagiScope(request);
-    const transport = createFetchPagiTransport(scope, request, { webSocketAdapter });
+    const releaseExtensions = extensionManager.attachScope({ scope, bindings, request });
+    let transport;
+    try {
+      transport = createFetchPagiTransport(scope, request, { webSocketAdapter });
+    } catch (error) {
+      releaseExtensions();
+      throw error;
+    }
     const completion = startPersistentSession(
       scope,
       request,
@@ -396,6 +407,14 @@ export function createWebDyneRuntime({
       webdyneRuntimeConfig(bindings),
     ).catch((error) => {
       if (!error?.pagiErrorId) console.error("PAGI application failed:", error);
+    }).finally(() => {
+      try {
+        releaseExtensions();
+      } catch (error) {
+        // Streaming callers may intentionally ignore completion. Keep a faulty
+        // extension cleanup observable without creating an unhandled rejection.
+        console.error("WebDyne extension cleanup failed", error);
+      }
     });
     return { response: transport.response, completion, type: scope.type };
   }

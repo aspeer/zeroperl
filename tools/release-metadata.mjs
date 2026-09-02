@@ -43,7 +43,7 @@ function releaseMetadata(version, override) {
     config: `config-${releaseId}.h`,
     manifest: `manifest-${releaseId}.json`,
     checksums: `SHA256SUMS-${releaseId}`,
-    npmName: `@webdyne/zeroperl-webdyne-${version}`,
+    npmName: `@webdyne/webdyne-zeroperl-${version}`,
     npmVersion: `${buildNumber}.0.0`,
   };
 }

@@ -18,6 +18,12 @@
   GitHub release candidate pipeline and signed build-provenance attestations.
 - Added a separate npm candidate workflow that consumes qualified release
   bytes, validates a strict package allowlist, and leaves publication disabled.
+- Renamed the npm convention to `@webdyne/webdyne-zeroperl-<perl-version>` and
+  added declarative npm extension discovery, static provider imports,
+  interpreter-generation registration, request attachment, and guaranteed
+  cleanup.
+- Added regression coverage proving that configured application directories
+  are archived recursively, including nested static and support files.
 
 ## Milestone 1: runtime consolidation
 
