@@ -1,10 +1,10 @@
-name: ZeroPerl WebDyne release
+name: ZeroPerl WebDyne npm package
 
 on:
   workflow_dispatch:
     inputs:
       perl_version:
-        description: Qualified Perl release to build
+        description: Qualified Perl release to package
         required: true
         type: choice
         default: 5.44.0
@@ -17,35 +17,31 @@ on:
         required: false
         type: string
         default: ""
-      publish_release:
-        description: Create the immutable GitHub tag and Release after validation
-        required: true
-        type: boolean
-        default: false
+      source_run_id:
+        description: Dry-run release workflow run ID; leave empty when consuming a GitHub Release
+        required: false
+        type: string
+        default: ""
+      release_tag:
+        description: Published source Release tag; mutually exclusive with source_run_id
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
-concurrency:
-  group: zeroperl-webdyne-${{ inputs.perl_version }}-${{ inputs.build_number || 'configured' }}
-  cancel-in-progress: false
-
 jobs:
-  build:
-    name: Build and qualify Perl ${{ inputs.perl_version }}
+  package:
+    name: Package Perl ${{ inputs.perl_version }} for npm
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       id-token: write
       attestations: write
-    outputs:
-      artifact_name: ${{ steps.metadata.outputs.artifact_name }}
-      archive_name: ${{ steps.metadata.outputs.archive_name }}
-      build_number: ${{ steps.metadata.outputs.build_number }}
-      release_id: ${{ steps.metadata.outputs.release_id }}
-      release_tag: ${{ steps.metadata.outputs.release_tag }}
     steps:
-      - name: Check out the pinned source and bridge
+      - name: Check out packaging source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
@@ -55,155 +51,187 @@ jobs:
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: "24"
+          registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
-      - name: Resolve and validate release metadata
-        id: metadata
+      - name: Resolve and validate package metadata
         env:
           PERL_VERSION: ${{ inputs.perl_version }}
           BUILD_NUMBER_OVERRIDE: ${{ inputs.build_number }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
+          if { [ -n "$SOURCE_RUN_ID" ] && [ -n "$INPUT_RELEASE_TAG" ]; } || \
+             { [ -z "$SOURCE_RUN_ID" ] && [ -z "$INPUT_RELEASE_TAG" ]; }; then
+            echo "Supply exactly one of source_run_id or release_tag" >&2
+            exit 1
+          fi
+          if [ -n "$SOURCE_RUN_ID" ] && ! [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "source_run_id must be numeric" >&2
+            exit 1
+          fi
           build_number="$(node tools/release-metadata.mjs build-number "$PERL_VERSION" "$BUILD_NUMBER_OVERRIDE")"
           release_id="${PERL_VERSION}-${build_number}"
-          release_tag="v${PERL_VERSION}-webdyne.${build_number}"
-          artifact_name="zeroperl-webdyne-${release_id}-release"
-          archive_name="zeroperl-webdyne-${release_id}.tar.gz"
-          {
-            echo "build_number=$build_number"
-            echo "release_id=$release_id"
-            echo "release_tag=$release_tag"
-            echo "artifact_name=$artifact_name"
-            echo "archive_name=$archive_name"
-          } >> "$GITHUB_OUTPUT"
+          expected_tag="v${PERL_VERSION}-webdyne.${build_number}"
+          if [ -n "$INPUT_RELEASE_TAG" ] && [ "$INPUT_RELEASE_TAG" != "$expected_tag" ]; then
+            echo "Expected release tag $expected_tag, received $INPUT_RELEASE_TAG" >&2
+            exit 1
+          fi
           {
             echo "PERL_VERSION=$PERL_VERSION"
             echo "BUILD_NUMBER=$build_number"
             echo "RELEASE_ID=$release_id"
-            echo "RELEASE_TAG=$release_tag"
-            echo "ARTIFACT_NAME=$artifact_name"
-            echo "ARCHIVE_NAME=$archive_name"
+            echo "RELEASE_TAG=$expected_tag"
+            echo "ARTIFACT_NAME=zeroperl-webdyne-${release_id}-release"
+            echo "ARCHIVE_NAME=zeroperl-webdyne-${release_id}.tar.gz"
           } >> "$GITHUB_ENV"
 
-      - name: Install verifier dependencies
-        run: npm --prefix tools ci
-
-      - name: Build the standard WebDyne runtime
+      - name: Download the qualified source artifact
         env:
-          BUILD_EXIFTOOL: "false"
-          ZEROPERL_EMBED_PREFIX: "true"
-          ZEROPERL_NO_CACHE: "false"
-        run: ./build.sh run off
-
-      - name: Verify versioned build products
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
         run: |
           set -euo pipefail
-          artifact_dir="output/${PERL_VERSION}"
-          wasm="${artifact_dir}/zeroperl-webdyne-${RELEASE_ID}.wasm"
-          reactor="${artifact_dir}/zeroperl-webdyne-reactor-${RELEASE_ID}.wasm"
-          prefix="${artifact_dir}/perl-wasi-prefix-${RELEASE_ID}"
-          checksums="${artifact_dir}/SHA256SUMS-${RELEASE_ID}"
-          (cd "$artifact_dir" && shasum -a 256 -c "$(basename "$checksums")")
-          node tools/verify-embedded-inc.mjs "$wasm"
-          node tools/wasm-smoke.mjs "$wasm"
-          node tools/smoke-socket.mjs "$wasm" "$prefix"
-          node tools/smoke-asyncify-free.mjs "$wasm" "$prefix"
-          node --input-type=module - "$wasm" "$reactor" <<'NODE'
+          mkdir -p incoming
+          if [ -n "$SOURCE_RUN_ID" ]; then
+            readarray -t run_fields < <(
+              gh run view "$SOURCE_RUN_ID" \
+                --repo "$GITHUB_REPOSITORY" \
+                --json conclusion,event,headSha,workflowName \
+                --jq '[.conclusion, .event, .headSha, .workflowName][]'
+            )
+            if [ "${run_fields[0]}" != "success" ] || \
+               [ "${run_fields[1]}" != "workflow_dispatch" ] || \
+               [ "${run_fields[3]}" != "zeroperl" ]; then
+              echo "Source run is not a successful ZeroPerl WebDyne release dispatch" >&2
+              exit 1
+            fi
+            echo "SOURCE_HEAD_SHA=${run_fields[2]}" >> "$GITHUB_ENV"
+            gh run download "$SOURCE_RUN_ID" \
+              --repo "$GITHUB_REPOSITORY" \
+              --name "$ARTIFACT_NAME" \
+              --dir incoming
+          else
+            gh release download "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --pattern "$ARCHIVE_NAME" \
+              --pattern "${ARCHIVE_NAME}.sha256" \
+              --dir incoming
+          fi
+
+      - name: Verify and extract the qualified release
+        run: |
+          set -euo pipefail
+          archive="$(find incoming -type f -name "$ARCHIVE_NAME" -print -quit)"
+          checksum="$(find incoming -type f -name "${ARCHIVE_NAME}.sha256" -print -quit)"
+          if [ -z "$archive" ] || [ -z "$checksum" ]; then
+            echo "Qualified archive or checksum is missing" >&2
+            exit 1
+          fi
+          archive_dir="$(dirname "$archive")"
+          (cd "$archive_dir" && shasum -a 256 -c "$(basename "$checksum")")
+          mkdir -p extracted
+          tar -xzf "$archive" -C extracted
+          package_source="extracted/zeroperl-webdyne-${RELEASE_ID}"
+          test -d "$package_source"
+          (cd "$package_source" && shasum -a 256 -c "SHA256SUMS-${RELEASE_ID}")
+          readarray -t manifest_source < <(
+            node --input-type=module - "$package_source/manifest-${RELEASE_ID}.json" <<'NODE'
+          import { readFile } from "node:fs/promises";
+          const manifest = JSON.parse(await readFile(process.argv[2], "utf8"));
+          console.log(manifest.source.revision);
+          console.log(String(manifest.source.dirty));
+          NODE
+          )
+          if [ "${manifest_source[1]}" != "false" ]; then
+            echo "Refusing an artifact built from a dirty source tree" >&2
+            exit 1
+          fi
+          if [ -n "${SOURCE_HEAD_SHA:-}" ] && [ "${manifest_source[0]}" != "$SOURCE_HEAD_SHA" ]; then
+            echo "Artifact source revision does not match source workflow run" >&2
+            exit 1
+          fi
+          echo "PACKAGE_SOURCE=$package_source" >> "$GITHUB_ENV"
+
+      - name: Prepare npm distribution directory
+        run: |
+          set -euo pipefail
+          package_dir="dist/npm/${RELEASE_ID}/package"
+          node tools/prepare-npm-package.mjs \
+            --source "$PACKAGE_SOURCE" \
+            --destination "$package_dir" \
+            --manifest "manifest-${RELEASE_ID}.json" \
+            --wasm "zeroperl-webdyne-${RELEASE_ID}.wasm" \
+            --reactor "zeroperl-webdyne-reactor-${RELEASE_ID}.wasm"
+          echo "PACKAGE_DIR=$package_dir" >> "$GITHUB_ENV"
+
+      - name: Pack and inspect npm tarball
+        run: |
+          set -euo pipefail
+          tarball_dir="dist/npm/${RELEASE_ID}/tarball"
+          mkdir -p "$tarball_dir"
+          npm pack "$PACKAGE_DIR" --pack-destination "$tarball_dir" --json > "$tarball_dir/pack.json"
+          tarball="$(find "$tarball_dir" -maxdepth 1 -name '*.tgz' -print -quit)"
+          test -n "$tarball"
+          tar -tzf "$tarball" | sort > "$tarball_dir/actual-files.txt"
+          {
+            echo package/LICENSE
+            echo package/README.md
+            echo package/bin/pagi-runner.pl
+            echo package/bin/webdyne-app.pl
+            echo package/embedded-files.json
+            echo package/index.js
+            echo package/js/provider/cloudflare.js
+            echo package/js/runtime/config.js
+            echo package/js/runtime/perl-filesystem.js
+            echo package/js/runtime/webdyne-runtime.js
+            echo package/js/transport/fetch-pagi.js
+            echo package/js/worker.js
+            echo package/js/zeroperl.js
+            echo package/lib/Future/IO/Impl/ZeroPerl.pm
+            echo package/manifest.json
+            echo package/package.json
+            echo package/scripts/build-vfs.mjs
+            echo package/scripts/install-cpan.mjs
+            echo package/scripts/webdyne-cloudflare.mjs
+            echo "package/zeroperl-webdyne-${RELEASE_ID}.wasm"
+            echo "package/zeroperl-webdyne-reactor-${RELEASE_ID}.wasm"
+          } | sort > "$tarball_dir/expected-files.txt"
+          diff -u "$tarball_dir/expected-files.txt" "$tarball_dir/actual-files.txt"
+          mkdir -p "$tarball_dir/unpacked"
+          tar -xzf "$tarball" -C "$tarball_dir/unpacked"
+          node --input-type=module - \
+            "$tarball_dir/unpacked/package/zeroperl-webdyne-${RELEASE_ID}.wasm" \
+            "$tarball_dir/unpacked/package/zeroperl-webdyne-reactor-${RELEASE_ID}.wasm" <<'NODE'
           import { readFile } from "node:fs/promises";
           for (const path of process.argv.slice(2)) {
             if (!WebAssembly.validate(await readFile(path))) {
-              throw new Error(`Invalid WebAssembly binary: ${path}`);
+              throw new Error(`Invalid packaged WebAssembly binary: ${path}`);
             }
           }
           NODE
+          npm publish "$PACKAGE_DIR" --access public --dry-run
+          echo "NPM_TARBALL=$tarball" >> "$GITHUB_ENV"
 
-      - name: Assemble deterministic release and distribution trees
-        run: |
-          set -euo pipefail
-          artifact_dir="output/${PERL_VERSION}"
-          archive_base="zeroperl-webdyne-${RELEASE_ID}"
-          release_dir="dist/github/${RELEASE_ID}"
-          archive_root="${release_dir}/${archive_base}"
-          distribution_dir="dist/distribution-repository/dist/${PERL_VERSION}"
-          mkdir -p "$archive_root" "$distribution_dir"
-          cp "$artifact_dir/zeroperl-webdyne-${RELEASE_ID}.wasm" "$archive_root/"
-          cp "$artifact_dir/zeroperl-webdyne-reactor-${RELEASE_ID}.wasm" "$archive_root/"
-          cp "$artifact_dir/config-${RELEASE_ID}.h" "$archive_root/"
-          cp -R "$artifact_dir/perl-wasi-prefix-${RELEASE_ID}" "$archive_root/"
-          cp "$artifact_dir/manifest-${RELEASE_ID}.json" "$archive_root/"
-          cp "$artifact_dir/SHA256SUMS-${RELEASE_ID}" "$archive_root/"
-          cp LICENSE "$archive_root/"
-          source_date_epoch="$(git show -s --format=%ct HEAD)"
-          tar --sort=name \
-            --mtime="@${source_date_epoch}" \
-            --owner=0 --group=0 --numeric-owner \
-            -czf "${release_dir}/${ARCHIVE_NAME}" \
-            -C "$release_dir" "$archive_base"
-          (
-            cd "$release_dir"
-            shasum -a 256 "$ARCHIVE_NAME" > "${ARCHIVE_NAME}.sha256"
-          )
-          cp "$artifact_dir/zeroperl-webdyne-${RELEASE_ID}.wasm" "$distribution_dir/"
-          cp "$artifact_dir/zeroperl-webdyne-reactor-${RELEASE_ID}.wasm" "$distribution_dir/"
-          cp "$artifact_dir/manifest-${RELEASE_ID}.json" "$distribution_dir/"
-          cp "$artifact_dir/SHA256SUMS-${RELEASE_ID}" "$distribution_dir/"
-
-      - name: Attest release binaries and archive
+      - name: Attest the npm package candidate
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
-          subject-path: |
-            output/${{ inputs.perl_version }}/zeroperl-webdyne-${{ steps.metadata.outputs.release_id }}.wasm
-            output/${{ inputs.perl_version }}/zeroperl-webdyne-reactor-${{ steps.metadata.outputs.release_id }}.wasm
-            dist/github/${{ steps.metadata.outputs.release_id }}/${{ steps.metadata.outputs.archive_name }}
+          subject-path: ${{ env.NPM_TARBALL }}
 
-      - name: Upload qualified release bundle
+      - name: Upload npm package candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: ${{ steps.metadata.outputs.artifact_name }}
+          name: zeroperl-webdyne-npm-${{ env.RELEASE_ID }}
           path: |
-            dist/github/${{ steps.metadata.outputs.release_id }}/
-            dist/distribution-repository/
+            dist/npm/${{ env.RELEASE_ID }}/package/
+            dist/npm/${{ env.RELEASE_ID }}/tarball/*.tgz
+            dist/npm/${{ env.RELEASE_ID }}/tarball/pack.json
           if-no-files-found: error
           retention-days: 30
 
-  publish:
-    name: Publish GitHub Release
-    needs: build
-    if: ${{ inputs.publish_release }}
-    runs-on: ubuntu-latest
-    environment: release
-    permissions:
-      contents: write
-    steps:
-      - name: Download qualified release bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: ${{ needs.build.outputs.artifact_name }}
-          path: qualified-release
-
-      - name: Refuse to replace an existing release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+      - name: npm publication is deliberately disabled
         run: |
-          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $RELEASE_TAG already exists and will not be replaced" >&2
-            exit 1
-          fi
-
-      - name: Create immutable GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_ID: ${{ needs.build.outputs.release_id }}
-          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
-          ARCHIVE_NAME: ${{ needs.build.outputs.archive_name }}
-        run: |
-          set -euo pipefail
-          release_dir="qualified-release/github/${RELEASE_ID}"
-          gh release create "$RELEASE_TAG" \
-            "$release_dir/$ARCHIVE_NAME" \
-            "$release_dir/${ARCHIVE_NAME}.sha256" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "ZeroPerl WebDyne ${RELEASE_ID}" \
-            --generate-notes
+          echo "Validated npm candidate: @webdyne/zeroperl-webdyne-${PERL_VERSION}@${BUILD_NUMBER}.0.0"
+          echo "Future command: npm publish \"${PACKAGE_DIR}\" --access public"
+          echo "No package was published."
