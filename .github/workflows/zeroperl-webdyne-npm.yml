@@ -178,9 +178,16 @@ jobs:
           {
             echo package/LICENSE
             echo package/README.md
+            echo package/bin/pagi-runner.pl
+            echo package/bin/webdyne-app.pl
             echo package/index.js
+            echo package/js/worker.js
+            echo package/js/zeroperl.js
+            echo package/lib/Future/IO/Impl/ZeroPerl.pm
             echo package/manifest.json
             echo package/package.json
+            echo package/script/build-vfs.mjs
+            echo package/script/webdyne-cloudflare.mjs
             echo "package/zeroperl-webdyne-${RELEASE_ID}.wasm"
             echo "package/zeroperl-webdyne-reactor-${RELEASE_ID}.wasm"
           } | sort > "$tarball_dir/expected-files.txt"

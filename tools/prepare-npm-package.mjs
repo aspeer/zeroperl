@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 
 function fail(message) {
@@ -65,6 +65,10 @@ await Promise.all([
   copyFile(reactorPath, resolve(destination, reactorName)),
   copyFile(sourceManifestPath, resolve(destination, "manifest.json")),
   copyFile(resolve("LICENSE"), resolve(destination, "LICENSE")),
+  cp(resolve("bin"), resolve(destination, "bin"), { recursive: true }),
+  cp(resolve("js"), resolve(destination, "js"), { recursive: true }),
+  cp(resolve("lib"), resolve(destination, "lib"), { recursive: true }),
+  cp(resolve("script"), resolve(destination, "script"), { recursive: true }),
 ]);
 
 const packageJson = {
@@ -75,16 +79,28 @@ const packageJson = {
   main: "./index.js",
   exports: {
     ".": "./index.js",
+    "./worker": "./js/worker.js",
     "./zeroperl.wasm": `./${wasmName}`,
     "./zeroperl-reactor.wasm": `./${reactorName}`,
     "./manifest.json": "./manifest.json",
   },
+  bin: {
+    "webdyne-cloudflare": "script/webdyne-cloudflare.mjs",
+  },
   files: [
+    "bin",
     "index.js",
+    "js",
+    "lib",
     "manifest.json",
+    "script",
     wasmName,
     reactorName,
   ],
+  dependencies: {
+    fflate: "0.8.3",
+    "modern-tar": "0.8.4",
+  },
   sideEffects: false,
   keywords: ["perl", "webdyne", "pagi", "wasm", "webassembly", "wasi"],
   author: "Anthony Speer",
@@ -108,14 +124,25 @@ export const reactorWasmUrl = new URL(${JSON.stringify(`./${reactorName}`)}, imp
 const readme = `# ${packageName}
 
 This package contains the qualified ZeroPerl WebAssembly runtime for Perl
-${perlVersion}, WebDyne, WebDyne::PAGI, PAGI::Tools, and their required runtime
-and static-XS dependencies.
+${perlVersion}, WebDyne, WebDyne::PAGI, PAGI::Tools, their required runtime and
+static-XS dependencies, and the Cloudflare Worker host needed to serve a
+WebDyne PSP application.
 
 Package version ${packageVersion} corresponds to WebDyne build ${buildNumber}.
 The normal runtime is \`${wasmName}\`; the pre-Asyncify linker output is
 \`${reactorName}\`.
 
-The TypeScript host bridge is distributed separately.
+An application can package its PSP files and generate its Worker entrypoint
+with:
+
+\`\`\`sh
+npx webdyne-cloudflare build --entry app.psp
+\`\`\`
+
+Use \`webdyne-cloudflare check\` for a Wrangler dry run,
+\`webdyne-cloudflare dev\` for local development, and
+\`webdyne-cloudflare deploy\` for a checked deployment. Wrangler should be a
+development dependency of the application repository.
 `;
 
 await Promise.all([

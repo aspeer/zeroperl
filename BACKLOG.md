@@ -7,6 +7,7 @@
   disabled final publication message with an approved OIDC publish step.
 - Rebuild and requalify final build-numbered artifacts for Perl 5.18.4 and
   5.36.3 after the 5.44.0 release workflow is proven.
+- Automate refreshing `js/zeroperl.js` from the canonical `zeroperl-ts`
+  submodule and fail CI if the generated bridge is stale.
 - Decide whether a future package should expose convenience TypeScript types;
-  the current packages intentionally contain only metadata and the normal and
-  reactor WASM binaries.
+  the package currently exposes the compiled bridge and Worker factory only.

@@ -14,6 +14,11 @@
 7. [x] Validate the new workflows on GitHub in nonpublishing mode.
 8. [ ] Configure the public binary distribution repository and npm Trusted
    Publisher after their external names and permissions are supplied.
+9. [x] Make the versioned npm distribution self-contained for WebDyne on
+   Cloudflare by including the compiled bridge, PAGI host, Perl launchers, and
+   application VFS/deployment tooling.
+10. [x] Prove the package contract from the independent `psp-WebDyne-Time`
+    example before enabling npm publication.
 
 Release creation, npm publication, and repository merges require separate
 approval. Feature-branch pushes and nonpublishing workflow runs are approved

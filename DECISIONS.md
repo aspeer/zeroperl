@@ -13,10 +13,17 @@ The canonical runtime embeds WebDyne 3.023, WebDyne::PAGI, PAGI::Tools
 0.002002, their runtime dependencies, and the XS modules they require. Generic
 PAGI compatibility is useful but is not a release gate.
 
-## D003: Bridge ownership
+## D003: Bridge ownership and distribution
 
 JavaScript/Perl marshalling and Asyncify-aware resource disposal belong in
 `zeroperl-ts`; Perl runtime and static-XS behaviour belong in this repository.
+The versioned WebDyne npm distribution nevertheless carries the compiled
+bridge, the generic Cloudflare PAGI host, and its Perl launchers so one package
+is sufficient to execute a PSP application. The canonical editable bridge
+source remains `zeroperl-ts`; `js/zeroperl.js` is its generated distribution
+artifact.
+
+Cloudflare-service integrations such as D1 remain separate from the core host.
 
 ## D004: Mini artifact gate
 

@@ -10,9 +10,62 @@ This is the canonical ZeroPerl runtime for WebDyne::PAGI WASM targets. It
 consolidates upstream fork improvements, embeds WebDyne 3.023 and PAGI::Tools
 0.002002 with their runtime dependencies, and statically compiles the XS
 modules needed by WebDyne. A normal PSP application therefore does not need a
-separate Perl library archive. See
-[wasm-WebDyne-PAGI](https://github.com/aspeer/wasm-WebDyne-PAGI) for the
-Cloudflare integration.
+separate Perl library archive. The versioned npm package also includes the
+compiled JavaScript bridge, generic Cloudflare Worker, Perl launchers, and
+application VFS builder required to serve PSP files without another WebDyne
+checkout.
+
+## Cloudflare package usage
+
+The npm package for Perl 5.44.0 build 1 is
+`@webdyne/zeroperl-webdyne-5.44.0@1`. In a repository containing `app.psp`,
+install the runtime and a local Wrangler development dependency:
+
+```bash
+npm install @webdyne/zeroperl-webdyne-5.44.0@1
+npm install --save-dev wrangler
+```
+
+Add scripts such as these to the application's `package.json`:
+
+```json
+{
+  "scripts": {
+    "build": "webdyne-cloudflare build --entry app.psp",
+    "check": "webdyne-cloudflare check --entry app.psp",
+    "dev": "webdyne-cloudflare dev --entry app.psp",
+    "deploy": "webdyne-cloudflare deploy --entry app.psp"
+  }
+}
+```
+
+The builder creates `.webdyne/worker.js`, `htdocs-vfs.tar.gz`, and an optional
+`perl-lib-vfs.tar.gz`. The application should ignore `.webdyne/` and configure
+Wrangler's `main` as `.webdyne/worker.js`. `check` and `deploy` perform a
+Wrangler dry run; `deploy` only invokes the real deployment after that dry run
+succeeds.
+
+Use repeated `--include` arguments for additional pages and assets. Use
+`--library DIR` only for a Pure-Perl application library; native extensions
+are rejected because host binaries cannot run in WASM.
+
+For local package testing, prepare and pack the npm candidate, then install the
+tarball rather than a linked package directory:
+
+```bash
+node tools/prepare-npm-package.mjs \
+  --source output/5.44.0 \
+  --destination output/5.44.0/npm/zeroperl-webdyne-5.44.0-1 \
+  --manifest manifest-5.44.0-1.json \
+  --wasm zeroperl-webdyne-5.44.0-1.wasm \
+  --reactor zeroperl-webdyne-reactor-5.44.0-1.wasm
+npm pack output/5.44.0/npm/zeroperl-webdyne-5.44.0-1 \
+  --pack-destination output/5.44.0/npm/tarball
+```
+
+Installing the `.tgz` mirrors npm publication. Installing the package
+directory with `file:` creates a symlink and can give Node an incorrect module
+resolution root for the package's dependencies.
 
 ## Build
 

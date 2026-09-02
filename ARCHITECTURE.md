@@ -163,6 +163,29 @@ Major runtime responsibilities:
 - Provide wrapped file access so Perl can read from the embedded virtual file system prefix.
 - Bridge host calls and internal error reporting.
 
+## Cloudflare npm Distribution
+
+The versioned npm package is self-contained at the application boundary:
+
+- `js/zeroperl.js` is the generated browser build of the canonical
+  `zeroperl-ts` bridge;
+- `js/worker.js` owns the persistent interpreter and PAGI HTTP, SSE, and
+  WebSocket lifecycle;
+- `bin/` contains the Perl bootstrap and WebDyne application launcher;
+- `lib/` contains the Worker-specific Pure-Perl compatibility module;
+- `script/` builds application VFS archives, generates the application Worker
+  entrypoint, and wraps local Wrangler build, development, and deployment.
+
+Tests remain in `t/` and `t.js/` and are excluded by the npm package allowlist.
+Cloudflare-service adapters such as D1 are not core execution dependencies.
+
+The application repository owns its PSP files and bindings. The generated
+entrypoint statically imports the qualified WASM from the installed package
+and supplies application archives to `createWebDyneWorker()`. Application VFS
+entries use a deterministic mtime of one whole epoch second: the JavaScript
+`File` API represents this as 1000 milliseconds, avoiding truncation to the
+zero mtime that WebDyne treats as a failed source stat.
+
 ### Runtime Data and Control Flow
 
 ```mermaid
