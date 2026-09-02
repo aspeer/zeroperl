@@ -45,6 +45,13 @@ lifecycle cleanup, and generated D1 configuration. The independent
 local request rendered a D1 `datetime('now')` result through the packaged Perl
 and JavaScript extension surfaces.
 
+The reversed npm package convention was then requalified from the existing
+immutable binary artifacts. GitHub Actions runs `33649857265` (5.44.0),
+`33649866179` (5.36.3), and `33649874827` (5.18.4) each passed checksum/source
+verification, exact package inspection, both WASM validations, npm publication
+dry-run, provenance attestation, and artifact upload. Each reached only the
+deliberately disabled publication step.
+
 The mini experiment must pass the same relevant runtime checks and demonstrate
 at least a 30% reduction in compressed WASM size.
 
