@@ -163,28 +163,55 @@ Major runtime responsibilities:
 - Provide wrapped file access so Perl can read from the embedded virtual file system prefix.
 - Bridge host calls and internal error reporting.
 
-## Cloudflare npm Distribution
+## Portable npm Runtime and Cloudflare Distribution
 
 The versioned npm package is self-contained at the application boundary:
 
 - `js/zeroperl.js` is the generated browser build of the canonical
   `zeroperl-ts` bridge;
-- `js/worker.js` owns the persistent interpreter and PAGI HTTP, SSE, and
-  WebSocket lifecycle;
+- `js/runtime/` owns the persistent interpreter, VFS construction, and
+  provider-neutral WebDyne configuration;
+- `js/transport/fetch-pagi.js` maps Fetch requests and PAGI HTTP/SSE events,
+  with WebSocket operations supplied as an injected capability;
+- `js/provider/cloudflare.js` is the default provider and is the only layer
+  allowed to use Cloudflare's `WebSocketPair` and execution-context APIs;
+- `js/worker.js` preserves the original Cloudflare factory export for existing
+  consumers;
 - `bin/` contains the Perl bootstrap and WebDyne application launcher;
-- `lib/` contains the Worker-specific Pure-Perl compatibility module;
-- `script/` builds application VFS archives, generates the application Worker
-  entrypoint, and wraps local Wrangler build, development, and deployment.
+- `lib/` contains the host-callback-based Pure-Perl compatibility module; and
+- `scripts/` builds application VFS archives, installs optional Pure-Perl
+  dependencies, generates the Cloudflare entrypoint and configuration, and
+  wraps the package's pinned Wrangler version.
 
 Tests remain in `t/` and `t.js/` and are excluded by the npm package allowlist.
+Cloudflare is the supported and default provider. The boundaries permit a
+future provider adapter without placing Cloudflare APIs in the runtime core;
 Cloudflare-service adapters such as D1 are not core execution dependencies.
 
-The application repository owns its PSP files and bindings. The generated
-entrypoint statically imports the qualified WASM from the installed package
-and supplies application archives to `createWebDyneWorker()`. Application VFS
-entries use a deterministic mtime of one whole epoch second: the JavaScript
-`File` API represents this as 1000 milliseconds, avoiding truncation to the
-zero mtime that WebDyne treats as a failed source stat.
+The application repository owns its PSP files and bindings. Its `app/` tree is
+mounted at VFS `/app`; a `package.json` override may select another source
+directory without changing that stable virtual path. The generated entrypoint
+statically imports the qualified WASM from the installed package and supplies
+the application and library archives to `createCloudflareWorker()`.
+
+The virtual filesystem has four application roots alongside `/dev`:
+
+- `/zeroperl` is the immutable library prefix embedded in the WASM module;
+- `/app` is the complete application tree and WebDyne document root;
+- `/perl5/bin` contains the PAGI and WebDyne launchers;
+- `/perl5/lib` contains the compatibility module and optional Pure-Perl
+  application dependencies; and
+- `/tmp` is writable, with `TMPDIR=/tmp` preserved through WebDyne's
+  request-local environment.
+
+An optional root `cpanfile` is installed into a cached local::lib-style tree.
+Only Pure-Perl output may enter `/perl5/lib`; host native artifacts and
+symlinks are rejected. A release-generated hash inventory omits a dependency
+only when its relative path and SHA-256 digest exactly match an embedded file.
+
+Application VFS entries use a deterministic mtime of one whole epoch second:
+the JavaScript `File` API represents this as 1000 milliseconds, avoiding
+truncation to the zero mtime that WebDyne treats as a failed source stat.
 
 ### Runtime Data and Control Flow
 

@@ -2,6 +2,15 @@
 
 ## Versioned WebDyne distribution pipeline
 
+- Split the npm Worker host into a provider-neutral runtime, Fetch/PAGI
+  transport, and a small default Cloudflare adapter.
+- Standardized application VFS paths as `/app`, runtime launchers as
+  `/perl5/bin`, optional application modules as `/perl5/lib`, and writable
+  temporary storage as `/tmp` with `TMPDIR` preserved during PAGI requests.
+- Made repository `app/` the default complete application source tree, added
+  package.json overrides, automatic Wrangler configuration, and optional
+  cached root-cpanfile installation for Pure-Perl dependencies.
+- Renamed package build and deployment tooling from `script/` to `scripts/`.
 - Added independent build numbers and versioned output directories for each
   qualified Perl release.
 - Added manifests and SHA-256 checksum lists to every local artifact set.

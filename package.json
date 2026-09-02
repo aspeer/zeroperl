@@ -1,4 +1,9 @@
 {
+  "type": "module",
+  "dependencies": {
+    "fflate": "0.8.3",
+    "modern-tar": "0.8.4"
+  },
   "devDependencies": {
     "@aspeer/zeroperl-ts": "file:./zeroperl-ts",
     "@eslint/js": "^10.0.1",

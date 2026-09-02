@@ -15,10 +15,13 @@
 8. [ ] Configure the public binary distribution repository and npm Trusted
    Publisher after their external names and permissions are supplied.
 9. [x] Make the versioned npm distribution self-contained for WebDyne on
-   Cloudflare by including the compiled bridge, PAGI host, Perl launchers, and
-   application VFS/deployment tooling.
+   Cloudflare by including the compiled bridge, portable PAGI runtime, default
+   provider adapter, Perl launchers, and application VFS/deployment tooling.
 10. [x] Prove the package contract from the independent `psp-WebDyne-Time`
     example before enabling npm publication.
+11. [x] Split the Worker into a portable runtime and Fetch transport with a
+    small default Cloudflare adapter; adopt `/app`, `/perl5`, and writable
+    `/tmp` VFS conventions and optional root-cpanfile installation.
 
 Release creation, npm publication, and repository merges require separate
 approval. Feature-branch pushes and nonpublishing workflow runs are approved

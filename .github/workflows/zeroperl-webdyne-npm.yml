@@ -180,14 +180,21 @@ jobs:
             echo package/README.md
             echo package/bin/pagi-runner.pl
             echo package/bin/webdyne-app.pl
+            echo package/embedded-files.json
             echo package/index.js
+            echo package/js/provider/cloudflare.js
+            echo package/js/runtime/config.js
+            echo package/js/runtime/perl-filesystem.js
+            echo package/js/runtime/webdyne-runtime.js
+            echo package/js/transport/fetch-pagi.js
             echo package/js/worker.js
             echo package/js/zeroperl.js
             echo package/lib/Future/IO/Impl/ZeroPerl.pm
             echo package/manifest.json
             echo package/package.json
-            echo package/script/build-vfs.mjs
-            echo package/script/webdyne-cloudflare.mjs
+            echo package/scripts/build-vfs.mjs
+            echo package/scripts/install-cpan.mjs
+            echo package/scripts/webdyne-cloudflare.mjs
             echo "package/zeroperl-webdyne-${RELEASE_ID}.wasm"
             echo "package/zeroperl-webdyne-reactor-${RELEASE_ID}.wasm"
           } | sort > "$tarball_dir/expected-files.txt"

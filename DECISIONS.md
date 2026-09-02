@@ -18,10 +18,10 @@ PAGI compatibility is useful but is not a release gate.
 JavaScript/Perl marshalling and Asyncify-aware resource disposal belong in
 `zeroperl-ts`; Perl runtime and static-XS behaviour belong in this repository.
 The versioned WebDyne npm distribution nevertheless carries the compiled
-bridge, the generic Cloudflare PAGI host, and its Perl launchers so one package
-is sufficient to execute a PSP application. The canonical editable bridge
-source remains `zeroperl-ts`; `js/zeroperl.js` is its generated distribution
-artifact.
+bridge, provider-neutral PAGI runtime, default Cloudflare adapter, and Perl
+launchers so one package is sufficient to execute a PSP application. The
+canonical editable bridge source remains `zeroperl-ts`; `js/zeroperl.js` is its
+generated distribution artifact.
 
 Cloudflare-service integrations such as D1 remain separate from the core host.
 
@@ -84,3 +84,19 @@ GitHub attestations and SHA-256 manifests provide binary provenance and
 integrity. Platform-specific executable signing is not applicable to a WASM
 module. npm Trusted Publishing remains disabled until the package namespace
 and OIDC publisher are configured.
+
+## D011: Portable core with Cloudflare as the default provider
+
+The npm runtime separates interpreter/VFS ownership, Fetch-to-PAGI transport,
+and provider integration. Cloudflare is the only qualified provider and remains
+the zero-configuration default. Its non-standard `WebSocketPair` and
+`ExecutionContext.waitUntil()` behavior is confined to the Cloudflare adapter;
+future providers must supply equivalent lifecycle and WebSocket capabilities
+without changing the WebDyne runtime core.
+
+Application repositories place their complete served tree in `app/` by
+default. The source directory is configurable, but it always mounts at VFS
+`/app`. Runtime helpers and optional Pure-Perl dependencies use `/perl5/bin`
+and `/perl5/lib`; `/tmp` is writable and exposed as `TMPDIR`. The package may
+generate Wrangler configuration during an explicit build/dev/check/deploy
+command, but installation itself has no deployment side effects.

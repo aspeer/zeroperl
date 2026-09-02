@@ -8,6 +8,11 @@ use JSON::PP;
 use MIME::Base64 qw(decode_base64 encode_base64);
 use Encode qw(decode encode FB_CROAK);
 
+# `/tmp` is created as a writable directory by the provider-neutral runtime.
+# Keep temporary-file behaviour out of provider configuration and available to
+# modules loaded before the first application request.
+$ENV{TMPDIR} //= '/tmp';
+
 # One interpreter serves many sessions; every bridge-owned Future is keyed by
 # Worker-assigned session ID. Applications keep the ordinary PAGI signature.
 our %SESSION;
@@ -158,7 +163,7 @@ sub send_file_event {
     sysseek($fh, $offset, 0)
         or die "Unable to seek PAGI response file $event->{file}: $!\n";
 
-    # Cloudflare's response sink currently buffers ordinary HTTP bodies, but
+    # The Fetch response sink currently buffers ordinary HTTP bodies, but
     # chunking here avoids one second full-file copy inside the Perl bridge and
     # preserves the native PAGI file/offset/length response semantics.
     my $chunk_size = 64 * 1024;

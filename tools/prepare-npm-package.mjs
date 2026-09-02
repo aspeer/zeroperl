@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { copyFile, cp, mkdir, readFile, writeFile } from "node:fs/promises";
-import { basename, resolve } from "node:path";
+import { copyFile, cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { basename, join, relative, resolve } from "node:path";
 
 function fail(message) {
   console.error(message);
@@ -24,6 +24,32 @@ function parseArguments(arguments_) {
 
 async function sha256(path) {
   return createHash("sha256").update(await readFile(path)).digest("hex");
+}
+
+async function embeddedFileInventory(prefix, perlVersion) {
+  const inventory = {};
+
+  async function visit(root, directory) {
+    for (const child of await readdir(directory, { withFileTypes: true })) {
+      const filename = join(directory, child.name);
+      if (child.isDirectory()) await visit(root, filename);
+      else if (child.isFile()) {
+        const modulePath = relative(root, filename).replaceAll("\\", "/");
+        // Preserve @INC precedence: architecture-specific files are searched
+        // before the portable library directory. Ambiguous later copies do
+        // not replace the hash used for safe application-library deduplication.
+        inventory[modulePath] ??= await sha256(filename);
+      }
+    }
+  }
+
+  for (const root of [
+    resolve(prefix, `lib/${perlVersion}/wasm32-wasi`),
+    resolve(prefix, `lib/${perlVersion}`),
+  ]) {
+    await visit(root, root);
+  }
+  return inventory;
 }
 
 const options = parseArguments(process.argv.slice(2));
@@ -58,6 +84,8 @@ const packageName = `@webdyne/zeroperl-webdyne-${perlVersion}`;
 const packageVersion = `${buildNumber}.0.0`;
 const wasmName = basename(options.wasm);
 const reactorName = basename(options.reactor);
+const prefixPath = resolve(source, manifest.artifacts.prefix.directory);
+const embeddedFiles = await embeddedFileInventory(prefixPath, perlVersion);
 
 await mkdir(destination, { recursive: true });
 await Promise.all([
@@ -68,8 +96,9 @@ await Promise.all([
   cp(resolve("bin"), resolve(destination, "bin"), { recursive: true }),
   cp(resolve("js"), resolve(destination, "js"), { recursive: true }),
   cp(resolve("lib"), resolve(destination, "lib"), { recursive: true }),
-  cp(resolve("script"), resolve(destination, "script"), { recursive: true }),
+  cp(resolve("scripts"), resolve(destination, "scripts"), { recursive: true }),
 ]);
+await writeFile(resolve(destination, "embedded-files.json"), `${JSON.stringify(embeddedFiles, null, 2)}\n`);
 
 const packageJson = {
   name: packageName,
@@ -79,27 +108,32 @@ const packageJson = {
   main: "./index.js",
   exports: {
     ".": "./index.js",
+    "./cloudflare": "./js/provider/cloudflare.js",
+    "./runtime": "./js/runtime/webdyne-runtime.js",
+    "./transport/fetch": "./js/transport/fetch-pagi.js",
     "./worker": "./js/worker.js",
     "./zeroperl.wasm": `./${wasmName}`,
     "./zeroperl-reactor.wasm": `./${reactorName}`,
     "./manifest.json": "./manifest.json",
   },
   bin: {
-    "webdyne-cloudflare": "script/webdyne-cloudflare.mjs",
+    "webdyne-cloudflare": "scripts/webdyne-cloudflare.mjs",
   },
   files: [
     "bin",
+    "embedded-files.json",
     "index.js",
     "js",
     "lib",
     "manifest.json",
-    "script",
+    "scripts",
     wasmName,
     reactorName,
   ],
   dependencies: {
     fflate: "0.8.3",
     "modern-tar": "0.8.4",
+    wrangler: "4.127.1",
   },
   sideEffects: false,
   keywords: ["perl", "webdyne", "pagi", "wasm", "webassembly", "wasi"],
@@ -125,24 +159,36 @@ const readme = `# ${packageName}
 
 This package contains the qualified ZeroPerl WebAssembly runtime for Perl
 ${perlVersion}, WebDyne, WebDyne::PAGI, PAGI::Tools, their required runtime and
-static-XS dependencies, and the Cloudflare Worker host needed to serve a
-WebDyne PSP application.
+static-XS dependencies, a provider-neutral PAGI runtime, and the default
+Cloudflare adapter needed to serve a WebDyne PSP application.
 
 Package version ${packageVersion} corresponds to WebDyne build ${buildNumber}.
 The normal runtime is \`${wasmName}\`; the pre-Asyncify linker output is
 \`${reactorName}\`.
 
-An application can package its PSP files and generate its Worker entrypoint
-with:
+Place the complete application tree in \`app/\`. A minimal project only needs
+\`package.json\` and \`app/app.psp\`; Cloudflare configuration is generated when
+the project does not provide its own \`wrangler.jsonc\`.
 
 \`\`\`sh
-npx webdyne-cloudflare build --entry app.psp
+npm install ${packageName}@${buildNumber}
+npx webdyne-cloudflare dev
 \`\`\`
 
 Use \`webdyne-cloudflare check\` for a Wrangler dry run,
 \`webdyne-cloudflare dev\` for local development, and
-\`webdyne-cloudflare deploy\` for a checked deployment. Wrangler should be a
-development dependency of the application repository.
+\`webdyne-cloudflare deploy\` for a checked deployment. The package includes
+its tested Wrangler version. Installation has no deployment side effects.
+
+Portable settings belong below \`package.json.webdyne\`. Use \`appDirectory\`
+to override the source \`app/\` directory, \`entry\` to override \`app.psp\`,
+\`static: false\` to disable static-file serving, or \`perlLibrary\` for one or
+more Pure-Perl library trees. The application always mounts at VFS \`/app\`.
+A root \`cpanfile\` is installed automatically into the cached \`.webdyne/cpan\`
+tree; commit \`cpanfile.snapshot\` for reproducible dependencies. Native Perl
+extensions are rejected because host binaries cannot execute inside the Wasm
+runtime. Runtime helpers and dependencies use \`/perl5\`, while \`/tmp\` is
+writable and exposed to Perl as \`TMPDIR=/tmp\`.
 `;
 
 await Promise.all([

@@ -11,3 +11,6 @@
   submodule and fail CI if the generated bridge is stale.
 - Decide whether a future package should expose convenience TypeScript types;
   the package currently exposes the compiled bridge and Worker factory only.
+- Qualify another serverless provider only when there is a concrete target.
+  Implement its lifecycle/WebSocket adapter against the portable runtime and
+  retain Cloudflare as the default provider and deployment command.

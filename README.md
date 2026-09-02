@@ -11,43 +11,65 @@ consolidates upstream fork improvements, embeds WebDyne 3.023 and PAGI::Tools
 0.002002 with their runtime dependencies, and statically compiles the XS
 modules needed by WebDyne. A normal PSP application therefore does not need a
 separate Perl library archive. The versioned npm package also includes the
-compiled JavaScript bridge, generic Cloudflare Worker, Perl launchers, and
-application VFS builder required to serve PSP files without another WebDyne
-checkout.
+compiled JavaScript bridge, provider-neutral PAGI runtime, default Cloudflare
+adapter, Perl launchers, and application VFS builder required to serve PSP
+files without another WebDyne checkout.
 
 ## Cloudflare package usage
 
 The npm package for Perl 5.44.0 build 1 is
-`@webdyne/zeroperl-webdyne-5.44.0@1`. In a repository containing `app.psp`,
-install the runtime and a local Wrangler development dependency:
+`@webdyne/zeroperl-webdyne-5.44.0@1`. Put the complete application tree below
+`app/`, including the default `app/app.psp`, then install the runtime:
 
 ```bash
 npm install @webdyne/zeroperl-webdyne-5.44.0@1
-npm install --save-dev wrangler
 ```
 
-Add scripts such as these to the application's `package.json`:
+The package includes its qualified Wrangler version. Add these convenient
+commands to the application's `package.json`:
 
 ```json
 {
   "scripts": {
-    "build": "webdyne-cloudflare build --entry app.psp",
-    "check": "webdyne-cloudflare check --entry app.psp",
-    "dev": "webdyne-cloudflare dev --entry app.psp",
-    "deploy": "webdyne-cloudflare deploy --entry app.psp"
+    "build": "webdyne-cloudflare build",
+    "check": "webdyne-cloudflare check",
+    "dev": "webdyne-cloudflare dev",
+    "deploy": "webdyne-cloudflare deploy"
   }
 }
 ```
 
-The builder creates `.webdyne/worker.js`, `htdocs-vfs.tar.gz`, and an optional
-`perl-lib-vfs.tar.gz`. The application should ignore `.webdyne/` and configure
-Wrangler's `main` as `.webdyne/worker.js`. `check` and `deploy` perform a
-Wrangler dry run; `deploy` only invokes the real deployment after that dry run
-succeeds.
+`npm run dev` starts local Wrangler and `npm run deploy` validates a dry-run
+bundle before uploading it to Cloudflare. When the project has no root
+`wrangler.jsonc`, the command generates a safe default in `.webdyne/`; a root
+configuration always takes precedence. The application should ignore the
+entire generated `.webdyne/` directory.
 
-Use repeated `--include` arguments for additional pages and assets. Use
-`--library DIR` only for a Pure-Perl application library; native extensions
-are rejected because host binaries cannot run in WASM.
+Every regular file under `app/` is copied to VFS `/app`, preserving its
+relative path. The generated runtime also provides `/zeroperl`, `/perl5/bin`,
+`/perl5/lib`, `/dev`, and a writable `/tmp`; Perl receives `TMPDIR=/tmp`.
+
+Portable application settings live under `webdyne` in `package.json`:
+
+```json
+{
+  "webdyne": {
+    "appDirectory": "site",
+    "entry": "home.psp",
+    "static": true,
+    "perlLibrary": "lib"
+  }
+}
+```
+
+`appDirectory` changes the source directory only; its contents still mount at
+VFS `/app`. `perlLibrary` may be a path or array of paths containing Pure-Perl
+modules. A root `cpanfile` is installed automatically with Carton, or with
+cpanminus when Carton is unavailable, and cached below `.webdyne/cpan` until
+`cpanfile` or `cpanfile.snapshot` changes. Commit `cpanfile.snapshot` for
+reproducible deployments. Native extensions are rejected because host binaries
+cannot run in WASM. Byte-identical modules already embedded in ZeroPerl are
+omitted from the application library archive.
 
 For local package testing, prepare and pack the npm candidate, then install the
 tarball rather than a linked package directory:

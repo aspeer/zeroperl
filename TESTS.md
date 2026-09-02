@@ -22,6 +22,19 @@ run `33537280381`; its GitHub Release job was skipped. npm candidate run
 run and provenance attestation, and executed only the deliberately disabled
 publication message.
 
+The portable-runtime package candidate was installed as a tarball into an
+independent minimal application with no `wrangler.jsonc`. Its direct
+`webdyne-cloudflare` command generated the default configuration, passed a
+Wrangler deployment dry run, and served both an evaluated WebDyne server-time
+page and a sibling static asset from VFS `/app`. A request-time probe created a
+file in writable `/tmp` and observed `TMPDIR=/tmp`. A root `cpanfile` installed
+the Pure-Perl `String::ShellQuote` fixture under `/perl5/lib`; the next build
+used the dependency cache without network access.
+The default Cloudflare adapter also passed live SSE start/event/close handling
+and separate WebSocket text and binary echo requests. A control run against the
+previous Worker isolated and corrected a bootstrap load-order regression before
+these protocol checks were accepted.
+
 The mini experiment must pass the same relevant runtime checks and demonstrate
 at least a 30% reduction in compressed WASM size.
 
