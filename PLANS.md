@@ -25,6 +25,9 @@
 12. [x] Add explicit npm extension discovery and interpreter/request lifecycle
     hooks; integrate the separately packaged `@webdyne/webdyne-cloudflare`
     extension without making D1 part of the core runtime.
+13. [x] Generate Cloudflare Workers KV and R2 bindings from application
+    package configuration while keeping their service bridges in the optional
+    extension.
 
 Release creation, npm publication, and repository merges require separate
 approval. Feature-branch pushes and nonpublishing workflow runs are approved

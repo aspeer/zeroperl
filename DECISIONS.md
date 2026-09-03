@@ -113,4 +113,7 @@ The provider-neutral lifecycle registers host functions for every interpreter
 generation and attaches request capabilities with guaranteed cleanup. The
 Cloudflare deployment helper may translate provider-owned configuration such
 as `d1Databases` into Wrangler fields without moving that behavior into the
-portable runtime.
+portable runtime. `kvNamespaces` and `r2Buckets` follow the same boundary: the
+helper maps application-owned identifiers and local/remote flags to Wrangler,
+while the separately installed extension owns the Perl and JavaScript service
+behavior.

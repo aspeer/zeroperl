@@ -221,6 +221,60 @@ function cloudflareD1Databases(value) {
   });
 }
 
+function cloudflareKVNamespaces(value) {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new TypeError("package.json webdyne.cloudflare.kvNamespaces must be an array");
+  return value.map((namespace, index) => {
+    const item = assertObject(namespace, `webdyne.cloudflare.kvNamespaces[${index}]`);
+    if (!/^[A-Z_][A-Z0-9_]*$/.test(item.binding ?? "")) {
+      throw new TypeError(`Invalid KV binding name at webdyne.cloudflare.kvNamespaces[${index}]`);
+    }
+    if (item.namespaceId !== undefined
+      && (typeof item.namespaceId !== "string" || item.namespaceId.length === 0)) {
+      throw new TypeError(`KV namespace ${item.binding} namespaceId must be a non-empty string`);
+    }
+    if (item.previewNamespaceId !== undefined
+      && (typeof item.previewNamespaceId !== "string" || item.previewNamespaceId.length === 0)) {
+      throw new TypeError(`KV namespace ${item.binding} previewNamespaceId must be a non-empty string`);
+    }
+    if (item.remote !== undefined && typeof item.remote !== "boolean") {
+      throw new TypeError(`KV namespace ${item.binding} remote must be boolean`);
+    }
+    return {
+      binding: item.binding,
+      ...(item.namespaceId === undefined ? {} : { id: item.namespaceId }),
+      ...(item.previewNamespaceId === undefined ? {} : { preview_id: item.previewNamespaceId }),
+      ...(item.remote === undefined ? {} : { remote: item.remote }),
+    };
+  });
+}
+
+function cloudflareR2Buckets(value) {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new TypeError("package.json webdyne.cloudflare.r2Buckets must be an array");
+  return value.map((bucket, index) => {
+    const item = assertObject(bucket, `webdyne.cloudflare.r2Buckets[${index}]`);
+    if (!/^[A-Z_][A-Z0-9_]*$/.test(item.binding ?? "")) {
+      throw new TypeError(`Invalid R2 binding name at webdyne.cloudflare.r2Buckets[${index}]`);
+    }
+    for (const name of ["bucketName", "previewBucketName", "jurisdiction"]) {
+      if (item[name] !== undefined && (typeof item[name] !== "string" || item[name].length === 0)) {
+        throw new TypeError(`R2 bucket ${item.binding} ${name} must be a non-empty string`);
+      }
+    }
+    if (item.remote !== undefined && typeof item.remote !== "boolean") {
+      throw new TypeError(`R2 bucket ${item.binding} remote must be boolean`);
+    }
+    return {
+      binding: item.binding,
+      ...(item.bucketName === undefined ? {} : { bucket_name: item.bucketName }),
+      ...(item.previewBucketName === undefined ? {} : { preview_bucket_name: item.previewBucketName }),
+      ...(item.jurisdiction === undefined ? {} : { jurisdiction: item.jurisdiction }),
+      ...(item.remote === undefined ? {} : { remote: item.remote }),
+    };
+  });
+}
+
 export async function generatedWranglerConfig(projectRoot, project, options, outputDirectory) {
   if (options.wranglerConfig) {
     const explicit = safeProjectPath(projectRoot, options.wranglerConfig, "Wrangler configuration");
@@ -249,6 +303,12 @@ export async function generatedWranglerConfig(projectRoot, project, options, out
     ...(project.cloudflare.d1Databases === undefined
       ? {}
       : { d1_databases: cloudflareD1Databases(project.cloudflare.d1Databases) }),
+    ...(project.cloudflare.kvNamespaces === undefined
+      ? {}
+      : { kv_namespaces: cloudflareKVNamespaces(project.cloudflare.kvNamespaces) }),
+    ...(project.cloudflare.r2Buckets === undefined
+      ? {}
+      : { r2_buckets: cloudflareR2Buckets(project.cloudflare.r2Buckets) }),
   };
   await writeFile(generatedConfig, `${JSON.stringify(config, null, 2)}\n`);
   return generatedConfig;

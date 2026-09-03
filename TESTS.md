@@ -45,6 +45,11 @@ lifecycle cleanup, and generated D1 configuration. The independent
 local request rendered a D1 `datetime('now')` result through the packaged Perl
 and JavaScript extension surfaces.
 
+The package builder subsequently added generated Workers KV and R2 binding
+support. Its 12 JavaScript tests pass exact mapping of application-facing
+`kvNamespaces` and `r2Buckets` options to Wrangler's `kv_namespaces` and
+`r2_buckets` fields, including preview, jurisdiction, and remote settings.
+
 The reversed npm package convention was then requalified from the existing
 immutable binary artifacts. GitHub Actions runs `33649857265` (5.44.0),
 `33649866179` (5.36.3), and `33649874827` (5.18.4) each passed checksum/source

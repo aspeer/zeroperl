@@ -72,7 +72,7 @@ cannot run in WASM. Byte-identical modules already embedded in ZeroPerl are
 omitted from the application library archive.
 
 Optional WebDyne extensions are direct npm dependencies enabled explicitly in
-`webdyne.extensions`. For example, a D1 application installs
+`webdyne.extensions`. For example, a Cloudflare storage application installs
 `@webdyne/webdyne-cloudflare@1` and configures:
 
 ```json
@@ -80,7 +80,9 @@ Optional WebDyne extensions are direct npm dependencies enabled explicitly in
   "webdyne": {
     "extensions": {
       "@webdyne/webdyne-cloudflare": {
-        "d1Bindings": ["DB"]
+        "d1Bindings": ["DB"],
+        "kvBindings": ["CACHE"],
+        "r2Bindings": ["ASSETS"]
       }
     },
     "cloudflare": {
@@ -88,6 +90,14 @@ Optional WebDyne extensions are direct npm dependencies enabled explicitly in
         "binding": "DB",
         "databaseName": "webdyne-time",
         "databaseId": "CLOUDFLARE-DATABASE-ID"
+      }],
+      "kvNamespaces": [{
+        "binding": "CACHE",
+        "namespaceId": "CLOUDFLARE-KV-NAMESPACE-ID"
+      }],
+      "r2Buckets": [{
+        "binding": "ASSETS",
+        "bucketName": "my-webdyne-assets"
       }]
     }
   }
@@ -97,6 +107,12 @@ Optional WebDyne extensions are direct npm dependencies enabled explicitly in
 The builder reads the package's declarative extension manifest, mounts its
 Perl modules at `/perl5/lib`, and emits a static provider import. It does not
 scan undeclared dependencies or execute npm installation hooks.
+
+The generated Wrangler configuration maps `d1Databases`, `kvNamespaces`, and
+`r2Buckets` to provider bindings. KV entries also accept `previewNamespaceId`
+and `remote`; R2 entries accept `previewBucketName`, `jurisdiction`, and
+`remote`. Resource names and IDs stay in the application package rather than
+the reusable extension.
 
 For local package testing, prepare and pack the npm candidate, then install the
 tarball rather than a linked package directory:

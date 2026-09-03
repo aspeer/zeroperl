@@ -252,7 +252,7 @@ test("declared npm extensions contribute Perl modules and static Worker imports"
   }
 });
 
-test("generated Cloudflare configuration validates and emits D1 databases", async () => {
+test("generated Cloudflare configuration validates and emits D1, KV, and R2 bindings", async () => {
   const root = await mkdtemp(join(tmpdir(), "webdyne-d1-config-test-"));
   try {
     await mkdir(join(root, ".webdyne"), { recursive: true });
@@ -265,6 +265,19 @@ test("generated Cloudflare configuration validates and emits D1 databases", asyn
           databaseName: "webdyne-time",
           databaseId: "00000000-0000-0000-0000-000000000001",
         }],
+        kvNamespaces: [{
+          binding: "CACHE",
+          namespaceId: "00000000000000000000000000000001",
+          previewNamespaceId: "00000000000000000000000000000002",
+          remote: true,
+        }],
+        r2Buckets: [{
+          binding: "ASSETS",
+          bucketName: "webdyne-assets",
+          previewBucketName: "webdyne-assets-preview",
+          jurisdiction: "eu",
+          remote: true,
+        }],
       },
     }, { entry: "app.psp" }, join(root, ".webdyne"));
     const config = JSON.parse(await readFile(path, "utf8"));
@@ -272,6 +285,19 @@ test("generated Cloudflare configuration validates and emits D1 databases", asyn
       binding: "DB",
       database_name: "webdyne-time",
       database_id: "00000000-0000-0000-0000-000000000001",
+    }]);
+    assert.deepEqual(config.kv_namespaces, [{
+      binding: "CACHE",
+      id: "00000000000000000000000000000001",
+      preview_id: "00000000000000000000000000000002",
+      remote: true,
+    }]);
+    assert.deepEqual(config.r2_buckets, [{
+      binding: "ASSETS",
+      bucket_name: "webdyne-assets",
+      preview_bucket_name: "webdyne-assets-preview",
+      jurisdiction: "eu",
+      remote: true,
     }]);
   } finally {
     await rm(root, { recursive: true, force: true });
