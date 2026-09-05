@@ -50,6 +50,17 @@ copy_site_file() {
         return
     fi
 
+    # WebDyne 3.026 requires Carp >= 1.50, newer than Perl 5.18's core copy.
+    # Carp is Pure Perl: retain its locked CPAN upgrade and companions while
+    # continuing to protect core XS companions from native/target mismatches.
+    case "$rel" in
+        Carp.pm|Carp/*.pm)
+            mkdir -p "$(dirname "$target_core/$rel")"
+            cp "$src" "$target_core/$rel"
+            return
+            ;;
+    esac
+
     # The native dependency resolver may upgrade a core XS distribution (for
     # example Encode on Perl 5.24).  Its .pm file must not shadow the version
     # paired with the statically linked target object.  New CPAN modules have

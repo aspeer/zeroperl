@@ -81,8 +81,8 @@ async function main() {
       require File::Glob;
       require WebDyne;
       require WebDyne::PAGI;
-      WebDyne->VERSION('3.023');
-      WebDyne::PAGI->VERSION('3.023');
+      WebDyne->VERSION('3.026');
+      WebDyne::PAGI->VERSION('3.026');
 
       print "__MODULE_OK__\\n";
     `);

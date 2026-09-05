@@ -234,3 +234,11 @@ provider must retain the originating request context through that completion
 to avoid canceled cross-request continuations. Response delivery and the single
 persistent interpreter remain unchanged. The normal Cloudflare post-request
 execution limit still applies; no compatibility flag is disabled.
+
+## WebDyne 3.026 and the locked Carp upgrade
+
+All supported snapshots select WebDyne exactly 3.026. Its Carp 1.50 minimum
+requires the locked Pure Perl Carp files to supersede Perl 5.18's older core
+copy. Prefix assembly permits that targeted override while continuing to
+protect native/target XS companion alignment. Delivered-WASM qualification
+checks WebDyne and WebDyne::PAGI against the snapshot and requires Carp >= 1.50.

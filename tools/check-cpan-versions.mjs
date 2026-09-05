@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Verify that the delivered XS Perl companions match the Carton lock.
+// Verify delivered XS companions and WebDyne against the Carton lock.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { ZeroPerl } from '../js/zeroperl.js';
@@ -21,7 +21,7 @@ const runtime = await readFile(wasmPath);
 const perl = await ZeroPerl.create({ fetch: async () => new Response(runtime) });
 try {
   let count = 0;
-  for (const recipe of recipes) {
+  for (const recipe of [...recipes, { module: 'WebDyne' }, { module: 'WebDyne::PAGI' }]) {
     if (recipe.before && Number(perlVersion.split('.')[1]) >= Number(recipe.before.split('.')[1])) continue;
     const module = recipe.module;
     const expected = versions.get(module);
@@ -31,7 +31,9 @@ try {
     assert.equal(result.success, true, `${module}: ${result.error}`);
     count++;
   }
-  console.log(`Verified ${count} target XS module versions against Perl ${perlVersion} snapshot`);
+  const carp = await perl.eval("require Carp; Carp->VERSION('1.50'); 1;");
+  assert.equal(carp.success, true, `Carp >= 1.50: ${carp.error}`);
+  console.log(`Verified ${count} target XS and WebDyne module versions against Perl ${perlVersion} snapshot`);
 } finally {
   await perl.dispose();
 }

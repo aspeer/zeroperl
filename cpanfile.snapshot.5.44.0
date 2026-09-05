@@ -1214,52 +1214,53 @@ DISTRIBUTIONS
       Exporter 0
       Module::Build 0.4005
       perl 5.008001
-  WebDyne-3.023
-    pathname: A/AS/ASPEER/WebDyne-3.023.tar.gz
+  WebDyne-3.026
+    pathname: A/AS/ASPEER/WebDyne-3.026.tar.gz
     provides:
-      WebDyne 3.023
-      WebDyne::CGI 3.023
-      WebDyne::CGI::Simple 3.023
-      WebDyne::CGI::Simple::Upload 3.023
-      WebDyne::Cache 3.023
-      WebDyne::Chain 3.023
-      WebDyne::Chain::Constant 3.023
-      WebDyne::Compile 3.023
-      WebDyne::Constant 3.023
-      WebDyne::Err 3.023
-      WebDyne::Err::Constant 3.023
-      WebDyne::Filter 3.023
-      WebDyne::Filter::Constant 3.023
-      WebDyne::HTML::Tiny 3.023
-      WebDyne::HTML::TreeBuilder 3.023
-      WebDyne::Handler 3.023
-      WebDyne::Install 3.023
-      WebDyne::Install::Apache 3.023
-      WebDyne::Install::Apache::Constant 3.023
-      WebDyne::Install::Constant 3.023
-      WebDyne::PAGI 3.023
-      WebDyne::PAGI::Constant 3.023
-      WebDyne::PSGI 3.023
-      WebDyne::PSGI::Constant 3.023
-      WebDyne::Request::Apache 3.023
-      WebDyne::Request::Apache::Body 3.023
-      WebDyne::Request::Common 3.023
-      WebDyne::Request::Fake 3.023
-      WebDyne::Request::PAGI 3.023
-      WebDyne::Request::PSGI 3.023
-      WebDyne::Request::PSGI::Constant 3.023
-      WebDyne::Request::PSGI::Static 3.023
-      WebDyne::Session 3.023
-      WebDyne::Session::Constant 3.023
-      WebDyne::Static 3.023
-      WebDyne::Template 3.023
-      WebDyne::TieHandle 3.023
-      WebDyne::Util 3.023
+      WebDyne 3.026
+      WebDyne::CGI 3.026
+      WebDyne::CGI::Simple 3.026
+      WebDyne::CGI::Simple::Upload 3.026
+      WebDyne::Cache 3.026
+      WebDyne::Chain 3.026
+      WebDyne::Chain::Constant 3.026
+      WebDyne::Compile 3.026
+      WebDyne::Constant 3.026
+      WebDyne::Err 3.026
+      WebDyne::Err::Constant 3.026
+      WebDyne::Filter 3.026
+      WebDyne::Filter::Constant 3.026
+      WebDyne::HTML::Tiny 3.026
+      WebDyne::HTML::TreeBuilder 3.026
+      WebDyne::Handler 3.026
+      WebDyne::Install 3.026
+      WebDyne::Install::Apache 3.026
+      WebDyne::Install::Apache::Constant 3.026
+      WebDyne::Install::Constant 3.026
+      WebDyne::PAGI 3.026
+      WebDyne::PAGI::Constant 3.026
+      WebDyne::PSGI 3.026
+      WebDyne::PSGI::Constant 3.026
+      WebDyne::Request::Apache 3.026
+      WebDyne::Request::Apache::Body 3.026
+      WebDyne::Request::Common 3.026
+      WebDyne::Request::Fake 3.026
+      WebDyne::Request::PAGI 3.026
+      WebDyne::Request::PSGI 3.026
+      WebDyne::Request::PSGI::Constant 3.026
+      WebDyne::Request::PSGI::Static 3.026
+      WebDyne::Session 3.026
+      WebDyne::Session::Constant 3.026
+      WebDyne::Static 3.026
+      WebDyne::Template 3.026
+      WebDyne::TieHandle 3.026
+      WebDyne::Util 3.026
       error_require undef
     requirements:
       Algorithm::Diff 0
       CGI::Simple 0
       Capture::Tiny 0
+      Carp 1.50
       Crypt::URandom 0
       Devel::Confess 0
       Digest::MD5 0

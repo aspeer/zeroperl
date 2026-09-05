@@ -127,3 +127,11 @@ Work continues from the uncommitted release preparation on
   versions; retain a dependency-free reproduction and remove instrumentation.
 - [x] Recheck normal overlap after forced disconnects.
 - [ ] Pursue upstream resolution and separately authorized hosted comparison.
+
+## WebDyne 3.026 final release qualification
+
+- [ ] Reconcile all supported CPAN snapshots with WebDyne exactly 3.026.
+- [ ] Integrate the corrected bridge source and restyled Perl loaders.
+- [ ] Build and verify final artifacts and npm consumers for all supported Perls.
+- [ ] Run local Cloudflare mixed traffic and storage acceptance with 3.026.
+- [ ] Merge qualified feature branches into local main; publication stays paused.
