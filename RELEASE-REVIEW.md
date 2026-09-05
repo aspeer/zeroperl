@@ -203,3 +203,23 @@ clean commits; local build-8 outputs remain qualification evidence. GitHub's
 public runtime repository is accessible; its API still cannot resolve
 aspeer/zeroperl-ts. Public source availability and npm publisher setup remain
 external release prerequisites. No remote push or publication is performed.
+
+### Final acceptance: publication blocker
+
+Clean main-source builds for all three supported Perls passed native/WASM
+module checks, locked XS version comparison, 24 lifecycle checks per build,
+Asyncify release probes, socket smoke, notice verification and checksums.
+The refreshed bridge passed 160 tests and its 47-file package verification.
+
+Local Wrangler acceptance found and fixed a caught D1 error leaking into the
+next KV request (12 native regression assertions; three D1/KV/R2 sequences).
+
+A separate unresolved blocker remains: a successful SSE stream followed by a
+WebSocket request in the same persistent 5.44.0 Worker produces `memory access
+out of bounds` during `start_session`. This reproduces with the original adapter
+as well as the error-isolation fix. Standalone WebSocket text/binary echo works.
+Do not treat isolated stream tests as full release acceptance or publish until
+this sequence passes. Fixtures are in `tests/runtime/stream-sequence`; copy
+these into a local test application's app directory, rebuild, then run
+`node tests/runtime/smoke-stream-sequence.mjs http://127.0.0.1:PORT/`.
+The fault's native/XS/bridge origin is not yet established.

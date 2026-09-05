@@ -208,3 +208,15 @@ record the clean runtime release manifest in a subsequent artifact-only commit.
 Repointing the runtime gitlink for every bundled-runtime refresh would create
 a circular provenance dependency. Validate that bridge source and the generated
 runtime bridge remain identical across that artifact-only refresh.
+
+## D014: Clear WebDyne diagnostics at application request entry
+
+Final local Worker acceptance reproduced a caught D1 batch constraint error
+appearing in the next unrelated KV request. WebDyne 3.023 retains that message
+in its process-wide diagnostic stack even when the API handler recovers.
+The WebDyne-specific adapter calls the public `WebDyne::Util::errclr()` API
+before invoking each new application request. This prevents cross-request
+error leakage while preserving errors raised by the current request. The
+provider-neutral PAGI runner and generic TypeScript bridge remain unchanged.
+The core framework's treatment of caught exceptions within one request remains
+an upstream follow-up; this compatibility fix establishes a clean request entry.

@@ -1,0 +1,15 @@
+<start_html title="SSE Demo" h3 sse>
+<p>SSE smoke fixture.</p>
+
+__PERL__
+use HTTP::Status qw(HTTP_OK);
+use Future::AsyncAwait;
+
+async sub sse {
+    my $self=shift();
+    my $sse_or=$self->r->sse();
+    await $sse_or->start(status => HTTP_OK);
+    await $sse_or->send_event(event => 'ready', data => 'WebDyne SSE');
+    await $sse_or->send_event(event => 'done', data => '');
+    await $sse_or->close();
+}

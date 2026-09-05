@@ -41,6 +41,10 @@ my $app = WebDyne::PAGI->new(
 )->to_app;
 
 sub application {
+    # WebDyne 3.023 can retain a caught API exception in its global error
+    # stack. A new request must not inherit that diagnostic from an earlier
+    # request served by this persistent interpreter.
+    WebDyne::Util::errclr();
     return $app->(@_);
 }
 

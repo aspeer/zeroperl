@@ -189,3 +189,17 @@ Snapshots are byte-identical to their build-8 selections, with only
 `cpanfile_sha256` changed in each metadata file. The existing native CPAN lock
 suite passed all 10 checks on 5.44. No interpreter or dependency code changed,
 so the cleanup did not require another WASM build or repeated runtime matrix.
+
+### Request error isolation
+
+`prove tests/runtime/webdyne-error-isolation.t` exercises a recovered API
+exception followed by an ordinary PSP request three times, plus an uncaught
+current-request failure and recovery. The regression failed before the adapter
+fix and passes all 12 assertions afterward. Local Wrangler acceptance also
+checks D1 batch rollback/recovery immediately followed by KV and R2 operations.
+
+The mixed stream acceptance sequence currently fails on the final 5.44.0
+local Worker: SSE emits ready/done successfully, then WebSocket startup traps
+with a WASM memory access error. This reproduces before and after the diagnostic
+isolation fix. See `tests/runtime/smoke-stream-sequence.mjs`; publication remains
+blocked pending resolution. Standalone text/binary WebSocket echo passes.

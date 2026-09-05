@@ -1,0 +1,23 @@
+<start_html ws title="WebSocket Demo" h3>
+<p>WebSocket echo smoke fixture.</p>
+
+__PERL__
+use Future::AsyncAwait;
+
+async sub ws {
+    my $self=shift();
+    my $r=$self->r();
+    my ($scope, $receive, $send) = map {$r->{$_}} qw(scope receive send);
+    await $send->({type => 'websocket.accept'});
+    while (1) {
+        my $event=await $receive->();
+        last if $event->{type} eq 'websocket.disconnect';
+        if (defined $event->{text}) {
+            await $send->({type => 'websocket.send', text => $event->{text}.' '.scalar(localtime())});
+        }
+        elsif (defined $event->{bytes}) {
+            await $send->({type => 'websocket.send', bytes => $event->{bytes}});
+        }
+    }
+    return;
+}

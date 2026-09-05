@@ -58,3 +58,14 @@ changes. Curation of the broad notice archive is an optional size improvement.
 - [x] Refresh the canonical bridge from build 8 and qualify its package.
 - [ ] Confirm public bridge repository access and npm publishing configuration;
   publication remains disabled pending approval.
+
+## Final acceptance follow-ups
+
+- [x] Prevent a caught API error from leaking into the next Worker request.
+- [ ] Improve WebDyne core handling of caught exceptions within a request;
+  the runtime adapter currently clears inherited diagnostics at request entry.
+- [ ] Reduce upstream startup warnings from Opcode and CGI::Simple::Cookie
+  after verifying changes against every supported Perl version.
+- [ ] **Publication blocker:** diagnose and fix successful SSE completion
+  followed by WebSocket startup trapping in the same persistent interpreter.
+  Reproducer: `tests/runtime/smoke-stream-sequence.mjs` and adjacent fixtures.

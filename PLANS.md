@@ -95,3 +95,11 @@ Work continues from the uncommitted release preparation on
 - [x] Reconcile all supported snapshots: distribution selections remain
   byte-identical; only the manifest hash changes in the integrity metadata.
 - [x] Pass the 10 existing CPAN lock tests and review the manifest diff.
+
+## Final main acceptance
+
+- [x] Commit the reviewed runtime and bridge and prepare local main branches.
+- [x] Build and qualify Perl 5.18.4, 5.36.3 and 5.44.0 from clean source.
+- [x] Add a request-entry compatibility fix for WebDyne's retained error stack,
+  with native regression coverage and local Worker storage-sequence acceptance.
+- [ ] Publish only after explicit approval and public source/publisher setup.
