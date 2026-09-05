@@ -66,6 +66,14 @@ changes. Curation of the broad notice archive is an optional size improvement.
   the runtime adapter currently clears inherited diagnostics at request entry.
 - [ ] Reduce upstream startup warnings from Opcode and CGI::Simple::Cookie
   after verifying changes against every supported Perl version.
-- [ ] **Publication blocker:** diagnose and fix successful SSE completion
-  followed by WebSocket startup trapping in the same persistent interpreter.
+- [x] Fix SSE completion followed by WebSocket startup trapping in the same
+  persistent interpreter: corrected Asyncify re-entry stack restoration.
   Reproducer: `tests/runtime/smoke-stream-sequence.mjs` and adjacent fixtures.
+- [x] Register all Cloudflare session completions with waitUntil; original
+  overlapping-request context cancellation no longer reproduces on Perl 5.44.0.
+- [ ] **Publication gate:** investigate hung-request diagnostics after forced
+  WebSocket termination, qualify long-lived SSE cancellation, and perform
+  separately authorized hosted acceptance. See CLOUDFLARE-CONTEXT-INVESTIGATION.md.
+
+- Update the canonical bridge gitlink after the source-only cleanup is committed
+  and approved for integration; retain the virtual WASM resolver in its builder.

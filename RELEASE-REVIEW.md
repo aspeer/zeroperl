@@ -214,12 +214,16 @@ The refreshed bridge passed 160 tests and its 47-file package verification.
 Local Wrangler acceptance found and fixed a caught D1 error leaking into the
 next KV request (12 native regression assertions; three D1/KV/R2 sequences).
 
-A separate unresolved blocker remains: a successful SSE stream followed by a
-WebSocket request in the same persistent 5.44.0 Worker produces `memory access
-out of bounds` during `start_session`. This reproduces with the original adapter
-as well as the error-isolation fix. Standalone WebSocket text/binary echo works.
-Do not treat isolated stream tests as full release acceptance or publish until
-this sequence passes. Fixtures are in `tests/runtime/stream-sequence`; copy
-these into a local test application's app directory, rebuild, then run
-`node tests/runtime/smoke-stream-sequence.mjs http://127.0.0.1:PORT/`.
-The fault's native/XS/bridge origin is not yet established.
+The SSE-to-WebSocket memory trap is repaired by correcting two Asyncify stack
+restorations in the TypeScript bridge. The regenerated bridge passes 17 runtime
+JavaScript tests; the three supported Perl binaries each pass the new 100-round
+re-entry regression and 24 lifecycle checks. Sequential local Worker streaming
+acceptance passes with the correction. See DECISIONS.md D011 and TESTS.md.
+
+The approved provider correction retains all session completions with `waitUntil`.
+The original context cancellation no longer reproduces in 1,000 overlap rounds
+on Perl 5.44.0, including concurrent storage checks. Forced WebSocket termination
+still emits a separate hung-request diagnostic. Publication remains paused for
+that investigation and hosted acceptance; see CLOUDFLARE-CONTEXT-INVESTIGATION.md.
+Fixtures for sequential acceptance remain in `tests/runtime/stream-sequence`;
+run `node tests/runtime/smoke-stream-sequence.mjs http://127.0.0.1:PORT/`.

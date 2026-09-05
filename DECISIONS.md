@@ -151,12 +151,17 @@ interpreter/dependency attribution must accompany the qualified artifacts.
 
 ## D011: Preserve live C frames through Asyncify rewind
 
-The bridge keeps the exported C stack pointer below suspended frames while a
-host promise settles and while it re-enters the export to rewind. Restoring
-the root pointer before re-entry allows argument setup to overwrite a live
-Perl JMPENV (observed on 5.36). Restore the root only after the rewind call
-returns. Regression coverage must include rejected asynchronous callbacks,
-not only successful awaits.
+The corrected bridge uses three stack-pointer phases: preserve the suspended
+C stack while awaiting the host promise; restore the root before re-entering
+the exported C wrapper; restore the suspended pointer at the rewound import
+before resuming its C continuation. Finally restore the root on export exit.
+
+Keeping the suspended pointer through export re-entry made the untransformed
+C wrapper read a different result context from the one its callback wrote.
+Restoring only the root repaired results but broke rejected-callback recovery
+on older Perl versions. Both restores are required. The correction passes
+scalar/list results, repeated yields, host allocations and rejection recovery
+on Perl 5.18.4, 5.36.3 and 5.44.0 without rebuilding the WASM binaries.
 
 Scalar replacement also drains its own Perl temporary scope. Perl 5.18 may
 mortalize the old reference, so omitting this scope postpones DESTROY beyond
@@ -220,3 +225,12 @@ error leakage while preserving errors raised by the current request. The
 provider-neutral PAGI runner and generic TypeScript bridge remain unchanged.
 The core framework's treatment of caught exceptions within one request remains
 an upstream follow-up; this compatibility fix establishes a clean request entry.
+
+## Retain Cloudflare completion for every session
+
+Register HTTP, SSE and WebSocket session completion with `context.waitUntil`.
+A connection closing can precede queued Perl work and extension cleanup. The
+provider must retain the originating request context through that completion
+to avoid canceled cross-request continuations. Response delivery and the single
+persistent interpreter remain unchanged. The normal Cloudflare post-request
+execution limit still applies; no compatibility flag is disabled.

@@ -103,3 +103,19 @@ Work continues from the uncommitted release preparation on
 - [x] Add a request-entry compatibility fix for WebDyne's retained error stack,
   with native regression coverage and local Worker storage-sequence acceptance.
 - [ ] Publish only after explicit approval and public source/publisher setup.
+
+## Source-only bridge checkout
+
+- [x] Resolve the bridge WASM import virtually so compiling the embedded bridge
+  does not require a binary in the canonical TypeScript checkout.
+
+## Asyncify re-entry correction (2026-09-05)
+
+- [x] Restore root stack before export re-entry and suspended stack at import rewind.
+- [x] Qualify scalar/list results, repeated yields, host allocations and rejected
+  callbacks on Perl 5.18.4, 5.36.3 and 5.44.0; all 24 lifecycle checks also pass.
+- [x] Regenerate the runtime bridge from the corrected TypeScript source.
+- [x] Implement approved Cloudflare waitUntil correction for all sessions and
+  qualify overlap, storage and long-lived WebSocket behaviour locally on 5.44.
+- [ ] Investigate forced WebSocket termination diagnostics and qualify hosted
+  request lifetimes. Publication is not approved.

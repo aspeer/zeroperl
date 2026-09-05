@@ -13,7 +13,11 @@ const result = await Bun.build({
   plugins: [{
     name: "runtime-wasm-location",
     setup(build) {
-      build.onLoad({ filter: /\.wasm$/ }, () => ({
+      build.onResolve({ filter: /\.wasm$/ }, ({ path }) => ({
+        path,
+        namespace: "external-runtime",
+      }));
+      build.onLoad({ filter: /\.wasm$/, namespace: "external-runtime" }, () => ({
         contents: 'export default "./zeroperl.wasm";',
         loader: "js",
       }));

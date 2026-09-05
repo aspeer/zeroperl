@@ -203,3 +203,27 @@ local Worker: SSE emits ready/done successfully, then WebSocket startup traps
 with a WASM memory access error. This reproduces before and after the diagnostic
 isolation fix. See `tests/runtime/smoke-stream-sequence.mjs`; publication remains
 blocked pending resolution. Standalone text/binary WebSocket echo passes.
+
+## Asyncify re-entry qualification (2026-09-05)
+
+The corrected bridge passes 160 Bun tests and installed ESM/CJS/NodeNext
+package checks. `tools/check-asyncify-reentry.mjs` in the TypeScript repository
+passes 100 rounds per binary on Perl 5.18.4, 5.36.3 and 5.44.0 (local build 1),
+covering scalar/list return handles, repeated yields, host allocations and
+rejected callbacks. All 24 lifecycle checks pass for each binary. The runtime
+bridge was regenerated and its 17 JavaScript tests pass. No WASM rebuild is
+needed for this bridge-only correction.
+
+Run `npm run build`, then `npm run test:asyncify -- /absolute/path/to/runtime.wasm`
+in the TypeScript repository. Cloudflare overlap stability remains a separate
+release gate; these bridge checks do not certify provider request lifetimes.
+
+## Cloudflare completion retention
+
+The implemented provider correction passes 1,000 rounds (6,000 requests) using
+`ROUNDS=1000 node tests/runtime/smoke-stream-overlap.mjs BASE_URL`. Install the
+existing `tests/runtime/stream-sequence` fixtures in the acceptance app first.
+D1/KV/R2 checks during overlap and a WebSocket echo after 45 seconds also pass.
+All 17 runtime JavaScript tests pass. Forced socket termination leaves service
+responsive but produces a separate hung-request warning; see
+CLOUDFLARE-CONTEXT-INVESTIGATION.md for evidence and remaining qualification.

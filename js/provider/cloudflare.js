@@ -19,9 +19,8 @@ function createCloudflareWebSocketAdapter() {
 /**
  * Create the default Cloudflare Workers provider around the portable runtime.
  *
- * Ordinary HTTP completion is registered with waitUntil so Perl cleanup can
- * finish after response construction. Streaming SSE and WebSocket sessions
- * own their request lifetime and must not be retained as background tasks.
+ * Register every session completion so queued Perl work and extension cleanup
+ * retain their request context after an HTTP response or stream closes.
  */
 export function createCloudflareWorker(options) {
   // Keep packages generated before the `/app` migration working while the
@@ -36,7 +35,7 @@ export function createCloudflareWorker(options) {
   return {
     fetch(request, env, context) {
       const dispatch = runtime.dispatch(request, env);
-      if (dispatch.type === "http") context.waitUntil(dispatch.completion);
+      context.waitUntil(dispatch.completion);
       return dispatch.response;
     },
   };
