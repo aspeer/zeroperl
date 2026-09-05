@@ -1,5 +1,18 @@
 # First release review — 2026-09-05
 
+## Current status (2026-09-06)
+
+WebDyne 3.026 final build 1 passes qualification on Perl 5.18.4, 5.36.3 and
+5.44.0. Final 5.44 npm-package local stream/storage acceptance passes, including
+sustained SSE cancellation after enabling Cloudflare request signals. Earlier
+3.026 hosted stream tests pass; repeating them with the exact final binary
+requires upload approval. The abrupt-WebSocket-disconnect warning is accepted.
+See [RELEASE-QUALIFICATION.md](RELEASE-QUALIFICATION.md) for exact source refs,
+checksums, evidence, limitations and remaining publication prerequisites.
+The dated records below preserve earlier findings and are superseded by that
+record where they describe old artifacts or outstanding runtime defects.
+
+
 ## Release assessment
 
 Local preparation is on `codex/first-release-review` in both canonical repos.

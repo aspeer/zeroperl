@@ -5,8 +5,7 @@
 - Bootstrap the public `@webdyne` npm package names, configure npm Trusted
   Publishing for the `webdyne-zeroperl` packages, and replace the deliberately
   disabled final publication message with an approved OIDC publish step.
-- Rebuild and requalify final build-numbered artifacts for Perl 5.18.4 and
-  5.36.3 after the 5.44.0 release workflow is proven.
+- [x] Rebuild and qualify final WebDyne 3.026 artifacts for all three Perls.
 - Automate refreshing `js/zeroperl.js` from the canonical `zeroperl-ts`
   submodule and fail CI if the generated bridge is stale.
 - Decide whether a future package should expose convenience TypeScript types;
@@ -75,8 +74,10 @@ changes. Curation of the broad notice archive is an optional size improvement.
   reproduces them on two workerd versions; WebDyne sessions complete cleanup.
 - [x] Maintainer accepts the abrupt-disconnect warning as a known limitation.
   Standalone reproduction: `tests/runtime/hung-request`.
-- [ ] Complete hosted Cloudflare acceptance and long-lived SSE cancellation
-  qualification; the accepted warning alone is not a release blocker.
+- [x] Fix long-lived SSE cancellation with enable_request_signal and pass
+  final-package local lifetime/overlap acceptance. Earlier 3.026 hosted tests pass.
+- [ ] Repeat hosted acceptance with the exact final binary after upload approval;
+  the accepted abrupt-WebSocket warning alone is not a release blocker.
 
-- Update the canonical bridge gitlink after the source-only cleanup is committed
-  and approved for integration; retain the virtual WASM resolver in its builder.
+- [x] Pin the corrected bridge implementation at 7e91d2c and retain the virtual
+  WASM resolver. See RELEASE-QUALIFICATION.md for current source/artifact refs.

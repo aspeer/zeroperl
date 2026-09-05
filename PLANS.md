@@ -130,8 +130,11 @@ Work continues from the uncommitted release preparation on
 
 ## WebDyne 3.026 final release qualification
 
-- [ ] Reconcile all supported CPAN snapshots with WebDyne exactly 3.026.
-- [ ] Integrate the corrected bridge source and restyled Perl loaders.
-- [ ] Build and verify final artifacts and npm consumers for all supported Perls.
-- [ ] Run local Cloudflare mixed traffic and storage acceptance with 3.026.
-- [ ] Merge qualified feature branches into local main; publication stays paused.
+- [x] Reconcile all supported CPAN snapshots with WebDyne exactly 3.026.
+- [x] Integrate the corrected bridge source and restyled Perl loaders.
+- [x] Build and verify final artifacts and npm consumers for all supported Perls.
+- [x] Run local Cloudflare mixed traffic and storage acceptance with 3.026.
+- [x] Merge qualified feature branches into local main; publication stays paused.
+
+Final evidence: [RELEASE-QUALIFICATION.md](RELEASE-QUALIFICATION.md). Exact-final
+hosted preview upload and npm publication remain separately approval-gated.

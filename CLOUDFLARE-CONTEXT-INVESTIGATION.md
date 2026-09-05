@@ -125,3 +125,23 @@ The maintainer accepts the abrupt-disconnect diagnostic as a known limitation.
 It is not by itself a release blocker. Hosted acceptance and long-lived SSE
 cancellation testing remain outstanding; local evidence does not certify those
 paths.
+
+
+## Long-lived SSE cancellation correction (2026-09-06)
+
+Unlike the accepted abrupt-WebSocket warning, a long-lived SSE cancellation
+caused a real shared-interpreter queue stall. Without request signals, a later
+SSE timer could await writer.write indefinitely after the client canceled.
+Tracing showed entry into timer delivery without exit; subsequent HTTP queued
+behind it. The existing request abort listener could not run because Cloudflare
+requires the explicit `enable_request_signal` compatibility flag.
+
+The generated Wrangler config now includes that flag. With it, disconnect
+finishes the PAGI session and the queue continues. No new interpreter or bridge
+change is needed. Custom Wrangler configs must include the same flag.
+The retained smoke-stream-lifetime probe checks both a 45-second live connection
+period and a 45-second post-cancellation health period. Final local package tests
+and earlier hosted 3.026 tests pass. Exact-final hosted replay was blocked by
+upload approval review. See RELEASE-QUALIFICATION.md for full evidence and limits.
+
+Cloudflare documents the opt-in in its [request cancellation announcement](https://developers.cloudflare.com/changelog/post/2025-05-22-handle-request-cancellation/).
