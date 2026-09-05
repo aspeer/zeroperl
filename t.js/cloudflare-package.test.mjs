@@ -282,6 +282,7 @@ test("generated Cloudflare configuration validates and emits D1, KV, and R2 bind
       },
     }, { entry: "app.psp" }, join(root, ".webdyne"));
     const config = JSON.parse(await readFile(path, "utf8"));
+    assert.deepEqual(config.compatibility_flags, ["enable_request_signal"]);
     assert.deepEqual(config.d1_databases, [{
       binding: "DB",
       database_name: "webdyne-time",

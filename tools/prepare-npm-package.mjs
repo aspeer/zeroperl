@@ -209,6 +209,10 @@ Use \`webdyne-cloudflare check\` for a Wrangler dry run,
 \`webdyne-cloudflare deploy\` for a checked deployment. The package includes
 its tested Wrangler version. Installation has no deployment side effects.
 
+Custom Wrangler configurations must include the \`enable_request_signal\`
+compatibility flag so disconnected SSE sessions stop promptly. Generated
+configurations include it automatically.
+
 Portable settings belong below \`package.json.webdyne\`. Use \`appDirectory\`
 to override the source \`app/\` directory, \`entry\` to override \`app.psp\`,
 \`static: false\` to disable static-file serving, or \`perlLibrary\` for one or

@@ -140,3 +140,11 @@ The generated Wrangler configuration maps `d1Databases`, `kvNamespaces`, and
 and `remote`; R2 entries accept `previewBucketName`, `jurisdiction`, and
 `remote`. Resource names and IDs stay in the application package rather than
 the reusable extension.
+
+### Incoming request cancellation
+
+Generated Cloudflare configurations enable `enable_request_signal`. If you
+maintain your own Wrangler configuration, include this flag in
+`compatibility_flags` as well. The runtime uses `Request.signal` to stop a
+disconnected SSE session before a later stream write can block the persistent
+interpreter. A recent compatibility date alone does not enable this behaviour.

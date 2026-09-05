@@ -290,6 +290,7 @@ export async function generatedWranglerConfig(projectRoot, project, options, out
     name: project.cloudflare.name ?? workerName(project.packageJson),
     main: "worker.js",
     compatibility_date: project.cloudflare.compatibilityDate ?? "2026-08-27",
+    compatibility_flags: ["enable_request_signal"],
     workers_dev: project.cloudflare.workersDev ?? true,
     vars: {
       WEBDYNE_ROOT: "/app",

@@ -1,0 +1,21 @@
+<start_html title="Long SSE acceptance" h3 sse>
+<p>Long-lived SSE acceptance fixture.</p>
+
+__PERL__
+use Future::AsyncAwait;
+use Future::IO;
+
+async sub sse {
+    my $self=shift();
+    my $request_or=$self->r();
+    my $sse_or=$request_or->sse();
+    my $connection_or=$request_or->{'scope'}->{'pagi.connection'};
+    await $sse_or->start(status => 200);
+    await $sse_or->send_event(event => 'ready', data => 'long SSE');
+    foreach my $index (1..120) {
+        await Future::IO->sleep(0.5);
+        return unless $connection_or->is_connected();
+        await $sse_or->send_event(event => 'tick', data => "$index");
+    }
+    await $sse_or->close();
+}

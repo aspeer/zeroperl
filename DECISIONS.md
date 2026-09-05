@@ -242,3 +242,12 @@ requires the locked Pure Perl Carp files to supersede Perl 5.18's older core
 copy. Prefix assembly permits that targeted override while continuing to
 protect native/target XS companion alignment. Delivered-WASM qualification
 checks WebDyne and WebDyne::PAGI against the snapshot and requires Carp >= 1.50.
+
+## Require Cloudflare incoming-request cancellation signals
+
+Generated Wrangler configurations explicitly enable `enable_request_signal`.
+Without it, the existing request abort listener cannot mark a canceled SSE
+connection disconnected; a later write can suspend the shared interpreter
+indefinitely. This flag supplies the missing provider event without changing
+Perl, Asyncify or the persistent interpreter architecture. Custom configurations
+must include it too. Long-SSE acceptance checks post-cancellation service.
