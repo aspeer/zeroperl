@@ -37,3 +37,7 @@ Thumbs.db
 
 # Pi agent config
 .pi/
+
+# Exported release artifacts and npm candidates are not build inputs
+output/
+dist/

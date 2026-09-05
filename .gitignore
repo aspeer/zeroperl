@@ -19,3 +19,6 @@ test-output*/
 .vscode/
 .test-matrix.pid
 tmp/
+
+# Generated npm candidates
+dist/
