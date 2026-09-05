@@ -119,3 +119,11 @@ Work continues from the uncommitted release preparation on
   qualify overlap, storage and long-lived WebSocket behaviour locally on 5.44.
 - [ ] Investigate forced WebSocket termination diagnostics and qualify hosted
   request lifetimes. Publication is not approved.
+
+## Forced WebSocket disconnect investigation
+
+- [x] Reproduce with session-completion and extension-release tracing on 5.44.
+- [x] Isolate the same warning in a standalone JavaScript Worker on two workerd
+  versions; retain a dependency-free reproduction and remove instrumentation.
+- [x] Recheck normal overlap after forced disconnects.
+- [ ] Pursue upstream resolution and separately authorized hosted comparison.

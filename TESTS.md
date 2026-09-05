@@ -227,3 +227,12 @@ D1/KV/R2 checks during overlap and a WebSocket echo after 45 seconds also pass.
 All 17 runtime JavaScript tests pass. Forced socket termination leaves service
 responsive but produces a separate hung-request warning; see
 CLOUDFLARE-CONTEXT-INVESTIGATION.md for evidence and remaining qualification.
+
+## Hung-request diagnostic isolation
+
+`tests/runtime/hung-request/README.md` documents the standalone reproduction
+and observed toolchain versions. The Node TCP client passes follow-up HTTP
+checks against both the standalone Worker and Perl 5.44; both log the diagnostic.
+Temporary tracing confirms WebDyne session removal and extension release.
+Another 200 normal overlap rounds pass after disconnects. No runtime code
+change or warning suppression was retained; hosted behaviour remains untested.

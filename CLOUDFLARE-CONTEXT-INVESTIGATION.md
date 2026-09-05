@@ -94,3 +94,34 @@ Evidence: `waituntil-worker.log`, `waituntil-overlap.log`, `waituntil-long.log`,
 `waituntil-disconnect.log` and `waituntil-runtime-tests.log` under the temporary
 evidence directory above. The overlap regression is retained in the repository.
 No hosted testing was performed.
+
+## Hung-request isolation
+
+Reproduced forced-disconnect warnings on Perl 5.44 with temporary tracing.
+`finishPagiSession` runs, the active JavaScript session map returns to zero, and
+extension release completes. Subsequent HTTP remains healthy. This is evidence
+against a stuck application session, not a comprehensive heap-leak measurement.
+
+A standalone JavaScript WebSocket echo handler reproduces the same diagnostic
+without loading Perl, WASM, WebDyne, a shared queue or waitUntil. It reproduces
+on Wrangler 4.127.1 / workerd 1.20260828.1 and on 4.129.0 / 1.20260903.1.
+A no-echo control also reproduces it. Explicit server close/error handlers merely
+change the diagnostic to 'Network connection lost'; no workaround was retained.
+
+The dependency-free fixture and client in `tests/runtime/hung-request` provide
+an upstream reproduction. Its client also reproduces the WebDyne warning while
+follow-up HTTP succeeds. Following forced disconnects, another 200 normal overlap
+rounds pass. No production runtime changes are justified by these experiments.
+All instrumentation and temporary handler changes were removed.
+
+The remaining work is upstream/local-versus-hosted qualification. The warning
+is unresolved, but is independently reproducible outside our interpreter. Do
+not confuse it with the repaired bridge corruption or cross-request cancellation.
+No upstream report, hosted deployment, merge or publication has been performed.
+
+## Maintainer acceptance
+
+The maintainer accepts the abrupt-disconnect diagnostic as a known limitation.
+It is not by itself a release blocker. Hosted acceptance and long-lived SSE
+cancellation testing remain outstanding; local evidence does not certify those
+paths.

@@ -71,9 +71,12 @@ changes. Curation of the broad notice archive is an optional size improvement.
   Reproducer: `tests/runtime/smoke-stream-sequence.mjs` and adjacent fixtures.
 - [x] Register all Cloudflare session completions with waitUntil; original
   overlapping-request context cancellation no longer reproduces on Perl 5.44.0.
-- [ ] **Publication gate:** investigate hung-request diagnostics after forced
-  WebSocket termination, qualify long-lived SSE cancellation, and perform
-  separately authorized hosted acceptance. See CLOUDFLARE-CONTEXT-INVESTIGATION.md.
+- [x] Isolate forced-WebSocket hung-request diagnostics: standalone JavaScript
+  reproduces them on two workerd versions; WebDyne sessions complete cleanup.
+- [x] Maintainer accepts the abrupt-disconnect warning as a known limitation.
+  Standalone reproduction: `tests/runtime/hung-request`.
+- [ ] Complete hosted Cloudflare acceptance and long-lived SSE cancellation
+  qualification; the accepted warning alone is not a release blocker.
 
 - Update the canonical bridge gitlink after the source-only cleanup is committed
   and approved for integration; retain the virtual WASM resolver in its builder.
