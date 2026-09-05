@@ -94,12 +94,12 @@ if [ "${BUILD_CPANFILE:-true}" = "true" ]; then
     # Flatten native architecture directories, but retain the same core-file
     # collision rule.  Their .so files are removed below after companion Perl
     # sources for deliberately cross-compiled XS modules have been retained.
-    for archdir in "$SITE_PERL/$NATIVE_ARCH"; do
-        [ -d "$archdir" ] || continue
+    archdir="$SITE_PERL/$NATIVE_ARCH"
+    if [ -d "$archdir" ]; then
         find "$archdir" -type f | while IFS= read -r src; do
             copy_site_file "$src" "${src#"$archdir"/}"
         done
-    done
+    fi
 
 
 fi
