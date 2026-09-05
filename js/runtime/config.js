@@ -35,3 +35,10 @@ export function webdyneRuntimeConfig(bindings = {}) {
     perlEnv: webdynePerlEnvironment(bindings),
   };
 }
+
+/** Encode data for Perl source without double-quoted string interpolation. */
+export function perlJsonExpression(value) {
+  const hex = Array.from(new TextEncoder().encode(JSON.stringify(value)),
+    (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `JSON::PP->new->utf8->decode(pack('H*', '${hex}'))`;
+}

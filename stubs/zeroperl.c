@@ -337,6 +337,9 @@ typedef struct {
 } zeroperl_context;
 
 typedef enum {
+  ZEROPERL_RELEASE_ARRAY_SET,
+  ZEROPERL_RELEASE_HASH_SET,
+  ZEROPERL_RELEASE_SET_VAR,
   ZEROPERL_RELEASE_VALUE_DECREF,
   ZEROPERL_RELEASE_VALUE_FREE,
   ZEROPERL_RELEASE_ARRAY_CLEAR,
@@ -353,6 +356,8 @@ typedef struct {
   zeroperl_release_type type;
   void *target;
   const char *key;
+  zeroperl_value *value;
+  size_t index;
   int result;
 } zeroperl_release_context;
 
@@ -535,6 +540,19 @@ static XS(xs_host_dispatch) {
 
   zeroperl_value *result = host_call_function(func_id, items, argv);
 
+  /* Arguments are borrowed handles; an independent result transfers its owned
+   * reference. Capture the result before releasing any argument handles. */
+  SV *sv = result ? result->sv : NULL;
+  bool borrowed = false;
+  for (int i = 0; i < items; i++) {
+    if (result == argv[i]) {
+      borrowed = true;
+      if (sv) SvREFCNT_inc(sv);
+      break;
+    }
+  }
+  if (result && !borrowed) free(result);
+
   if (argv) {
     for (int i = 0; i < items; i++) {
       SvREFCNT_dec(argv[i]->sv);
@@ -543,11 +561,7 @@ static XS(xs_host_dispatch) {
     free(argv);
   }
 
-  if (!result || !result->sv) {
-    if (result) {
-      free(result);
-    }
-
+  if (!sv) {
     const char *host_err = zeroperl_get_host_error();
     if (host_err && host_err[0] != '\0') {
       croak("%s", host_err);
@@ -556,9 +570,6 @@ static XS(xs_host_dispatch) {
     XSRETURN_UNDEF;
   }
 
-  SV *sv = result->sv;
-  SvREFCNT_inc(sv);
-  free(result);
   ST(0) = sv_2mortal(sv);
   XSRETURN(1);
 }
@@ -856,6 +867,37 @@ static int zeroperl_release_callback(int argc, char **argv) {
   ctx->result = 0;
 
   switch (ctx->type) {
+  case ZEROPERL_RELEASE_ARRAY_SET: {
+    dTHX;
+    zeroperl_array *arr = (zeroperl_array *)ctx->target;
+    SV *value = SvREFCNT_inc(ctx->value->sv);
+    ctx->result = av_store(arr->av, (SSize_t)ctx->index, value) != NULL;
+    if (!ctx->result) SvREFCNT_dec(value);
+    break;
+  }
+  case ZEROPERL_RELEASE_HASH_SET: {
+    dTHX;
+    zeroperl_hash *hash = (zeroperl_hash *)ctx->target;
+    SV *value = SvREFCNT_inc(ctx->value->sv);
+    ctx->result = hv_store(hash->hv, ctx->key, strlen(ctx->key), value, 0) != NULL;
+    if (!ctx->result) SvREFCNT_dec(value);
+    break;
+  }
+  case ZEROPERL_RELEASE_SET_VAR: {
+    dTHX;
+    SV *sv = get_sv(ctx->key, GV_ADD);
+    if (sv) {
+      // Older Perls mortalize the overwritten reference. Drain those
+      // temporaries inside this boundary so DESTROY completes before return.
+      ENTER;
+      SAVETMPS;
+      sv_setsv(sv, ctx->value->sv);
+      FREETMPS;
+      LEAVE;
+      ctx->result = 1;
+    }
+    break;
+  }
   case ZEROPERL_RELEASE_VALUE_DECREF: {
     zeroperl_value *val = (zeroperl_value *)ctx->target;
     if (val && val->sv) {
@@ -1535,9 +1577,9 @@ bool zeroperl_array_set(zeroperl_array *arr, size_t index,
     return false;
   }
 
-  dTHX;
-  SV **svp = av_store(arr->av, (SSize_t)index, SvREFCNT_inc(val->sv));
-  return svp != NULL;
+  zeroperl_release_context ctx = {.type = ZEROPERL_RELEASE_ARRAY_SET,
+                                  .target = arr, .value = val, .index = index};
+  return asyncjmp_rt_start(zeroperl_release_callback, 0, (char **)&ctx) != 0;
 }
 
 //! Get the length of an array
@@ -1656,9 +1698,9 @@ bool zeroperl_hash_set(zeroperl_hash *hash, const char *key,
     return false;
   }
 
-  dTHX;
-  SV **svp = hv_store(hash->hv, key, strlen(key), SvREFCNT_inc(val->sv), 0);
-  return svp != NULL;
+  zeroperl_release_context ctx = {.type = ZEROPERL_RELEASE_HASH_SET,
+                                  .target = hash, .value = val, .key = key};
+  return asyncjmp_rt_start(zeroperl_release_callback, 0, (char **)&ctx) != 0;
 }
 
 //! Get a value from a hash
@@ -2005,15 +2047,9 @@ bool zeroperl_set_var(const char *name, zeroperl_value *val) {
     return false;
   }
 
-  dTHX;
-  SV *sv = get_sv(name, GV_ADD);
-
-  if (!sv) {
-    return false;
-  }
-
-  sv_setsv(sv, val->sv);
-  return true;
+  zeroperl_release_context ctx = {.type = ZEROPERL_RELEASE_SET_VAR,
+                                  .value = val, .key = name};
+  return asyncjmp_rt_start(zeroperl_release_callback, 0, (char **)&ctx) != 0;
 }
 
 //! Register a host function that can be called from Perl

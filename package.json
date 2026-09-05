@@ -11,6 +11,7 @@
     "globals": "^17.4.0"
   },
   "scripts": {
+    "build:bridge": "bun tools/build-bridge.ts",
     "test:cloudflare-package": "node --test t.js/*.test.mjs",
     "verify:embedded-inc": "node tools/verify-embedded-inc.mjs"
   }

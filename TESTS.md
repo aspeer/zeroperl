@@ -94,3 +94,98 @@ Artifact evidence:
 - `zeroperl_reactor.wasm`: 13,604,111 bytes.
 - ExifTool was disabled and no older Perl variant was rebuilt for this
   iteration.
+
+## First release review
+
+See RELEASE-REVIEW.md for the exact coverage and remaining publication actions.
+`npm run test:cloudflare-package` now covers library override deduplication,
+Perl-safe bootstrap configuration and failed Fetch response construction.
+`make -C tests/sfs` runs native C and generator tests; the generator harness
+supports the root ESM package scope. Build tools require a native lz4 addon
+compiled for the Node architecture in use.
+
+## First-release runtime fixes
+
+`tools/smoke-asyncify-free.mjs` now verifies borrowed/fresh callback returns and
+11 asynchronous C ABI cases, including array/hash/scalar replacement. Run it
+against each newly built versioned artifact and prefix. The bridge's
+`tools/check-runtime-lifecycle.mjs <wasm>` additionally checks transferred
+wrapper invalidation, rejected callbacks, exact destructor counts, foreign
+values, and synchronous replacement.
+
+The core module smoke now requires every deliberately linked CPAN XS module
+and exercises Cpanel::JSON::XS encode/decode, catching mismatched Perl companions.
+The native module smoke passes on Perl 5.42.2 (IO::File is skipped by its existing
+host compatibility check). These are marker-based scripts, not TAP tests.
+
+The package tests include a same-size prefix tampering check. Release packaging
+also verifies the attribution evidence checksum; workflow archive allowlists
+include the preserved notices.
+
+Final candidate build 5 passes the 24-check generated bridge lifecycle suite,
+11 C ABI cases and ten external async releases on Perl 5.18.4, 5.36.3 and
+5.44.0. Attribution inventories verify 11,370, 11,150 and 11,425 files
+respectively. Runtime release CI runs the generated lifecycle probe against
+each selected version. The extracted 38-file runtime npm tarball also passes
+all lifecycle checks; the 45-file TypeScript tarball passes Node 22/24/26
+ESM, CJS and strict NodeNext checks.
+
+## CPAN snapshot checks
+
+`tests/cpan/xs-runtime.t` runs the shared `Core::XSCompatibility` checks under
+native Perl during the container build. The WASM smoke harness runs the same
+checks twice in one interpreter: actual XS entry points, subroutine names,
+parameter validation, hash/array accessors, CSV quoting/Unicode/binary/error
+handling, and Variable::Magic attach/detach/scope cleanup.
+
+`node tools/check-xs-magic.mjs WASM` additionally checks asynchronous host calls
+from Variable::Magic set/free callbacks over three interpreter turns. It runs
+in release qualification alongside the existing lifecycle tests.
+
+`tests/cpan/lock.t` runs in the container build with the selected native Perl
+and Carton. It checks input binding, archive integrity, locked recipe lookup,
+and rejection of unsupported installed XS modules. Run it independently with
+`container run --rm -v "$PWD:/review:ro" zeroperl-cpan-tools:5.44.0
+/build/native/prefix/bin/prove /review/tests/cpan/lock.t` (one shell line).
+
+Snapshot generation and full WASM builds must pass for each supported Perl.
+Repeat `make cpanfile.snapshot` without input changes and check that the snapshot
+and metadata remain unchanged. Normal runtime builds must never regenerate them.
+
+## Base XS qualification (2026-09-05)
+
+Local standard (`off`, embedded prefix) build 8 passes on all three supported
+Perls: native `prove` lock and XS suites; core/WASM module smoke tests; locked
+XS version checks (14 on 5.18, 13 on 5.36/5.44); embedded @INC; socket XS;
+11 asynchronous release operations; 24 lifecycle checks; and asynchronous
+Variable::Magic set/free callbacks over three turns. Artifact checksums and
+upstream attribution inventories also pass. No TypeScript source changed.
+
+Sizes below are bytes; gzip uses level 9 and mtime 0. Growth compares build 8
+with the existing build 6 and includes the executable-module packaging repair.
+
+| Perl | Raw WASM | Gzip-9 | Raw growth | Gzip growth |
+| --- | ---: | ---: | ---: | ---: |
+| 5.18.4 | 12,988,140 | 4,489,362 | 226,198 | 59,100 |
+| 5.36.3 | 13,600,771 | 4,492,487 | 217,921 | 58,803 |
+| 5.44.0 | 14,288,201 | 4,634,526 | 218,862 | 57,501 |
+
+The controlled 5.44 size comparison reuses the same compiled interpreter,
+toolchain and optimization flags, removes selected target archives and prefix
+files, regenerates the SFS/bootstrap registry, and relinks. The complete batch
+accounts for 210,258 raw / 58,048 gzip bytes; Variable::Magic accounts for
+27,791 raw / 194 gzip bytes in that comparison. Hidden installation metadata
+is excluded by SFS already. These whole-binary compressed deltas are not
+portable per-module size promises.
+
+Local evidence is in `output/5.44.0/xs-size-build-8/`: `sizes.json`,
+`matrix.json`, the measurement script and the three compared WASM files.
+The full comparison binary has SHA-256
+`6605e16e373be2610d37c20da19204dabff5717a746c16afdaea26efa27abcd0`,
+matching `output/5.44.0/zeroperl-webdyne-5.44.0-8.wasm`.
+
+The subsequent cpanfile cleanup reconciled successfully on all three Perls.
+Snapshots are byte-identical to their build-8 selections, with only
+`cpanfile_sha256` changed in each metadata file. The existing native CPAN lock
+suite passed all 10 checks on 5.44. No interpreter or dependency code changed,
+so the cleanup did not require another WASM build or repeated runtime matrix.

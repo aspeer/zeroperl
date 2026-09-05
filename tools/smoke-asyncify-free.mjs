@@ -44,7 +44,12 @@ let hostCalls = 0;
 const { instance } = await WebAssembly.instantiate(fs.readFileSync(wasmPath), {
   wasi_snapshot_preview1: wasi.wasiImport,
   env: {
-    call_host_function: () => {
+    call_host_function: (id, argc, argv) => {
+      if (id === 2) {
+        assert.equal(argc, 1);
+        return new DataView(wasm.memory.buffer).getUint32(argv, true);
+      }
+      if (id === 3) return wasm.zeroperl_new_int(42);
       hostCalls += 1;
       if (!shouldSuspend) return 0;
 
@@ -143,6 +148,13 @@ try {
     assert.equal(status, 0, readCString(wasm.zeroperl_last_error()));
   }
 
+  for (const [id, name] of [[2, 'main::identity'], [3, 'main::fresh']]) {
+    const ptr = writeCString(name);
+    wasm.zeroperl_register_function(id, ptr);
+    wasm.free(ptr);
+  }
+  evalOrThrow('for (1..1000) { die "borrowed return" unless identity(42) == 42; die "owned return" unless fresh() == 42; }');
+
   function makeHolderValue() {
     // Move the returned object into a global through the public API, then
     // discard the result. The subsequent get_var handle is now the only
@@ -180,6 +192,43 @@ try {
   }
 
   const releaseCases = {
+    async array_set() {
+      evalOrThrow('our @replacement = (bless {}, "AsyncFreeProbe")');
+      const name = writeCString('main::replacement');
+      const array = wasm.zeroperl_get_array_var(name);
+      const replacement = wasm.zeroperl_new_int(42);
+      await releaseWithAsyncify(async () => {
+        assert.equal(await invokeAsync(wasm.zeroperl_array_set, array, 0, replacement), 1);
+      });
+      wasm.zeroperl_value_free(replacement);
+      wasm.zeroperl_array_free(array);
+      wasm.free(name);
+      evalOrThrow('die "array replacement" unless $replacement[0] == 42');
+    },
+    async hash_set() {
+      evalOrThrow('our %replacement = (probe => bless {}, "AsyncFreeProbe")');
+      const name = writeCString('main::replacement');
+      const hash = wasm.zeroperl_get_hash_var(name);
+      const replacement = wasm.zeroperl_new_int(42);
+      await releaseWithAsyncify(async () => {
+        assert.equal(await invokeAsync(wasm.zeroperl_hash_set, hash, keyName, replacement), 1);
+      });
+      wasm.zeroperl_value_free(replacement);
+      wasm.zeroperl_hash_free(hash);
+      wasm.free(name);
+      evalOrThrow('die "hash replacement" unless $replacement{probe} == 42');
+    },
+    async set_var() {
+      evalOrThrow('our $replacement = bless {}, "AsyncFreeProbe"');
+      const name = writeCString('main::replacement');
+      const replacement = wasm.zeroperl_new_int(42);
+      await releaseWithAsyncify(async () => {
+        assert.equal(await invokeAsync(wasm.zeroperl_set_var, name, replacement), 1);
+      });
+      wasm.zeroperl_value_free(replacement);
+      wasm.free(name);
+      evalOrThrow('die "scalar replacement" unless $replacement == 42');
+    },
     async value_free() {
       const value = makeHolderValue();
       await releaseWithAsyncify(() => invokeAsync(wasm.zeroperl_value_free, value));

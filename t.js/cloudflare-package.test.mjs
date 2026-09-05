@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -12,7 +13,7 @@ import {
   main as cloudflareMain,
 } from "../scripts/webdyne-cloudflare.mjs";
 import { createExtensionManager } from "../js/runtime/extensions.js";
-import { webdyneRuntimeConfig } from "../js/runtime/config.js";
+import { perlJsonExpression, webdyneRuntimeConfig } from "../js/runtime/config.js";
 import { buildPagiScope, createFetchPagiTransport } from "../js/transport/fetch-pagi.js";
 
 const worker = await readFile(new URL("../js/worker.js", import.meta.url), "utf8");
@@ -330,3 +331,49 @@ test("the packaged bridge exposes the runtime primitives", async () => {
   assert.equal(typeof bridge.ZeroPerl, "function");
   assert.equal(typeof bridge.MemoryFileSystem, "function");
 });
+
+
+test("embedded deduplication preserves differing application overrides", async () => {
+  const root = await mkdtemp(join(tmpdir(), "zeroperl-override-"));
+  try {
+    for (const name of ["app", "lib1", "lib2"]) await mkdir(join(root, name));
+    await writeFile(join(root, "app/app.psp"), "hello");
+    await writeFile(join(root, "lib1/Example.pm"), "embedded");
+    await writeFile(join(root, "lib2/Example.pm"), "override");
+    const result = await buildApplicationArchives({
+      projectRoot: root, appDirectory: "app", libraryDirectories: ["lib1", "lib2"],
+      outputDirectory: join(root, "out"),
+      embeddedFiles: {"Example.pm": createHash("sha256").update("embedded").digest("hex")},
+    });
+    assert.deepEqual(result.omittedEmbeddedFiles, []);
+    const entries = await unpackTar(gunzipSync(await readFile(result.perlLibraryVfsArchive)), {strict: true});
+    assert.ok(entries.some(({header, data}) => header.name === "perl5/lib/Example.pm"
+      && new TextDecoder().decode(data) === "override"));
+  } finally { await rm(root, {recursive: true, force: true}); }
+});
+
+
+test("bootstrap configuration preserves Perl sigils and Unicode as data", () => {
+  const value = {value: '$secret @names \\ " café π'};
+  const expression = perlJsonExpression(value);
+  const result = execFileSync("perl", ["-MJSON::PP", "-e",
+    `print JSON::PP->new->utf8->encode(${expression});`], {encoding: "utf8"});
+  assert.deepEqual(JSON.parse(result), value);
+});
+
+
+for (const type of ["http", "sse"]) {
+  test(`${type} invalid Fetch response construction settles with an error response`, async () => {
+    const request = new Request("https://example.test/", {
+      headers: type === "sse" ? {accept: "text/event-stream"} : {},
+    });
+    const transport = createFetchPagiTransport(buildPagiScope(request), request);
+    try {
+      await transport.sink.send({type: type === "http" ? "http.response.start" : "sse.start",
+        status: 100, headers_base64: []});
+      if (type === "http") await transport.sink.send({type: "http.response.body", body_base64: "", more: 0});
+      assert.fail("Fetch must reject status 100");
+    } catch (error) { await transport.sink.fail(error); }
+    assert.equal((await transport.response).status, 500);
+  });
+}

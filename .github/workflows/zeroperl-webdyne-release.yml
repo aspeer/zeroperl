@@ -104,10 +104,14 @@ jobs:
           prefix="${artifact_dir}/perl-wasi-prefix-${RELEASE_ID}"
           checksums="${artifact_dir}/SHA256SUMS-${RELEASE_ID}"
           (cd "$artifact_dir" && shasum -a 256 -c "$(basename "$checksums")")
+          python3 tools/verify-notices.py "$artifact_dir/third-party-notices-${RELEASE_ID}.tar.gz"
           node tools/verify-embedded-inc.mjs "$wasm"
           node tools/wasm-smoke.mjs "$wasm"
           node tools/smoke-socket.mjs "$wasm" "$prefix"
           node tools/smoke-asyncify-free.mjs "$wasm" "$prefix"
+          node tools/check-runtime-lifecycle.mjs "$wasm" js/zeroperl.js
+          node tools/check-cpan-versions.mjs "$wasm" "$PERL_VERSION"
+          node tools/check-xs-magic.mjs "$wasm"
           node --input-type=module - "$wasm" "$reactor" <<'NODE'
           import { readFile } from "node:fs/promises";
           for (const path of process.argv.slice(2)) {
@@ -132,7 +136,9 @@ jobs:
           cp -R "$artifact_dir/perl-wasi-prefix-${RELEASE_ID}" "$archive_root/"
           cp "$artifact_dir/manifest-${RELEASE_ID}.json" "$archive_root/"
           cp "$artifact_dir/SHA256SUMS-${RELEASE_ID}" "$archive_root/"
-          cp LICENSE "$archive_root/"
+          cp LICENSE THIRD-PARTY-NOTICES.md "$archive_root/"
+          cp -R licenses "$archive_root/"
+          cp "$artifact_dir/third-party-notices-${RELEASE_ID}.tar.gz" "$archive_root/"
           source_date_epoch="$(git show -s --format=%ct HEAD)"
           tar --sort=name \
             --mtime="@${source_date_epoch}" \
@@ -146,6 +152,9 @@ jobs:
           cp "$artifact_dir/zeroperl-webdyne-${RELEASE_ID}.wasm" "$distribution_dir/"
           cp "$artifact_dir/zeroperl-webdyne-reactor-${RELEASE_ID}.wasm" "$distribution_dir/"
           cp "$artifact_dir/manifest-${RELEASE_ID}.json" "$distribution_dir/"
+          cp "$artifact_dir/third-party-notices-${RELEASE_ID}.tar.gz" "$distribution_dir/"
+          cp -R licenses "$distribution_dir/"
+          cp LICENSE THIRD-PARTY-NOTICES.md "$distribution_dir/"
           cp "$artifact_dir/SHA256SUMS-${RELEASE_ID}" "$distribution_dir/"
 
       - name: Attest release binaries and archive

@@ -9,14 +9,6 @@ PERL_VERSION="${PERL_VERSION:-5.44.0}"
 NPROC="${NPROC:-$(nproc)}"
 WORK="${WORK:-/build/cpan-xs}"
 
-PERL_MINOR=$(echo "$PERL_VERSION" | cut -d. -f2)
-FUTURE_XS_VERSION=0.15
-if [ "$PERL_MINOR" -lt 24 ]; then
-    # Future::XS 0.08 and later require Perl 5.24. Version 0.07 is the
-    # newest upstream release compatible with the 5.18 target.
-    FUTURE_XS_VERSION=0.07
-fi
-
 export PATH="$REPO_DIR/wasi-bin:$PATH"
 # MakeMaker is configured against the target tree below. Module::Build itself
 # loads IO while generating its Build script, however, and miniperl cannot load
@@ -27,11 +19,6 @@ export WASI_TARGET=1
 
 mkdir -p "$WORK"
 cd "$WORK"
-
-fetch() {
-    url="$1"
-    curl -fsSL "$url" | tar -xzf -
-}
 
 build_static() {
     dist="$1"
@@ -47,6 +34,9 @@ build_static() {
     wasimake make -j"$NPROC"
     mkdir -p "$(dirname "$WASM_DIR/$destination")"
     cp "$(find blib -type f -name "$archive" -print -quit)" "$WASM_DIR/$destination"
+    # Keep generated Perl companions paired with their target XS implementation.
+    mkdir -p "/zeroperl/lib/$PERL_VERSION/wasm32-wasi"
+    cp -R blib/lib/. "/zeroperl/lib/$PERL_VERSION/wasm32-wasi/"
     cd "$WORK"
 }
 
@@ -79,41 +69,27 @@ build_module_build_static() {
         built_archive="$(find blib -type f -name '*.so' -print -quit)"
     fi
     cp "$built_archive" "$WASM_DIR/$destination"
+    # Keep generated Perl companions paired with their target XS implementation.
+    mkdir -p "/zeroperl/lib/$PERL_VERSION/wasm32-wasi"
+    cp -R blib/lib/. "/zeroperl/lib/$PERL_VERSION/wasm32-wasi/"
     cd "$WORK"
 }
 
-fetch "https://www.cpan.org/authors/id/O/OA/OALDERS/HTML-Parser-3.85.tar.gz"
-build_static "HTML-Parser-3.85" "Parser.a" "lib/auto/HTML/Parser/Parser.a"
-
-fetch "https://www.cpan.org/authors/id/A/AT/ATOOMIC/Clone-0.50.tar.gz"
-build_static "Clone-0.50" "Clone.a" "lib/auto/Clone/Clone.a"
-
-fetch "https://www.cpan.org/authors/id/R/RU/RURBAN/Cpanel-JSON-XS-4.43.tar.gz"
-build_static "Cpanel-JSON-XS-4.43" "XS.a" "lib/auto/Cpanel/JSON/XS/XS.a"
-
-# WebDyne::PAGI requires Sub::Util. Perl 5.18 predates it, so pairing a
-# current Sub::Util.pm from the dependency resolver with the old core
-# List::Util XS object produces a load-time version mismatch. Later supported
-# Perls already ship a mutually compatible List::Util/Sub::Util pair.
-if [ "$PERL_MINOR" -lt 24 ]; then
-    fetch "https://www.cpan.org/authors/id/P/PE/PEVANS/Scalar-List-Utils-1.70.tar.gz"
-    build_static "Scalar-List-Utils-1.70" "Util.a" "lib/auto/List/Util/Util.a"
-fi
-
-fetch "https://www.cpan.org/authors/id/D/DD/DDICK/Crypt-URandom-0.55.tar.gz"
-cd "$WORK/Crypt-URandom-0.55"
-patch -p1 < "$REPO_DIR/patches/crypt-urandom-wasi.patch"
-cd "$WORK"
-build_static "Crypt-URandom-0.55" "URandom.a" "lib/auto/Crypt/URandom/URandom.a"
-
-fetch "https://www.cpan.org/authors/id/P/PE/PEVANS/XS-Parse-Sublike-0.41.tar.gz"
-build_module_build_static "XS-Parse-Sublike-0.41" "Sublike.a" "lib/auto/XS/Parse/Sublike/Sublike.a"
-
-fetch "https://www.cpan.org/authors/id/P/PE/PEVANS/XS-Parse-Keyword-0.49.tar.gz"
-build_module_build_static "XS-Parse-Keyword-0.49" "Keyword.a" "lib/auto/XS/Parse/Keyword/Keyword.a"
-
-fetch "https://cpan.metacpan.org/authors/id/P/PE/PEVANS/Future-XS-${FUTURE_XS_VERSION}.tar.gz"
-build_module_build_static "Future-XS-${FUTURE_XS_VERSION}" "XS.a" "lib/auto/Future/XS/XS.a"
-
-fetch "https://www.cpan.org/authors/id/P/PE/PEVANS/Future-AsyncAwait-0.71.tar.gz"
-build_module_build_static "Future-AsyncAwait-0.71" "AsyncAwait.a" "lib/auto/Future/AsyncAwait/AsyncAwait.a"
+# Resolve every source archive from the same snapshot used by Carton.
+PERL5LIB="$NATIVE_DIR/prefix/lib/perl5/site_perl/$PERL_VERSION" \
+"$NATIVE_DIR/prefix/bin/perl" "$REPO_DIR/pipeline/cpan-lock.pl" recipes \
+    /build/cpan-project "$REPO_DIR/pipeline/cpan-xs.json" > "$WORK/recipes.tsv"
+while IFS="$(printf '\t')" read -r source builder archive destination patch_name; do
+    source_archive="/build/cpan-project/vendor/cache/authors/id/$source"
+    dist_dir="$(basename "$source" | sed 's/\.tar\.gz$//; s/\.tgz$//; s/\.tar\.bz2$//')"
+    mkdir -p "$WORK/$dist_dir"
+    tar xf "$source_archive" --strip-components=1 -C "$WORK/$dist_dir"
+    if [ "$patch_name" != - ]; then
+        (cd "$WORK/$dist_dir" && patch -p1 < "$REPO_DIR/patches/$patch_name")
+    fi
+    case "$builder" in
+        makemaker) build_static "$dist_dir" "$archive" "$destination" ;;
+        modulebuild) build_module_build_static "$dist_dir" "$archive" "$destination" ;;
+        *) echo "Unsupported XS builder: $builder" >&2; exit 1 ;;
+    esac
+done < "$WORK/recipes.tsv"

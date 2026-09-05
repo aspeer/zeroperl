@@ -113,7 +113,9 @@ __attribute__((noinline)) int _asyncjmp_setjmp_internal(asyncjmp_jmp_buf *env)
         asyncify_stop_rewind();
         ASYNCJMP_DEBUG_LOG("  JMP_BUF_STATE_RETURNING");
         env->state = JMP_BUF_STATE_CAPTURED;
-        free(env->longjmp_buf_ptr);
+        // _asyncjmp_longjmp uses a static scratch buffer, not a heap allocation.
+        // Freeing it corrupts the allocator when a captured setjmp resumes.
+        env->longjmp_buf_ptr = NULL;
         _asyncjmp_active_jmpbuf = NULL;
         return env->payload;
     }

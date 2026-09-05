@@ -45,7 +45,7 @@ RUN chmod +x /build/repo/pipeline/build-wasi-libs.sh && \
 RUN mkdir -p /zeroperl
 
 
-FROM base AS native-perl
+FROM base AS native-perl-tools
 
 ARG PERL_VERSION=5.44.0
 ARG EXIFTOOL_VERSION=13.55
@@ -61,11 +61,33 @@ ENV PERL_VERSION=${PERL_VERSION} \
     NATIVE_DIR=/build/native \
     REPO_DIR=/build/repo
 
-COPY cpanfile /build/repo/
 COPY pipeline/build-native-perl.sh pipeline/build-exiftool.sh /build/repo/pipeline/
 RUN chmod +x /build/repo/pipeline/*.sh
 
 RUN /build/repo/pipeline/build-native-perl.sh
+# GCC line markers split errno macro expansions expected on one line by 5.18.
+# Regenerate the native module before Carton's HTTP client imports its constants.
+RUN if [ "$PERL_VERSION" = "5.18.4" ]; then \
+      cd "$NATIVE_DIR/ext/Errno" && \
+      sed -i 's/return "\$cppstdin /return "\$cppstdin -P /' Errno_pm.PL && \
+      "$NATIVE_DIR/prefix/bin/perl" Errno_pm.PL && \
+      cp Errno.pm "$NATIVE_DIR/lib/Errno.pm" && \
+      archlib=$("$NATIVE_DIR/prefix/bin/perl" -MConfig -e 'print $Config{archlib}') && \
+      cp Errno.pm "$archlib/Errno.pm" && \
+      "$NATIVE_DIR/prefix/bin/perl" -MErrno=EINTR,EPIPE -e1; \
+    fi
+
+# Carton runs under the selected Perl, independently of the application local::lib.
+RUN export PATH="$NATIVE_DIR/prefix/bin:$PATH" && \
+    echo yes | cpan App::cpanminus && \
+    "$NATIVE_DIR/prefix/bin/cpanm" --notest ExtUtils::MakeMaker && \
+    ("$NATIVE_DIR/prefix/bin/cpanm" --notest Carton || \
+      { find /root/.cpanm/work -name build.log -exec tail -n 100 {} \; ; exit 1; })
+COPY pipeline/cpan-snapshot.sh tools/cpan-lock.pl tools/cpan-xs.json /build/repo/pipeline/
+
+FROM native-perl-tools AS native-perl
+COPY cpanfile* /build/repo/
+RUN if [ "${BUILD_CPANFILE}" = "true" ]; then sh /build/repo/pipeline/cpan-snapshot.sh install; fi
 RUN if [ "${BUILD_EXIFTOOL}" = "true" ]; then /build/repo/pipeline/build-exiftool.sh; fi
 
 
@@ -98,10 +120,18 @@ RUN cd /build/repo/tools && npm ci
 COPY wasi-bin/ /build/repo/wasi-bin/
 COPY pipeline/ /build/repo/pipeline/
 COPY patches/ /build/repo/patches/
-COPY stubs/ /build/repo/stubs/
+# The Perl build needs compatibility headers, Perl shims, and native SFS tests.
+# Runtime C/assembly is copied only in the final stage so ABI fixes can reuse
+# the expensive interpreter and CPAN layers.
+COPY stubs/*.h stubs/*.pm stubs/sfs*.c /build/repo/stubs/
 COPY tools/ /build/repo/tools/
 COPY tests/smoke/ /build/repo/tests/smoke/
 COPY tests/sfs/ /build/repo/tests/sfs/
+COPY tests/cpan/ /build/repo/tests/cpan/
+RUN "$NATIVE_DIR/prefix/bin/prove" /build/repo/tests/cpan/lock.t
+RUN if [ "${BUILD_CPANFILE}" = "true" ]; then \
+      "$NATIVE_DIR/prefix/bin/prove" /build/repo/tests/cpan/xs-runtime.t; \
+    fi
 RUN chmod +x /build/repo/wasi-bin/* /build/repo/pipeline/*.sh \
     /build/repo/tools/*.sh /build/repo/tools/*.pl && \
     mkdir -p /build/repo/gen
@@ -156,10 +186,11 @@ RUN if [ "${ZEROPERL_EMBED_PREFIX}" = "true" ]; then \
     fi
 
 RUN mkdir -p /artifacts && \
-    cp /build/wasm/config.h /build/wasm/zeroperl.wasm /build/wasm/zeroperl_reactor.wasm /artifacts/ && \
+    cp /build/wasm/config.h /build/wasm/zeroperl.wasm /build/wasm/zeroperl_reactor.wasm /build/third-party-notices.tar.gz /artifacts/ && \
     cp -r /zeroperl /artifacts/perl-wasi-prefix && \
-    [ "${BUILD_EXIFTOOL}" = "true" ] && [ -f /build/repo/exiftool.min.pl ] && \
-        cp /build/repo/exiftool.min.pl /artifacts/ || true
+    if [ "${BUILD_EXIFTOOL}" = "true" ]; then \
+        cp /build/repo/exiftool.min.pl /artifacts/; \
+    fi
 
 
 FROM debian:trixie-slim

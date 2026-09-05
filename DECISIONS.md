@@ -117,3 +117,94 @@ portable runtime. `kvNamespaces` and `r2Buckets` follow the same boundary: the
 helper maps application-owned identifiers and local/remote flags to Wrangler,
 while the separately installed extension owns the Perl and JavaScript service
 behavior.
+
+
+## D013: First public release uses the consolidated implementations
+
+The user confirmed preparing candidates from the latest implementation branches
+for eventual main merges. Review fixes remain on `codex/first-release-review`.
+The npm runtime and standalone bridge are separate distributions with separate
+versions; both need matching runtime qualification. No publication or merge is
+implied by preparing a public package manifest.
+
+Bootstrap JSON is encoded as UTF-8 hexadecimal data in a Perl pack expression,
+so configuration is never interpreted as interpolated Perl source. Library
+files matching the embedded prefix are omitted only when no configured library
+supplies differing bytes for that module path.
+
+## D010: Callback ownership and asynchronous replacement
+
+Callback arguments are borrowed until the host callback settles. The C
+callback captures a returned argument's SV before freeing argument handles;
+an independent returned wrapper transfers its owned reference without an
+extra increment. The bridge invalidates returned owned wrappers and expired
+borrowed wrappers and rejects cross-interpreter returns.
+
+Array/hash/scalar replacements use the same asyncjmp boundary as release.
+The bridge retains temporary values and names through completion and preserves
+the synchronous path when no destructor suspends. Direct value APIs do not
+promise support for tied/overloaded magic; evaluate those operations in Perl.
+
+Generated npm metadata follows the existing MIT runtime source license. The
+Apache bridge license and notice are included separately, and embedded
+interpreter/dependency attribution must accompany the qualified artifacts.
+
+## D011: Preserve live C frames through Asyncify rewind
+
+The bridge keeps the exported C stack pointer below suspended frames while a
+host promise settles and while it re-enters the export to rewind. Restoring
+the root pointer before re-entry allows argument setup to overwrite a live
+Perl JMPENV (observed on 5.36). Restore the root only after the rewind call
+returns. Regression coverage must include rejected asynchronous callbacks,
+not only successful awaits.
+
+Scalar replacement also drains its own Perl temporary scope. Perl 5.18 may
+mortalize the old reference, so omitting this scope postpones DESTROY beyond
+the setter's completion.
+
+## D012: Resolve CPAN versions once per target Perl
+
+`make cpanfile.snapshot` reconciles dependencies under the selected native Perl;
+`make cpanfile.snapshot-update` starts a fresh resolution. The default comes
+from `release/defaults.mk`. Versioned Carton snapshots are the sole selection
+of CPAN distribution versions. Companion metadata binds inputs and archives
+by checksum. Normal builds install in deployment mode and XS recipes consume
+the same archives; recipes only describe target compilation and patches.
+Snapshots differ by Perl version because core modules and compatible dependency
+versions differ. Full toolchain/byte-for-byte reproducibility is outside this
+change. Publication remains a separate user decision.
+
+## D014: Include a small base set of application XS modules
+
+The approved base additions are Sub::Name 0.28, Params::Util 1.102,
+Class::XSAccessor 1.19 (including Array), Text::CSV_XS 1.64 and
+Variable::Magic 0.65. The snapshots retain existing selections; only Perl
+5.18 additionally needs the Pure Perl XSLoader 0.24 distribution. Variable::Magic
+has no external C library or non-core runtime dependencies.
+
+Retain Variable::Magic: removing its archive, bootstrap and embedded companions
+from the otherwise identical Perl 5.44 build reduces raw WASM by 27,791 bytes
+and gzip-9 by 194 bytes. Compressed deltas depend on whole-program optimization
+and compression and are not additive module sizes. The all-five measurement
+binary is byte-identical to qualified build 8. Removing the complete batch
+reduces it by 210,258 raw bytes and 58,048 gzip-9 bytes.
+
+Params::Util's native dynamic-loading probes are bypassed only for WASI;
+target compilation and execution qualify the static implementation. Normalize
+module source permissions before executable stripping, since the upstream
+Params::Util.pm has its executable bit set. This also restores four existing
+runtime module files that were previously stripped. The locked XSLoader update
+may replace Perl 5.18's older Pure Perl loader without changing core XS objects.
+
+Build 8 is qualified on 5.18.4, 5.36.3 and 5.44.0, including asynchronous
+Variable::Magic set/free callbacks and the existing lifecycle checks. See
+TESTS.md for artifact sizes and evidence. Publication and consumer package
+refreshes remain separate from these local runtime candidates.
+
+## D013: Release source references across the runtime and bridge
+
+The runtime pins the tested bridge implementation commit. The bridge can then
+record the clean runtime release manifest in a subsequent artifact-only commit.
+Repointing the runtime gitlink for every bundled-runtime refresh would create
+a circular provenance dependency. Validate that bridge source and the generated
+runtime bridge remain identical across that artifact-only refresh.

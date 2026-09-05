@@ -4,6 +4,8 @@ import { createHash } from "node:crypto";
 import { copyFile, cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, join, relative, resolve } from "node:path";
 
+import { directoryInventory } from "./artifact-inventory.mjs";
+
 function fail(message) {
   console.error(message);
   process.exit(1);
@@ -80,11 +82,23 @@ if ((await sha256(reactorPath)) !== manifest.artifacts.reactor.sha256) {
   fail(`Reactor checksum does not match ${options.manifest}`);
 }
 
+if (!manifest.artifacts.notices?.filename) fail("Manifest has no attribution evidence artifact");
+const noticesPath = resolve(source, manifest.artifacts.notices.filename);
+if ((await sha256(noticesPath)) !== manifest.artifacts.notices.sha256) {
+  fail(`Attribution evidence checksum does not match ${options.manifest}`);
+}
+
 const packageName = `@webdyne/webdyne-zeroperl-${perlVersion}`;
 const packageVersion = `${buildNumber}.0.0`;
 const wasmName = basename(options.wasm);
 const reactorName = basename(options.reactor);
 const prefixPath = resolve(source, manifest.artifacts.prefix.directory);
+const prefixInventory = await directoryInventory(prefixPath);
+for (const field of ["files", "bytes", "sha256"]) {
+  if (prefixInventory[field] !== manifest.artifacts.prefix[field]) {
+    fail(`Prefix ${field} does not match ${options.manifest}`);
+  }
+}
 const embeddedFiles = await embeddedFileInventory(prefixPath, perlVersion);
 
 await mkdir(destination, { recursive: true });
@@ -92,7 +106,10 @@ await Promise.all([
   copyFile(wasmPath, resolve(destination, wasmName)),
   copyFile(reactorPath, resolve(destination, reactorName)),
   copyFile(sourceManifestPath, resolve(destination, "manifest.json")),
+  copyFile(noticesPath, resolve(destination, "third-party-notices.tar.gz")),
   copyFile(resolve("LICENSE"), resolve(destination, "LICENSE")),
+  copyFile(resolve("THIRD-PARTY-NOTICES.md"), resolve(destination, "THIRD-PARTY-NOTICES.md")),
+  cp(resolve("licenses"), resolve(destination, "licenses"), { recursive: true }),
   cp(resolve("bin"), resolve(destination, "bin"), { recursive: true }),
   cp(resolve("js"), resolve(destination, "js"), { recursive: true }),
   cp(resolve("lib"), resolve(destination, "lib"), { recursive: true }),
@@ -127,6 +144,9 @@ const packageJson = {
     "js",
     "lib",
     "manifest.json",
+    "THIRD-PARTY-NOTICES.md",
+    "third-party-notices.tar.gz",
+    "licenses",
     "scripts",
     wasmName,
     reactorName,
@@ -139,7 +159,7 @@ const packageJson = {
   sideEffects: false,
   keywords: ["perl", "webdyne", "pagi", "wasm", "webassembly", "wasi"],
   author: "Anthony Speer",
-  license: "Apache-2.0",
+  license: "MIT",
   repository: {
     type: "git",
     url: "git+https://github.com/aspeer/zeroperl.git",
@@ -165,7 +185,15 @@ Cloudflare adapter needed to serve a WebDyne PSP application.
 
 Package version ${packageVersion} corresponds to WebDyne build ${buildNumber}.
 The normal runtime is \`${wasmName}\`; the pre-Asyncify linker output is
-\`${reactorName}\`.
+\`${reactorName}\`. Use the normal runtime with the ZeroPerl bridge; the
+reactor is retained for downstream tooling and does not support the bridge's
+asynchronous host callbacks.
+
+The manifest records binary, prefix and attribution evidence hashes.
+\`third-party-notices.tar.gz\` preserves upstream build evidence; \`licenses/\`
+adds the bridge and exact SDK toolchain license texts. See
+\`THIRD-PARTY-NOTICES.md\` for scope. The runtime source is MIT-licensed;
+embedded components retain their own licenses.
 
 Place the complete application tree in \`app/\`. A minimal project only needs
 \`package.json\` and \`app/app.psp\`; Cloudflare configuration is generated when

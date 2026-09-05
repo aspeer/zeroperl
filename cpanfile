@@ -1,3 +1,18 @@
+# Explicit target XS distributions. Versions are resolved in the per-Perl snapshot.
+requires 'HTML::Parser';
+requires 'Clone';
+requires 'Sub::Name';
+requires 'Params::Util';
+requires 'Class::XSAccessor';
+requires 'Text::CSV_XS';
+requires 'Variable::Magic';
+requires 'Cpanel::JSON::XS';
+requires 'XS::Parse::Sublike';
+requires 'XS::Parse::Keyword';
+if ( $] < 5.024 ) {
+    requires 'List::Util', '1.70';
+}
+
 requires 'CGI::Simple';
 requires 'Capture::Tiny';
 requires 'Crypt::URandom';
@@ -40,54 +55,17 @@ requires 'Time::HiRes';
 requires 'URI';
 requires 'URI::Escape';
 requires 'WebDyne', '== 3.023';
-requires 'perl', '5.006';
-recommends 'Plack::Middleware::Static';
-recommends 'Plack::Runner';
-recommends 'Win32::TieRegistry';
-suggests 'APR::Pool';
-suggests 'APR::Table';
-suggests 'Apache2';
-suggests 'Apache2::Const';
-suggests 'Apache2::Log';
-suggests 'Apache2::RequestIO';
-suggests 'Apache2::RequestRec';
-suggests 'Apache2::RequestUtil';
-suggests 'Apache2::Response';
-suggests 'Apache2::ServerUtil';
-suggests 'Apache2::SubRequest';
-suggests 'Apache::Const';
-suggests 'Apache::Constants';
-suggests 'Apache::Log';
-suggests 'Apache::Response';
-suggests 'Apache::ServerUtil';
-suggests 'Apache::SubRequest';
-suggests 'Apache::Table';
-suggests 'Module::Reload';
-suggests 'mod_perl';
-suggests 'mod_perl2';
+requires 'perl', '5.018';
 
 on configure => sub {
     requires 'ExtUtils::MakeMaker';
     requires 'Tie::File';
-    requires 'perl', '5.006';
-};
-
-on build => sub {
-    requires 'Capture::Tiny';
-    requires 'Test::Deep';
-    requires 'Test::Exception';
-    requires 'Test::More';
-    requires 'Test::Simple', '0.44';
-    requires 'Test::Differences';
 };
 
 on test => sub {
     requires 'Algorithm::Diff';
-    requires 'Capture::Tiny';
-    requires 'File::Temp';
-    requires 'IO::String';
-    requires 'Storable';
     requires 'Test::Deep';
+    requires 'Test::Differences';
     requires 'Test::More', '0.88';
-    suggests 'Text::Diff';
+    requires 'Text::Diff';
 };

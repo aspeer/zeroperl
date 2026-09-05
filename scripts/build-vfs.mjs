@@ -87,12 +87,12 @@ function applicationFilter(name) {
   return !components.some((component) => excludedApplicationComponents.has(component));
 }
 
-function perlLibraryFilter(duplicates) {
+function perlLibraryFilter(duplicates, libraries) {
   return (name) => {
     const normalized = name.replaceAll("\\", "/");
     const components = normalized.split("/");
-    const isEmbeddedDuplicate = [...duplicates].some(
-      (modulePath) => normalized === modulePath || normalized.endsWith(`/${modulePath}`),
+    const isEmbeddedDuplicate = libraries.some((root) =>
+      duplicates.has(relative(root, name).replaceAll("\\", "/")),
     );
     return !components.includes(".meta")
       && !components.includes(".packlist")
@@ -103,6 +103,7 @@ function perlLibraryFilter(duplicates) {
 
 async function collectIdenticalEmbeddedFiles(libraryDirectories, embeddedFiles) {
   const duplicates = new Set();
+  const overrides = new Set();
   if (!embeddedFiles || Object.keys(embeddedFiles).length === 0) return duplicates;
 
   async function visit(root, directory) {
@@ -116,11 +117,13 @@ async function collectIdenticalEmbeddedFiles(libraryDirectories, embeddedFiles) 
         if (!embeddedHash) continue;
         const installedHash = createHash("sha256").update(await readFile(filename)).digest("hex");
         if (installedHash === embeddedHash) duplicates.add(modulePath);
+        else overrides.add(modulePath);
       }
     }
   }
 
   for (const directory of libraryDirectories) await visit(directory, directory);
+  for (const modulePath of overrides) duplicates.delete(modulePath);
   return duplicates;
 }
 
@@ -159,7 +162,7 @@ export async function buildApplicationArchives({
   await writeArchive(
     libraries.map((source) => ({ type: "directory", source, target: "perl5/lib" })),
     perlLibraryVfsArchive,
-    perlLibraryFilter(duplicates),
+    perlLibraryFilter(duplicates, libraries),
   );
 
   return {

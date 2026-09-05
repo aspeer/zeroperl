@@ -97,14 +97,3 @@ fi
     echo "error: Module::ScanDeps is not installed" >&2
     exit 1
 }
-
-if [ "${BUILD_CPANFILE:-true}" = "true" ]; then
-    echo "yes" | cpan App::cpanminus
-    if ! cpanm --installdeps --notest "$REPO_DIR"; then
-        echo "error: cpanfile dependency installation failed; recent cpanm logs follow" >&2
-        find /root/.cpanm/work -name build.log -type f -exec \
-            grep -n -E 'error:|Error|ERROR|failed|FAIL|not supported|undefined' {} \; >&2
-        find /root/.cpanm/work -name build.log -type f -exec tail -n 200 {} \; >&2
-        exit 1
-    fi
-fi

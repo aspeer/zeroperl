@@ -42,6 +42,14 @@ copy_site_file() {
     target_arch="/zeroperl/lib/$PERL_VERSION/wasm32-wasi"
     target_core="/zeroperl/lib/$PERL_VERSION"
 
+    # Params::Util requires XSLoader >= 0.22; Perl 5.18 supplies 0.16.
+    # XSLoader is a Pure Perl loader, so its locked update has no native XS
+    # object to mismatch and may safely replace that older core companion.
+    if [ "$PERL_VERSION" = "5.18.4" ] && [ "$rel" = "XSLoader.pm" ]; then
+        cp "$src" "$target_core/$rel"
+        return
+    fi
+
     # The native dependency resolver may upgrade a core XS distribution (for
     # example Encode on Perl 5.24).  Its .pm file must not shadow the version
     # paired with the statically linked target object.  New CPAN modules have
@@ -54,7 +62,7 @@ copy_site_file() {
 }
 
 if [ "${BUILD_CPANFILE:-true}" = "true" ]; then
-    SITE_PERL="$NATIVE_DIR/prefix/lib/perl5/site_perl/$PERL_VERSION"
+    SITE_PERL="/build/cpan-project/local/lib/perl5"
     NATIVE_ARCH=$("$NATIVE_DIR/prefix/bin/perl" -MConfig -e 'print $Config{archname}')
     mkdir -p "/zeroperl/lib/$PERL_VERSION/wasm32-wasi"
 
@@ -82,20 +90,7 @@ if [ "${BUILD_CPANFILE:-true}" = "true" ]; then
         done
     done
 
-    PERL_MINOR=$(echo "$PERL_VERSION" | cut -d. -f2)
-    if [ "$PERL_MINOR" -lt 24 ]; then
-        # Scalar-List-Utils is deliberately cross-compiled after the core
-        # Perl build for 5.18. Override the old core Perl sources with the
-        # same 1.70 sources as the replacement static List::Util archive.
-        for rel in List/Util.pm List/Util/XS.pm Sub/Util.pm Scalar/List/Utils.pm; do
-            for site_root in "$SITE_PERL/$NATIVE_ARCH" "$SITE_PERL"; do
-                [ -f "$site_root/$rel" ] || continue
-                install -Dm 644 "$site_root/$rel" \
-                    "/zeroperl/lib/$PERL_VERSION/wasm32-wasi/$rel"
-                break
-            done
-        done
-    fi
+
 fi
 
 # The complete core POSIX extension is excluded for WASI, but zeroperl
@@ -103,6 +98,9 @@ fi
 install -Dm 644 "$REPO_DIR/stubs/POSIX.pm" \
     "/zeroperl/lib/$PERL_VERSION/wasm32-wasi/POSIX.pm"
 
+# Some CPAN archives mark module sources executable (notably Params::Util).
+# They are still runtime libraries, so normalize their mode before removing tools.
+find /zeroperl -type f -name '*.pm' -exec chmod a-x {} +
 find /zeroperl -type f \( -name "*.so" -o -name "*.a" -o -name "*.ld" -o -name "*.pod" -o -name "*.h" -o -executable \) -delete
 
 copy_traced_site_files() {
@@ -167,6 +165,12 @@ fi
 if [ "$ZEROPERL_SHRINK" = "full" ] && [ -x "$REPO_DIR/tools/unicore-strip.pl" ]; then
     perl "$REPO_DIR/tools/unicore-strip.pl" "/zeroperl/lib/$PERL_VERSION"
 fi
+
+# Preserve upstream attribution before perltidy removes comments and POD.
+python3 "$REPO_DIR/tools/collect-notices.py"
+tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner \
+    -czf /build/third-party-notices.tar.gz -C /build third-party-notices
+python3 "$REPO_DIR/tools/verify-notices.py" /build/third-party-notices.tar.gz
 
 if [ "$TRIM" = "true" ]; then
     export PATH="$NATIVE_DIR/prefix/bin:$PATH"

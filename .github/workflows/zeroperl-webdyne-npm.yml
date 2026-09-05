@@ -177,6 +177,9 @@ jobs:
           tar -tzf "$tarball" | sort > "$tarball_dir/actual-files.txt"
           {
             echo package/LICENSE
+            echo package/THIRD-PARTY-NOTICES.md
+            echo package/third-party-notices.tar.gz
+            find licenses -type f -print | sed 's#^#package/#'
             echo package/README.md
             echo package/bin/pagi-runner.pl
             echo package/bin/webdyne-app.pl

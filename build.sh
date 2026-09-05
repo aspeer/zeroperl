@@ -60,7 +60,11 @@ fi
 
 ZEROPERL_SHRINK="${1:-off}"
 ZEROPERL_SFS_COMPRESS="${ZEROPERL_SFS_COMPRESS:-}"
-PERL_VERSION="${PERL_VERSION:-5.44.0}"
+PERL_VERSION="${PERL_VERSION:-$(sed -n 's/^PERL_VERSION ?= //p' release/defaults.mk)}"
+if [ ! -s "cpanfile.snapshot.${PERL_VERSION}" ]; then
+  echo "Missing snapshot: run make cpanfile.snapshot PERL_VERSION=${PERL_VERSION}" >&2
+  exit 1
+fi
 BUILD_NUMBER="$(node tools/release-metadata.mjs build-number "${PERL_VERSION}" "${BUILD_NUMBER:-}")"
 ZLIB_VERSION="${ZLIB_VERSION:-1.3.2}"
 EXIFTOOL_VERSION="${EXIFTOOL_VERSION:-13.55}"
@@ -77,6 +81,7 @@ CONFIG_NAME="config-${RELEASE_ID}.h"
 PREFIX_NAME="perl-wasi-prefix-${RELEASE_ID}"
 MANIFEST_NAME="manifest-${RELEASE_ID}.json"
 CHECKSUMS_NAME="SHA256SUMS-${RELEASE_ID}"
+NOTICES_NAME="third-party-notices-${RELEASE_ID}.tar.gz"
 EXIFTOOL_NAME="exiftool-${RELEASE_ID}.min.pl"
 VERSION_OUTPUT_DIR="${PWD}/output/${PERL_VERSION}"
 
@@ -87,6 +92,7 @@ FINAL_PATHS=(
   "${VERSION_OUTPUT_DIR}/${PREFIX_NAME}"
   "${VERSION_OUTPUT_DIR}/${MANIFEST_NAME}"
   "${VERSION_OUTPUT_DIR}/${CHECKSUMS_NAME}"
+  "${VERSION_OUTPUT_DIR}/${NOTICES_NAME}"
 )
 if [ "${BUILD_EXIFTOOL}" = "true" ]; then
   FINAL_PATHS+=("${VERSION_OUTPUT_DIR}/${EXIFTOOL_NAME}")
@@ -178,6 +184,8 @@ if [ -f "${STAGING_DIR}/exiftool.min.pl" ]; then
   mv "${STAGING_DIR}/exiftool.min.pl" "${VERSION_OUTPUT_DIR}/${EXIFTOOL_NAME}"
 fi
 
+mv "${STAGING_DIR}/third-party-notices.tar.gz" "${VERSION_OUTPUT_DIR}/${NOTICES_NAME}"
+
 SOURCE_REVISION="$(git rev-parse HEAD)"
 SUBMODULE_REVISION="$(git rev-parse HEAD:zeroperl-ts)"
 if [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
@@ -194,6 +202,7 @@ node tools/create-release-manifest.mjs \
   --config "${CONFIG_NAME}" \
   --prefix "${PREFIX_NAME}" \
   --manifest "${MANIFEST_NAME}" \
+  --notices "${NOTICES_NAME}" \
   --source-revision "${SOURCE_REVISION}" \
   --source-dirty "${SOURCE_DIRTY}" \
   --submodule-revision "${SUBMODULE_REVISION}" \
@@ -208,6 +217,7 @@ node tools/create-release-manifest.mjs \
     "${WASM_NAME}" \
     "${REACTOR_NAME}" \
     "${CONFIG_NAME}" \
+    "${NOTICES_NAME}" \
     "${MANIFEST_NAME}" > "${CHECKSUMS_NAME}"
   if [ -f "${EXIFTOOL_NAME}" ]; then
     shasum -a 256 "${EXIFTOOL_NAME}" >> "${CHECKSUMS_NAME}"

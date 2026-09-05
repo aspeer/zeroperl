@@ -61,7 +61,7 @@ Responsibilities:
 - Install WASI SDK and Binaryen.
 - Build static WASI copies of zlib and bzip2 via [pipeline/build-wasi-libs.sh](pipeline/build-wasi-libs.sh).
 
-### Stage 2: native-perl
+### Stage 2: native-perl-tools and native-perl
 
 Driven by:
 
@@ -74,6 +74,14 @@ Responsibilities:
 - Install `Module::ScanDeps` via CPAN: pinned `Module-ScanDeps-1.31` for Perl
   ≤5.18 (newer releases need `List::Util` newer than shipped in those trees),
   otherwise latest from CPAN.
+- Bootstrap Carton in the tools stage. Snapshot generation reuses that stage,
+  before application dependencies are installed.
+- In `native-perl`, validate the selected versioned snapshot and archive hashes,
+  then install with Carton deployment mode into `/build/cpan-project/local`.
+  Copy the local library into the native prefix for existing cross-build tools;
+  prefix assembly takes application files directly from the isolated tree.
+- Resolve static XS recipe sources from this same snapshot, preserving their
+  target-built Perl companion files. Recipes contain no independent versions.
 - Optionally build and minify ExifTool (`exiftool.min.pl`). Minification uses the
   Debian `perltidy` package from the base image (not a CPAN `Perl::Tidy` install).
 - Generate warmup include list at `gen/warmup-inc.txt`.

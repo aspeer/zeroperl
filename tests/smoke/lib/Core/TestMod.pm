@@ -6,6 +6,26 @@ sub run {
     my @errors;
     my @skipped;
 
+    eval {
+        require Core::XSCompatibility;
+        Core::XSCompatibility::run();
+        Core::XSCompatibility::run();
+        1;
+    } or push @errors, "base XS compatibility: $@";
+
+    # Require the Perl companions for every deliberately linked CPAN XS
+    # distribution. This catches version drift in the native CPAN resolver.
+    for my $module (qw(Clone Crypt::URandom HTML::Parser Cpanel::JSON::XS
+        XS::Parse::Sublike XS::Parse::Keyword Future::XS Future::AsyncAwait)) {
+        eval "require $module; 1" or push @errors, "$module: $@";
+    }
+    eval {
+        my $json = Cpanel::JSON::XS->new;
+        my $value = $json->decode($json->encode({answer => 42}));
+        die "Cpanel::JSON::XS roundtrip" unless $value->{answer} == 42;
+        1;
+    } or push @errors, "Cpanel::JSON::XS roundtrip: $@";
+
     # ── Tier 1: universal core ────────────────────────────────────────────────
 
     # Digest::MD5 (XS, core since 5.8)

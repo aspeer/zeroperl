@@ -476,8 +476,8 @@ function createHttpResponseSink() {
         bodyChunks.push(chunk);
         bodyLength += chunk.length;
         if (event.more !== 1) {
-          finished = true;
           completeResponse();
+          finished = true;
         }
         return;
       }
@@ -589,8 +589,9 @@ function createSseResponseSink(connection) {
         // An EventSource/client close aborts the readable side of this
         // TransformStream. Convert that into the shared PAGI connection event.
         void writer.closed.catch(() => connection.disconnect());
+        const startedResponse = new Response(stream.readable, { status: event.status, headers });
         started = true;
-        resolveResponse(new Response(stream.readable, { status: event.status, headers }));
+        resolveResponse(startedResponse);
         return;
       }
 

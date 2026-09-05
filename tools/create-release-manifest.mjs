@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { readdir, readFile, stat, writeFile } from "node:fs/promises";
-import { relative, resolve } from "node:path";
+import { readFile, stat, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
+import { directoryInventory } from "./artifact-inventory.mjs";
 
 function fail(message) {
   console.error(message);
@@ -36,33 +38,6 @@ async function fileRecord(directory, filename) {
   };
 }
 
-async function directoryInventory(root) {
-  const paths = [];
-  let bytes = 0;
-
-  async function visit(directory) {
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
-      const path = resolve(directory, entry.name);
-      if (entry.isDirectory()) {
-        await visit(path);
-      } else if (entry.isFile()) {
-        paths.push(path);
-        bytes += (await stat(path)).size;
-      }
-    }
-  }
-
-  await visit(root);
-  paths.sort((left, right) => relative(root, left).localeCompare(relative(root, right)));
-  const treeHash = createHash("sha256");
-  for (const path of paths) {
-    treeHash.update(relative(root, path));
-    treeHash.update("\0");
-    treeHash.update(await readFile(path));
-    treeHash.update("\0");
-  }
-  return { files: paths.length, bytes, sha256: treeHash.digest("hex") };
-}
 
 const options = parseArguments(process.argv.slice(2));
 const required = [
@@ -74,6 +49,7 @@ const required = [
   "config",
   "prefix",
   "manifest",
+  "notices",
   "source-revision",
   "source-dirty",
   "submodule-revision",
@@ -106,6 +82,7 @@ const manifest = {
   artifacts: {
     wasm: await fileRecord(artifactDirectory, options.wasm),
     reactor: await fileRecord(artifactDirectory, options.reactor),
+    notices: await fileRecord(artifactDirectory, options.notices),
     config: await fileRecord(artifactDirectory, options.config),
     prefix: {
       directory: options.prefix,

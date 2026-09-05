@@ -1,5 +1,24 @@
 # Changes
 
+## CPAN manifest cleanup
+
+- Removed all optional recommendations/suggestions from the WASM cpanfile.
+- Matched pm-WebDyne's compact configure/test sections, removed duplicated
+  build/test declarations, and corrected the runtime Perl minimum to 5.18.
+- Reconciled all three snapshots; distribution selections and source checksums
+  are unchanged, so qualified build 8 remains applicable.
+
+## Base XS application support
+
+- Added Sub::Name, Params::Util, Class::XSAccessor (hash and array accessors),
+  Text::CSV_XS and Variable::Magic to the standard embedded runtime.
+- Reconciled the supported Perl snapshots without upgrading existing locked
+  distributions; Perl 5.18 also receives the required Pure Perl XSLoader update.
+- Added a WASI-only Params::Util configuration patch and preserved module
+  sources whose upstream executable bits previously caused them to be stripped.
+- Qualified local build 8 on Perl 5.18.4, 5.36.3 and 5.44.0 with native, WASM
+  and asynchronous callback tests. Compressed growth is approximately 56–58 KiB.
+
 ## Versioned WebDyne distribution pipeline
 
 - Split the npm Worker host into a provider-neutral runtime, Fetch/PAGI

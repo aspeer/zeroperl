@@ -1,370 +1,119 @@
-zeroperl is an experimental build of Perl 5 in a sandboxed, self-contained WebAssembly module.
-This WebDyne integration fork builds the last patch releases of three qualified
-release lines: **5.18.4**, **5.36.3**, and **5.44.0**.
+# ZeroPerl — WebDyne integration fork
+
+This is a fork of the original [6over3/zeroperl](https://github.com/6over3/zeroperl)
+project. It supports a WASM implementation of WebDyne, primarily on Cloudflare
+Workers at this time, with the potential to support other WASM providers later.
+
+**WebDyne-specific installation and usage instructions are in
+[WEBDYNE.md](WEBDYNE.md).** See [BUILD.md](BUILD.md) for this fork's build process,
+CPAN snapshots and XS modules. Install the WebDyne runtime from npm as described
+in that usage guide. The source license is in [LICENSE](LICENSE);
+bundled-component attribution is described in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+## Credits
+
+- [6over3/zeroperl](https://github.com/6over3/zeroperl) and
+  [6over3/zeroperl-ts](https://github.com/6over3/zeroperl-ts): the original
+  runtime and JavaScript/TypeScript bridge, and their contributors.
+- [lbe/zeroperl](https://github.com/lbe/zeroperl): inherited multi-version
+  build work, shrink tracing, compressed SFS and release tooling, including
+  [commit 025be1c](https://github.com/lbe/zeroperl/commit/025be1ccdfe63b143cd550d35170bcd76ea75f51).
+  [lbe/zeroperl-ts](https://github.com/lbe/zeroperl-ts) also supplied bridge
+  custom-fetch and Perl-version helper improvements.
+- [lilohuang/zeroperl](https://github.com/lilohuang/zeroperl) and
+  [lilohuang/zeroperl-ts](https://github.com/lilohuang/zeroperl-ts): additional
+  fork work consulted during consolidation, particularly ExifTool build,
+  packaging and CI work. These are reference/inspiration credits; they do not
+  imply that every feature or patch from those forks is included here.
+
+## Original upstream README
+
+The text below is from the original **6over3/zeroperl** repository's
+[README at `c28db5d`](https://github.com/6over3/zeroperl/blob/c28db5dd4fc9660e67117dfdb9f18a43623f5f3d/README.md),
+preserved unchanged. Its defaults and commands describe that upstream revision;
+use [BUILD.md](BUILD.md) and [WEBDYNE.md](WEBDYNE.md) for this fork.
+
+---
+
+zeroperl is an experimental build of Perl5 in a sandboxed, self-contained WebAssembly module.
 
 Read the full blog [here](https://andrews.substack.com/p/zeroperl-sandboxed-perl-with-webassembly)
-
-## Note
-
-This is the canonical ZeroPerl runtime for WebDyne::PAGI WASM targets. It
-consolidates upstream fork improvements, embeds WebDyne 3.023 and PAGI::Tools
-0.002002 with their runtime dependencies, and statically compiles the XS
-modules needed by WebDyne. A normal PSP application therefore does not need a
-separate Perl library archive. The versioned npm package also includes the
-compiled JavaScript bridge, provider-neutral PAGI runtime, default Cloudflare
-adapter, Perl launchers, and application VFS builder required to serve PSP
-files without another WebDyne checkout.
-
-## Cloudflare package usage
-
-The npm package for Perl 5.44.0 build 1 is
-`@webdyne/webdyne-zeroperl-5.44.0@1`. Put the complete application tree below
-`app/`, including the default `app/app.psp`, then install the runtime:
-
-```bash
-npm install @webdyne/webdyne-zeroperl-5.44.0@1
-```
-
-The package includes its qualified Wrangler version. Add these convenient
-commands to the application's `package.json`:
-
-```json
-{
-  "scripts": {
-    "build": "webdyne-cloudflare build",
-    "check": "webdyne-cloudflare check",
-    "dev": "webdyne-cloudflare dev",
-    "deploy": "webdyne-cloudflare deploy"
-  }
-}
-```
-
-`npm run dev` starts local Wrangler and `npm run deploy` validates a dry-run
-bundle before uploading it to Cloudflare. When the project has no root
-`wrangler.jsonc`, the command generates a safe default in `.webdyne/`; a root
-configuration always takes precedence. The application should ignore the
-entire generated `.webdyne/` directory.
-
-Every regular file under `app/` is copied to VFS `/app`, preserving its
-relative path. The generated runtime also provides `/zeroperl`, `/perl5/bin`,
-`/perl5/lib`, `/dev`, and a writable `/tmp`; Perl receives `TMPDIR=/tmp`.
-
-Portable application settings live under `webdyne` in `package.json`:
-
-```json
-{
-  "webdyne": {
-    "appDirectory": "site",
-    "entry": "home.psp",
-    "static": true,
-    "perlLibrary": "lib"
-  }
-}
-```
-
-`appDirectory` changes the source directory only; its contents still mount at
-VFS `/app`. `perlLibrary` may be a path or array of paths containing Pure-Perl
-modules. A root `cpanfile` is installed automatically with Carton, or with
-cpanminus when Carton is unavailable, and cached below `.webdyne/cpan` until
-`cpanfile` or `cpanfile.snapshot` changes. Commit `cpanfile.snapshot` for
-reproducible deployments. Native extensions are rejected because host binaries
-cannot run in WASM. Byte-identical modules already embedded in ZeroPerl are
-omitted from the application library archive.
-
-Optional WebDyne extensions are direct npm dependencies enabled explicitly in
-`webdyne.extensions`. For example, a Cloudflare storage application installs
-`@webdyne/webdyne-cloudflare@1` and configures:
-
-```json
-{
-  "webdyne": {
-    "extensions": {
-      "@webdyne/webdyne-cloudflare": {
-        "d1Bindings": ["DB"],
-        "kvBindings": ["CACHE"],
-        "r2Bindings": ["ASSETS"]
-      }
-    },
-    "cloudflare": {
-      "d1Databases": [{
-        "binding": "DB",
-        "databaseName": "webdyne-time",
-        "databaseId": "CLOUDFLARE-DATABASE-ID"
-      }],
-      "kvNamespaces": [{
-        "binding": "CACHE",
-        "namespaceId": "CLOUDFLARE-KV-NAMESPACE-ID"
-      }],
-      "r2Buckets": [{
-        "binding": "ASSETS",
-        "bucketName": "my-webdyne-assets"
-      }]
-    }
-  }
-}
-```
-
-The builder reads the package's declarative extension manifest, mounts its
-Perl modules at `/perl5/lib`, and emits a static provider import. It does not
-scan undeclared dependencies or execute npm installation hooks.
-
-The generated Wrangler configuration maps `d1Databases`, `kvNamespaces`, and
-`r2Buckets` to provider bindings. KV entries also accept `previewNamespaceId`
-and `remote`; R2 entries accept `previewBucketName`, `jurisdiction`, and
-`remote`. Resource names and IDs stay in the application package rather than
-the reusable extension.
-
-For local package testing, prepare and pack the npm candidate, then install the
-tarball rather than a linked package directory:
-
-```bash
-node tools/prepare-npm-package.mjs \
-  --source output/5.44.0 \
-  --destination output/5.44.0/npm/webdyne-zeroperl-5.44.0-1 \
-  --manifest manifest-5.44.0-1.json \
-  --wasm zeroperl-webdyne-5.44.0-1.wasm \
-  --reactor zeroperl-webdyne-reactor-5.44.0-1.wasm
-npm pack output/5.44.0/npm/webdyne-zeroperl-5.44.0-1 \
-  --pack-destination output/5.44.0/npm/tarball
-```
-
-Installing the `.tgz` mirrors npm publication. Installing the package
-directory with `file:` creates a symlink and can give Node an incorrect module
-resolution root for the package's dependencies.
 
 ## Build
 
 Requires Docker or Apple Container (macOS).
 
-The supported local entry point builds, verifies, and extracts one versioned
-WebDyne artifact set:
-
+**Docker:**
 ```bash
-./build.sh run off
-PERL_VERSION=5.36.3 ./build.sh run off
+docker build -t zeroperl .
+mkdir -p output
+docker run --rm -v $(pwd)/output:/output zeroperl cp -r /artifacts/. /output/
 ```
 
-Default build numbers come from `release/versions.json`. Increment the selected
-version there for a new immutable build, or override it for an experiment:
-
+**Apple Container (macOS):**
 ```bash
-PERL_VERSION=5.44.0 BUILD_NUMBER=2 ./build.sh run off
+container build -t zeroperl .
+mkdir -p output
+container run --rm -v $(pwd)/output:/output zeroperl cp -r /artifacts/. /output/
 ```
 
-Perl 5.44.0 build 1 produces:
-
-```text
-output/5.44.0/
-  zeroperl-webdyne-5.44.0-1.wasm
-  zeroperl-webdyne-reactor-5.44.0-1.wasm
-  config-5.44.0-1.h
-  perl-wasi-prefix-5.44.0-1/
-  manifest-5.44.0-1.json
-  SHA256SUMS-5.44.0-1
-```
-
-The normal WASM is the Asyncify-instrumented output. The reactor file is the
-linker output before that pass. The extracted prefix is retained for inventory,
-comparison, and optional external mounting even though standard builds embed
-it in the normal WASM.
+Output in `./output/`:
+- `zeroperl.wasm` — reactor with asyncify
+- `zeroperl_reactor.wasm` — reactor without asyncify
+- `perl-wasi-prefix/` — Perl library prefix
+- `exiftool.min.pl` — minified ExifTool (if enabled)
 
 ### Build args
 
 **Docker:**
-
 ```bash
-docker build --build-arg PERL_VERSION=5.44.0 --build-arg BUILD_EXIFTOOL=false -t zeroperl .
+docker build --build-arg PERL_VERSION=5.42.0 --build-arg BUILD_EXIFTOOL=false -t zeroperl .
 ```
 
 **Apple Container:**
-
 ```bash
-container build --build-arg PERL_VERSION=5.44.0 --build-arg BUILD_EXIFTOOL=false -t zeroperl .
+container build --build-arg PERL_VERSION=5.42.0 --build-arg BUILD_EXIFTOOL=false -t zeroperl .
 ```
 
 <details>
-<summary>Build configuration reference</summary>
+<summary>Available build arguments</summary>
 
-### Dockerfile build arguments
-
-Declared in [Dockerfile](Dockerfile) as `ARG` (pass with `--build-arg`).
-
-| Arg                                     | Default                                                 | Notes                                                                                                |
-| --------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `PERL_VERSION`                          | `5.44.0`                                                | Perl source version; qualified release artifacts use 5.18.4, 5.36.3, and 5.44.0.                    |
-| `EXIFTOOL_VERSION`                      | `13.55`                                                 | ExifTool release tag                                                                                 |
-| `BUILD_EXIFTOOL`                        | `false`                                                 | Optionally build and ship ExifTool; it is not part of standard WebDyne artifacts                     |
-| `BUILD_CPANFILE`                        | `true`                                                  | Install WebDyne dependencies and cross-compile their XS components                                   |
-| `EXIFTOOL_WARMUP_MODE`                  | `curated`                                               | `curated` or `full`                                                                                  |
-| `STACK_SIZE`                            | `8388608`                                               | WASM stack (bytes), `final` stage                                                                   |
-| `INITIAL_MEMORY`                        | `33554432`                                              | WASM initial memory (bytes), `final` stage                                                           |
-| `ASYNCIFY`                              | `true`                                                  | wasm-opt asyncify imports (`final` stage)                                                           |
-| `WASM_OPT_FLAGS`                        | `""`                                                    | Extra flags appended to the wasm-opt invocation (`final` stage)                                      |
-| `TRIM`                                  | `true`                                                  | Strip unused modules                                                                                 |
-| `ZEROPERL_SHRINK`                       | `off`                                                   | `off` or `full`                                                                                      |
-| `ZEROPERL_SFS_COMPRESS`                 | auto (`true` when `ZEROPERL_SHRINK=full`, else `false`) | LZ4-framed SFS entries (`pipeline/prepare-prefix.sh` / `pipeline/build-wasm.sh`)                     |
-| `ZEROPERL_EMBED_PREFIX`                 | `true`                                                  | Embed prefix in wasm via SFS (`false` = empty SFS; consumer supplies `perl-wasi-prefix/`)             |
-
-### Shrink tracer environment
-
-Read by [tools/regen-wasm-shrink.sh](tools/regen-wasm-shrink.sh) during the `wasi-perl` image layer (defaults and overrides in [tools/wasm-shrink.env](tools/wasm-shrink.env)). The stock Dockerfile does **not** declare these as `ARG`, so `docker build --build-arg TRACE_…` has no effect unless you add matching `ARG`/`ENV` wiring.
-
-| Variable                                | Default                                                 | Role                                                                                                 |
-| --------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `TRACE_EXPLICIT_PACKAGES`               | (empty)                                                 | Comma-separated modules for `--explicit-package` (full subtrees when expansion is on).               |
-| `TRACE_USE_MODULE`                      | `Image::ExifTool` when `BUILD_EXIFTOOL=true`, else empty | Comma-separated `--use` seeds for the tracer.                                                        |
-| `TRACE_EXPAND_EXPLICIT_PACKAGE_TREES`   | `true`                                                  | Expand explicit packages to full subtrees on disk.                                                   |
-| `TRACE_EXPAND_DEPENDENCY_PACKAGE_TREES` | `true`                                                  | Expand traced dependency packages to full subtrees.                                                  |
+| Arg | Default | |
+|-----|---------|--|
+| `PERL_VERSION` | `5.42.0` | Perl source version |
+| `EXIFTOOL_VERSION` | `13.42` | ExifTool version |
+| `BUILD_EXIFTOOL` | `true` | Include ExifTool |
+| `STACK_SIZE` | `8388608` | WASM stack (bytes) |
+| `INITIAL_MEMORY` | `33554432` | WASM initial memory (bytes) |
+| `ASYNCIFY` | `true` | Enable asyncify |
+| `TRIM` | `true` | Strip unused modules |
 
 </details>
-
-Shrink implementation notes:
-
-- `ZEROPERL_SHRINK=off` preserves the current full-copy / full-XS behavior.
-- `ZEROPERL_SHRINK=full` enables traced site-perl copying, deterministic shrink artifacts,
-  generated `static_ext`, linker archives, `xs_init.inc`, and unicore stripping.
-- `ZEROPERL_SFS_COMPRESS` defaults to `true` only when `ZEROPERL_SHRINK=full` (otherwise `false`); leave unset for that auto behavior or override explicitly.
-- `ZEROPERL_SFS_COMPRESS=true` stores each embedded SFS file as an LZ4 frame and enables lazy decompression in the runtime.
-- Compressed entries are decompressed on first open and cached in an LRU (20 MB cap, 4096 entries).
-- If all cache entries are pinned and cannot be evicted, runtime serves a transient non-cached decompressed buffer for that open.
-- Decompression failures return `EIO` and fail fast (no fallback to raw bytes).
-- Rollback switch: set `ZEROPERL_SFS_COMPRESS=false` and rebuild.
-- `ZEROPERL_EMBED_PREFIX=false` skips embedding the Perl library prefix in the wasm binary. The prefix directory is still produced as a build artifact (`perl-wasi-prefix/`), but the wasm has an empty SFS table. Consumers must provide the library files externally and set `PERL5LIB`.
-- When `ZEROPERL_EMBED_PREFIX=false`, `ZEROPERL_SFS_COMPRESS` is silently forced to `false` (nothing to compress).
-- `TRACE_USE_MODULE` adds `--use` seeds so the tracer executes those modules during warm-up (comma-separated).
-- `TRACE_EXPLICIT_PACKAGES` registers `--explicit-package` modules; when `TRACE_EXPAND_EXPLICIT_PACKAGE_TREES=true`, those packages are retained as full directory subtrees.
-- When `TRACE_EXPAND_DEPENDENCY_PACKAGE_TREES=true`, traced dependency modules are also retained as full package trees.
-- Generated shrink artifacts live in `gen/` and can be refreshed via `tools/regen-wasm-shrink.sh`.
-- Checked-in smoke corpus sources live in `tests/smoke/` (`sample.jpg.b64`, `sample.tiff.b64`, `sample.xmp`).
-- Prefix/full image builds with `BUILD_EXIFTOOL=true` now run shrink smoke automatically in the `wasi-perl` stage and fail if missing paths are detected.
-- Run smoke validation manually inside the wasi build image for version-matched Perl (Apple Containers on macOS):
-  - `container run --rm -v $PWD:/work -w /work zeroperl:wasi sh -lc './tools/wasm-smoke.sh .'`
-    It exercises `exiftool.min.pl` against that corpus and writes diagnostics to `gen/wasm-smoke.log` and missing-path findings to `gen/wasm-missing-paths.txt`.
-- If `gen/wasm-missing-paths.txt` is non-empty, triage each entry into `gen/extra-paths-allowlist.txt` or trace seed/warmup inputs, then regenerate.
-- For deterministic checks, run `tools/check-wasm-shrink-determinism.sh` inside the build image after native prefix/exiftool assets are present.
-
-### End-to-end build with build.sh
-
-`build.sh` drives the full pipeline: container build → artifact extract.
-
-```bash
-# Default (Perl 5.44.0, no shrink)
-./build.sh run off
-
-# Another supported release
-PERL_VERSION=5.36.3 ./build.sh run off
-
-# Explicit build-number override
-PERL_VERSION=5.44.0 BUILD_NUMBER=2 ./build.sh run off
-```
 
 ### Iterating on stubs/zeroperl.c
 
 Build from `final` stage to reuse cached wasi-perl:
 
 **Docker:**
-
 ```bash
 docker build --target final -t zeroperl .
 ```
 
 **Apple Container:**
-
 ```bash
 container build --target final -t zeroperl .
 ```
 
-## Node tooling & submodule setup
-
-This repo vendors the canonical development `zeroperl-ts` source as a git
-submodule at `./zeroperl-ts`. Initialize it before running the root package or
-editing and testing the bridge in place. Release-build verifier tooling instead
-uses a public bridge commit pinned in `tools/package-lock.json`, so clean CI
-builders do not need credentials for the private canonical bridge remote.
-
-Clone with submodules:
-
-```bash
-git clone --recurse-submodules https://github.com/aspeer/zeroperl.git
-```
-
-Or, if you already cloned without submodules:
-
-```bash
-git submodule update --init --recursive
-```
-
-Without `./zeroperl-ts` present, root-level npm installs and bridge development
-will fail because the root package retains its local `file:` dependency.
-
-> **Windows note:** `npm file:` dependencies create symlinks under
-> `node_modules`. On Windows, symlink creation may require Developer Mode or an
-> elevated terminal. See [Microsoft: Enable your device for development](https://learn.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development).
-
 ## Testing
 
-This repo vendors `zeroperl-ts` as `./zeroperl-ts`. After initializing
-submodules (see [Node tooling & submodule setup](#node-tooling--submodule-setup)),
-you can test a new `zeroperl.wasm` build using the local submodule:
+The easiest way to test a new build of `zeroperl.wasm` is to clone the TypeScript wrapper and run its test suite:
 
 ```bash
-cd zeroperl-ts
-npm test
+git clone https://github.com/6over3/zeroperl-ts
 ```
 
-You can also iterate on `zeroperl-ts` source directly inside `./zeroperl-ts`;
-the parent repo tracks it as a submodule.
-
-If you need to work on the canonical WebDyne TypeScript bridge in isolation,
-clone it separately:
-
-```bash
-git clone https://github.com/aspeer/zeroperl-ts
-```
-
-See the [zeroperl-ts README](https://github.com/aspeer/zeroperl-ts) for details.
-
-### Verified standard artifacts
-
-The Milestone 1 build matrix below uses `BUILD_EXIFTOOL=false` and embeds the
-complete WebDyne/PAGI runtime and Perl prefix. Each artifact passed the core,
-static Socket, embedded-module, eight async-disposal, and persistent Worker
-render probes.
-
-| Perl | `zeroperl.wasm` | gzip | `zeroperl_reactor.wasm` | SHA-256 (`zeroperl.wasm`) |
-| --- | ---: | ---: | ---: | --- |
-| 5.18.4 | 13,534,404 | 4,672,831 | 12,496,642 | `eb9efcf72027f89fcdaffd8aceda694fec258f437d17645c3c320c6e8d0cfe36` |
-| 5.36.3 | 14,182,812 | 4,691,822 | 12,943,244 | `4dece6f6b2c2d5c85db5ab9ae589ce752b86b1ffe548abd8bbeb86ee8c8d6a27` |
-| 5.44.0 | 14,869,138 | 4,844,215 | 13,604,111 | `d84676e4728bab51f99818b48023af434453f175d29194e74630ac97000dcec3` |
-
-Sizes are bytes. The 5.44 safe mini experiment kept the same module and XS
-surface and enabled compressed SFS embedding. It produced a 12,050,075-byte
-WASM (16.1% smaller raw), but its gzip size increased to 5,055,576 bytes. It
-therefore failed the required 30% compressed-size reduction and no `-mini`
-artifact is produced.
-
-Perl 5.24.4 is intentionally not qualified. Its low-level async probes pass,
-but a real WebDyne::Chain/Template request reproducibly traps in
-`_asyncjmp_longjmp` at both the original 32 KiB and expanded 64 KiB capture
-buffer sizes. The 64 KiB buffer remains because all retained versions pass and
-the additional capture headroom is useful for deeper WebDyne page call stacks.
-
-During implementation iteration, rebuild and test Perl 5.44.0 only. Rebuild
-the other qualified release lines after the final runtime pattern is stable.
-
-For an in-repo verification that the built wasm can load modules from the
-embedded `/zeroperl` prefix without mounting the extracted versioned prefix,
-run:
-
-```bash
-npm --prefix tools ci
-node tools/verify-embedded-inc.mjs \
-  output/5.44.0/zeroperl-webdyne-5.44.0-1.wasm
-```
-
-This verifier uses the local `zeroperl-ts` submodule (`./zeroperl-ts`) to
-instantiate the local wasm artifact directly, inspects `@INC`, and requires
-WebDyne and WebDyne::PAGI without providing the extracted prefix tree.
+See the [zeroperl-ts README](https://github.com/6over3/zeroperl-ts) for details.
 
 ## Usage
 

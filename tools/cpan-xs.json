@@ -1,0 +1,16 @@
+[
+  {"module":"HTML::Parser", "archive":"Parser.a", "destination":"lib/auto/HTML/Parser/Parser.a", "builder":"makemaker"},
+  {"module":"Clone", "archive":"Clone.a", "destination":"lib/auto/Clone/Clone.a", "builder":"makemaker"},
+  {"module":"Sub::Name", "archive":"Name.a", "destination":"lib/auto/Sub/Name/Name.a", "builder":"makemaker"},
+  {"module":"Params::Util", "archive":"Util.a", "destination":"lib/auto/Params/Util/Util.a", "builder":"makemaker", "patch":"params-util-wasi.patch"},
+  {"module":"Class::XSAccessor", "archive":"XSAccessor.a", "destination":"lib/auto/Class/XSAccessor/XSAccessor.a", "builder":"makemaker"},
+  {"module":"Text::CSV_XS", "archive":"CSV_XS.a", "destination":"lib/auto/Text/CSV_XS/CSV_XS.a", "builder":"makemaker"},
+  {"module":"Variable::Magic", "archive":"Magic.a", "destination":"lib/auto/Variable/Magic/Magic.a", "builder":"makemaker"},
+  {"module":"Cpanel::JSON::XS", "archive":"XS.a", "destination":"lib/auto/Cpanel/JSON/XS/XS.a", "builder":"makemaker"},
+  {"module":"List::Util", "archive":"Util.a", "destination":"lib/auto/List/Util/Util.a", "builder":"makemaker", "before":"5.024"},
+  {"module":"Crypt::URandom", "archive":"URandom.a", "destination":"lib/auto/Crypt/URandom/URandom.a", "builder":"makemaker", "patch":"crypt-urandom-wasi.patch"},
+  {"module":"XS::Parse::Sublike", "archive":"Sublike.a", "destination":"lib/auto/XS/Parse/Sublike/Sublike.a", "builder":"modulebuild"},
+  {"module":"XS::Parse::Keyword", "archive":"Keyword.a", "destination":"lib/auto/XS/Parse/Keyword/Keyword.a", "builder":"modulebuild"},
+  {"module":"Future::XS", "archive":"XS.a", "destination":"lib/auto/Future/XS/XS.a", "builder":"modulebuild"},
+  {"module":"Future::AsyncAwait", "archive":"AsyncAwait.a", "destination":"lib/auto/Future/AsyncAwait/AsyncAwait.a", "builder":"modulebuild"}
+]

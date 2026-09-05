@@ -1,6 +1,6 @@
 import { ZeroPerl } from "../zeroperl.js";
 import { createPerlFileSystem } from "./perl-filesystem.js";
-import { webdyneRuntimeConfig } from "./config.js";
+import { perlJsonExpression, webdyneRuntimeConfig } from "./config.js";
 import { createExtensionManager } from "./extensions.js";
 import {
   buildPagiScope,
@@ -83,6 +83,8 @@ export function createWebDyneRuntime({
       try {
         values = buildArgs(persistentPerl);
         await persistentPerl.call(name, values.args, "void");
+        const perlError = persistentPerl.getLastError();
+        if (perlError) throw new Error(perlError);
         persistentPerl.clearError();
       } finally {
         values?.dispose();
@@ -125,6 +127,8 @@ export function createWebDyneRuntime({
       const sessionValue = persistentPerl.createInt(session.id);
       try {
         await persistentPerl.call("Pagi::ZeroPerl::Runner::abort_session", [sessionValue], "void");
+        const perlError = persistentPerl.getLastError();
+        if (perlError) throw new Error(perlError);
         persistentPerl.clearError();
       } finally {
         sessionValue.dispose();
@@ -169,8 +173,8 @@ export function createWebDyneRuntime({
       }
     }
 
-    persistentRuntimeResetPromise = Promise.resolve().then(() => {
-      try { oldPerl?.dispose(); } catch (disposeError) {
+    persistentRuntimeResetPromise = Promise.resolve().then(async () => {
+      try { await oldPerl?.dispose(); } catch (disposeError) {
         console.error("Unable to dispose poisoned ZeroPerl runtime", disposeError);
       }
     }).finally(() => {
@@ -255,10 +259,10 @@ export function createWebDyneRuntime({
       persistentPerl = perl;
       registerPersistentHostFunctions(perl);
       extensionManager.register(perl);
-      const bootstrapJson = JSON.stringify({ applicationConfig, perlEnv });
+      const bootstrapExpression = perlJsonExpression({ applicationConfig, perlEnv });
       const configure = await perl.eval(
         `require JSON::PP;
-         my $bootstrap = JSON::PP->new->decode(${JSON.stringify(bootstrapJson)});
+         my $bootstrap = ${bootstrapExpression};
          while (my ($name, $value) = each %{$bootstrap->{perlEnv}}) {
            $ENV{$name} = $value;
          }
@@ -275,7 +279,7 @@ export function createWebDyneRuntime({
       return { perl, generation };
     } catch (error) {
       persistentPerl = undefined;
-      perl.dispose();
+      await perl.dispose();
       throw error;
     }
   }

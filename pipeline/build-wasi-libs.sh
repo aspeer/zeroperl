@@ -58,5 +58,9 @@ make -j"$(nproc)" -C lib liblz4.a \
 cp lib/liblz4.a "$LIBDIR/"
 cp lib/lz4.h lib/lz4frame.h lib/lz4hc.h "$INCDIR/"
 
+mkdir -p /build/dependency-notices/zlib /build/dependency-notices/bzip2 /build/dependency-notices/lz4
+cp "$WORK/zlib-${ZLIB_VERSION}/README" /build/dependency-notices/zlib/
+cp "$WORK/bzip2-${BZIP2_VERSION}/LICENSE" /build/dependency-notices/bzip2/
+cp "$WORK/lz4-${LZ4_VERSION}/lib/LICENSE" /build/dependency-notices/lz4/
 rm -rf "$WORK"
 echo "zlib, bzip2, and lz4 installed into $SYSROOT"
