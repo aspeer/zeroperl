@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { copyFile, cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, join, relative, resolve } from "node:path";
 
@@ -107,9 +109,6 @@ const embeddedFiles = await embeddedFileInventory(prefixPath, perlVersion);
 await mkdir(destination, { recursive: true });
 await Promise.all([
   copyFile(wasmPath, resolve(destination, wasmName)),
-  copyFile(reactorPath, resolve(destination, reactorName)),
-  copyFile(sourceManifestPath, resolve(destination, "manifest.json")),
-  copyFile(noticesPath, resolve(destination, "third-party-notices.tar.gz")),
   copyFile(resolve("LICENSE"), resolve(destination, "LICENSE")),
   copyFile(resolve("THIRD-PARTY-NOTICES.md"), resolve(destination, "THIRD-PARTY-NOTICES.md")),
   cp(resolve("licenses"), resolve(destination, "licenses"), { recursive: true }),
@@ -118,6 +117,14 @@ await Promise.all([
   cp(resolve("lib"), resolve(destination, "lib"), { recursive: true }),
   cp(resolve("scripts"), resolve(destination, "scripts"), { recursive: true }),
 ]);
+const compactNotices = resolve(destination, "THIRD-PARTY-LICENSES.txt");
+execFileSync("python3", [fileURLToPath(new URL("./compact-notices.py", import.meta.url)), noticesPath, compactNotices], {stdio: "inherit"});
+const packageManifest = {...manifest, npmPackage: {
+  name: packageName, version: packageVersion,
+  includedArtifacts: ["wasm"],
+  notices: {filename: "THIRD-PARTY-LICENSES.txt", sha256: await sha256(compactNotices)},
+}};
+await writeFile(resolve(destination, "manifest.json"), `${JSON.stringify(packageManifest, null, 2)}\n`);
 await writeFile(resolve(destination, "embedded-files.json"), `${JSON.stringify(embeddedFiles, null, 2)}\n`);
 
 const packageJson = {
@@ -134,7 +141,6 @@ const packageJson = {
     "./transport/fetch": "./js/transport/fetch-pagi.js",
     "./worker": "./js/worker.js",
     "./zeroperl.wasm": `./${wasmName}`,
-    "./zeroperl-reactor.wasm": `./${reactorName}`,
     "./manifest.json": "./manifest.json",
   },
   bin: {
@@ -148,11 +154,10 @@ const packageJson = {
     "lib",
     "manifest.json",
     "THIRD-PARTY-NOTICES.md",
-    "third-party-notices.tar.gz",
+    "THIRD-PARTY-LICENSES.txt",
     "licenses",
     "scripts",
     wasmName,
-    reactorName,
   ],
   dependencies: {
     fflate: "0.8.3",
@@ -176,7 +181,6 @@ const packageJson = {
 const indexSource = `export const perlVersion = ${JSON.stringify(perlVersion)};
 export const buildNumber = ${buildNumber};
 export const wasmUrl = new URL(${JSON.stringify(`./${wasmName}`)}, import.meta.url);
-export const reactorWasmUrl = new URL(${JSON.stringify(`./${reactorName}`)}, import.meta.url);
 `;
 
 const readme = `# ${packageName}
@@ -187,16 +191,14 @@ static-XS dependencies, a provider-neutral PAGI runtime, and the default
 Cloudflare adapter needed to serve a WebDyne PSP application.
 
 Package version ${packageVersion} corresponds to WebDyne build ${buildNumber}.
-The normal runtime is \`${wasmName}\`; the pre-Asyncify linker output is
-\`${reactorName}\`. Use the normal runtime with the ZeroPerl bridge; the
-reactor is retained for downstream tooling and does not support the bridge's
-asynchronous host callbacks.
+The runtime is \`${wasmName}\`. The pre-Asyncify reactor and full attribution
+source archive are diagnostic build artifacts and are not included in npm.
 
-The manifest records binary, prefix and attribution evidence hashes.
-\`third-party-notices.tar.gz\` preserves upstream build evidence; \`licenses/\`
-adds the bridge and exact SDK toolchain license texts. See
-\`THIRD-PARTY-NOTICES.md\` for scope. The runtime source is MIT-licensed;
-embedded components retain their own licenses.
+The manifest records build provenance and hashes; not every build artifact is
+shipped in this package. \`THIRD-PARTY-LICENSES.txt\` preserves upstream legal
+texts from the verified build evidence; \`licenses/\` adds bridge and SDK
+licenses. See \`THIRD-PARTY-NOTICES.md\` for scope. The runtime source is
+MIT-licensed; embedded components retain their own licenses.
 
 Place the complete application tree in \`app/\`. A minimal project only needs
 \`package.json\` and \`app/app.psp\`; Cloudflare configuration is generated when

@@ -1,0 +1,10 @@
+import {readFileSync, statSync} from 'node:fs';
+const [tarball, inventory] = process.argv.slice(2);
+const [pack] = JSON.parse(readFileSync(inventory, 'utf8'));
+const wasm = pack.files.filter(file => file.path.endsWith('.wasm'));
+if (wasm.length !== 1 || wasm[0].path.includes('reactor')) throw Error('npm must contain exactly one production WASM');
+if (pack.files.some(file => file.path.endsWith('.tar.gz') || /reactor/i.test(file.path))) throw Error('Diagnostic artifacts must not ship in npm');
+if (!pack.files.some(file => file.path === 'THIRD-PARTY-LICENSES.txt')) throw Error('Missing compact attribution');
+const bytes = statSync(tarball).size;
+if (bytes > 10_000_000) throw Error(`npm archive exceeds the 10 MB budget: ${bytes} bytes`);
+console.log(`Lean npm archive verified: ${bytes} bytes, one production WASM, compact attribution`);

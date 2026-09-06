@@ -71,7 +71,9 @@ jobs:
           npm --prefix tools ci
           npm ci --ignore-scripts
       - name: Test release tooling and package contracts
-        run: node --test t.js/*.test.mjs
+        run: |
+          node --test t.js/*.test.mjs
+          python3 -B tests/test_compact_notices.py
       - name: Build once from the tagged source
         env:
           BUILD_EXIFTOOL: 'false'
@@ -181,7 +183,7 @@ jobs:
           {
             echo package/LICENSE
             echo package/THIRD-PARTY-NOTICES.md
-            echo package/third-party-notices.tar.gz
+            echo package/THIRD-PARTY-LICENSES.txt
             find licenses -type f -print | sed 's#^#package/#'
             echo package/README.md
             echo package/bin/pagi-runner.pl
@@ -204,14 +206,12 @@ jobs:
             echo package/scripts/install-cpan.mjs
             echo package/scripts/webdyne-cloudflare.mjs
             echo "package/zeroperl-webdyne-${RELEASE_ID}.wasm"
-            echo "package/zeroperl-webdyne-reactor-${RELEASE_ID}.wasm"
           } | sort > "$tarball_dir/expected-files.txt"
           diff -u "$tarball_dir/expected-files.txt" "$tarball_dir/actual-files.txt"
           mkdir -p "$tarball_dir/unpacked"
           tar -xzf "$tarball" -C "$tarball_dir/unpacked"
           node --input-type=module - \
-            "$tarball_dir/unpacked/package/zeroperl-webdyne-${RELEASE_ID}.wasm" \
-            "$tarball_dir/unpacked/package/zeroperl-webdyne-reactor-${RELEASE_ID}.wasm" <<'NODE'
+            "$tarball_dir/unpacked/package/zeroperl-webdyne-${RELEASE_ID}.wasm" <<'NODE'
           import { readFile } from "node:fs/promises";
           for (const path of process.argv.slice(2)) {
             if (!WebAssembly.validate(await readFile(path))) {
@@ -219,6 +219,8 @@ jobs:
             }
           }
           NODE
+          node tools/check-npm-size.mjs "$tarball" "$tarball_dir/pack.json"
+          node tools/check-runtime-lifecycle.mjs "$tarball_dir/unpacked/package/zeroperl-webdyne-${RELEASE_ID}.wasm" "$tarball_dir/unpacked/package/js/zeroperl.js"
           npm stage publish "$tarball" --access public --dry-run
           echo "NPM_TARBALL=$tarball" >> "$GITHUB_ENV"
 
@@ -238,10 +240,10 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Preserve qualified binary artifacts
+      - name: Preserve diagnostic build evidence (not an npm dependency)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: zeroperl-${{ matrix.perl }}-${{ github.ref_name }}
+          name: zeroperl-diagnostics-${{ matrix.perl }}-${{ github.ref_name }}
           path: dist/github/
           if-no-files-found: error
           retention-days: 90

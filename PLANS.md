@@ -152,3 +152,12 @@ hosted preview acceptance passes. npm publication remains approval-gated.
 
 See RELEASING.md for the current release procedure. Earlier entries describing
 per-Perl numbering or disabled staging are historical.
+
+
+## Lean 1.0.3 npm release
+
+- [x] Exclude the reactor and full source-evidence archive from npm.
+- [x] Retain deduplicated verbatim license/notice texts and SDK/bridge licenses.
+- [x] Add a 10 MB package budget and reject diagnostic payloads in npm.
+- [ ] Build and qualify 1.0.3, including packed runtime consumers.
+- [ ] Push/stage only when initiated by the maintainer; no public publication.

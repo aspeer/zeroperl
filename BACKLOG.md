@@ -85,3 +85,12 @@ changes. Curation of the broad notice archive is an optional size improvement.
 
 - [x] Pin the corrected bridge implementation at 7e91d2c and retain the virtual
   WASM resolver. See RELEASE-QUALIFICATION.md for current source/artifact refs.
+
+
+## Lean 1.0.3 npm release
+
+- [x] Exclude the reactor and full source-evidence archive from npm.
+- [x] Retain deduplicated verbatim license/notice texts and SDK/bridge licenses.
+- [x] Add a 10 MB package budget and reject diagnostic payloads in npm.
+- [ ] Build and qualify 1.0.3, including packed runtime consumers.
+- [ ] Push/stage only when initiated by the maintainer; no public publication.

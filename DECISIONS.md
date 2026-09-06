@@ -263,3 +263,14 @@ pair; CI does not mutate source, allocate versions, or approve npm publication.
 The inspected tarball is submitted using npm stage publish with stage-only
 OIDC permission. The maintainer approves in npm. This supersedes independent
 Perl build numbering and the previous two-workflow/manual artifact transfer.
+
+
+## Separate npm runtime payload from diagnostic build evidence
+
+Starting with 1.0.3, the npm package ships only the Asyncify-enabled runtime.
+The raw reactor and full attribution-source archive remain diagnostic build
+artifacts. Compact redistribution notices are generated from verified evidence;
+dedicated legal files and legal comment/POD blocks are preserved verbatim, with
+whole-source fallback for unrecognized formats. SDK notices remain separately
+included. The package budget is 10 MB compressed; the interpreter and provider
+behavior do not change.

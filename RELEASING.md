@@ -95,3 +95,20 @@ archive. Packages and checksums remain available as GitHub Actions artifacts;
 there is no automatic public GitHub Release announcement. Download artifacts
 before their retention expires (npm candidate: 30 days for runtime, 90 days
 for TypeScript; runtime binary bundle: 90 days).
+
+
+## Lean runtime package (1.0.3 onward)
+
+npm contains one production WASM and the files needed to run or build WebDyne
+applications, plus compact attribution and license texts. It excludes the
+pre-Asyncify reactor and the full source-attribution archive. Reactor exports
+are removed from the npm interface. No runtime interpreter change is involved.
+CI checks the file inventory, requires exactly one WASM, rejects diagnostic
+archives and imposes a 10 MB compressed-package budget.
+
+The full prefix, reactor and evidence remain in the separate
+zeroperl-diagnostics-* GitHub Actions artifact (90-day retention), not in a
+public GitHub release or npm dependency. Archive this diagnostic bundle if you
+need it beyond that retention period; ordinary npm users need only the package.
+The compact notices are generated from this exact verified evidence, preserving
+complete legal sections and conservatively retaining unfamiliar source formats.
