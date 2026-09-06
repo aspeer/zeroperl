@@ -159,5 +159,5 @@ per-Perl numbering or disabled staging are historical.
 - [x] Exclude the reactor and full source-evidence archive from npm.
 - [x] Retain deduplicated verbatim license/notice texts and SDK/bridge licenses.
 - [x] Add a 10 MB package budget and reject diagnostic payloads in npm.
-- [ ] Build and qualify 1.0.3, including packed runtime consumers.
+- [x] Build and qualify 1.0.3, including packed runtime consumers.
 - [ ] Push/stage only when initiated by the maintainer; no public publication.

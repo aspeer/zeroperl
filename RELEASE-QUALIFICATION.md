@@ -1,5 +1,54 @@
 # Final release qualification — 2026-09-06
 
+## Lean npm release 1.0.3
+
+Built and qualified from clean source
+`59fe8bfa284eaec850d86c8789f9fa8197fc099f`, tagged locally as
+`aspeer-zeroperl_1.0.3` and `v1.0.3`. This package targets Perl 5.44.0 and
+includes WebDyne 3.026. The bridge remains pinned to `7e91d2c`.
+
+The final npm tarball contains 37 files, downloads as **8,402,233 bytes**
+(previous 1.0.2: 30,761,950 bytes), and unpacks to 26,890,775 bytes.
+Its SHA-256 is
+`ae7819158a829dbfbf7a59e438cdfaf19196e4d2a7f9e2f6c1f357813ba7e729`.
+The production WASM SHA-256 is
+`dad6520e897c40813303347a79dabcbcb0e67f79c6f804076ee434cc8c29a415`.
+
+npm includes one production WASM and deduplicated verbatim redistribution
+notices. The pre-Asyncify reactor and full attribution evidence archive are
+excluded. The workflow retains full build diagnostics in a separate GitHub
+Actions artifact for 90 days. A 10,000,000-byte compressed package budget,
+archive inventory checks and diagnostic-artifact rejection guard future builds.
+
+Validation passed:
+
+- 25 Node tests, three compact-notice tests and workflow actionlint.
+- Locked CPAN/XS versions, XS magic, 24 runtime lifecycle checks, 100 Asyncify
+  re-entry rounds, embedded INC, core modules, Socket and 11 release probes.
+- Full attribution inventory, build checksums, exact npm file inventory,
+  compact-notice hash, clean tagged-source manifest and staging check-only.
+- Offline installation of the final tarball into the local Worker acceptance app.
+- HTTP pages, WebDyne 3.026/Perl 5.44 version output, CPAN and writable tmp.
+- Live SSE/WebSocket for 45 seconds, cancellation/close, then 45 seconds of
+  HTTP health checks; 100 overlap rounds (600 requests); SSE-to-WebSocket sequence.
+- Local D1, KV and R2 operations, including concurrency and atomic D1 batches.
+- 20 deliberately forced WebSocket disconnects with healthy follow-up HTTP.
+
+The forced disconnects produced 20 instances of the previously accepted
+server-side hung-request diagnostic. Existing streams and subsequent overlap
+requests remained healthy. No WASM memory trap or cross-request I/O diagnostic
+was observed. This package was tested locally; no new hosted deployment was
+performed. Prior hosted qualification below remains historical evidence for
+the runtime implementation, not a hosted test of this exact tarball.
+
+The local tarball is
+`dist/npm/5.44.0-1.0.3/tarball/webdyne-webdyne-zeroperl-5.44.0-1.0.3.tgz`.
+Temporary evidence logs use `/tmp/zeroperl-1.0.3-*.log`. No push or npm publication
+was performed. The paired release tags remain on the build source commit;
+subsequent documentation commits only record these results.
+
+## Earlier first-release qualification
+
 The first-release artifacts include WebDyne **3.026**, pinned exactly in
 `cpanfile` and all three target snapshots. Builds use clean runtime source
 `b08c545bb740d2093b8858a09be9e7a3a0b3cc04` and bridge implementation
