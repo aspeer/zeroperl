@@ -267,3 +267,12 @@ bridge passes 167 Bun tests and installed ESM/CJS/NodeNext checks against the
 exact already-packed archive. No interpreter changes or WASM recompilation were
 needed for these workflow/metadata changes. A real tagged GitHub/OIDC staging
 run remains to be exercised after the maintainer initiates the release push.
+
+## Clean-checkout dependency installation
+
+The first tagged GitHub run exposed an ignored root package-lock.json. The
+root tooling package now has a stable name and a tracked lock generated with
+npm 11.19.1. A clean source export with the pinned bridge source passed npm ci
+--ignore-scripts and all 25 runtime/release tests. This check does not rely on
+the developer checkout node_modules or ignored lockfile. A new release tag is
+needed to include this correction; rerunning an older tag uses its old source.

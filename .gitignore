@@ -4,6 +4,7 @@
 .DS_Store
 package.json
 package-lock.json
+!/package-lock.json
 eslint.config.mjs
 AGENTS.md
 lint.sh*
