@@ -1,8 +1,10 @@
 # Cloudflare request-context investigation (2026-09-05)
 
-Status: bridge and provider corrections implemented. Local Perl 5.44.0
-acceptance passes for the original context failure. Abrupt WebSocket termination
-still produces a separate diagnostic; no publication or hosted deployment.
+Status (2026-09-06): bridge, provider and SSE cancellation corrections pass
+local and hosted acceptance with the final Perl 5.44 / WebDyne 3.026 binary.
+The accepted abrupt-disconnect diagnostic remains a known limitation. No npm
+publication or production deployment. Earlier sections preserve the investigation
+history; RELEASE-QUALIFICATION.md records final evidence.
 
 ## Finding
 
@@ -141,7 +143,9 @@ finishes the PAGI session and the queue continues. No new interpreter or bridge
 change is needed. Custom Wrangler configs must include the same flag.
 The retained smoke-stream-lifetime probe checks both a 45-second live connection
 period and a 45-second post-cancellation health period. Final local package tests
-and earlier hosted 3.026 tests pass. Exact-final hosted replay was blocked by
-upload approval review. See RELEASE-QUALIFICATION.md for full evidence and limits.
+and the subsequently approved exact-final hosted replay pass. Hosted checks
+cover lifetime, overlap, forced disconnect and recovery. Five network-loss
+diagnostics accompanied deliberate disconnects; service remained healthy.
+See RELEASE-QUALIFICATION.md for full evidence and limits.
 
 Cloudflare documents the opt-in in its [request cancellation announcement](https://developers.cloudflare.com/changelog/post/2025-05-22-handle-request-cancellation/).

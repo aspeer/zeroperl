@@ -76,8 +76,8 @@ changes. Curation of the broad notice archive is an optional size improvement.
   Standalone reproduction: `tests/runtime/hung-request`.
 - [x] Fix long-lived SSE cancellation with enable_request_signal and pass
   final-package local lifetime/overlap acceptance. Earlier 3.026 hosted tests pass.
-- [ ] Repeat hosted acceptance with the exact final binary after upload approval;
-  the accepted abrupt-WebSocket warning alone is not a release blocker.
+- [x] Repeat hosted acceptance with the exact final binary after upload approval;
+  lifetime, overlap and disconnect recovery pass. See RELEASE-QUALIFICATION.md.
 
 - [x] Pin the corrected bridge implementation at 7e91d2c and retain the virtual
   WASM resolver. See RELEASE-QUALIFICATION.md for current source/artifact refs.

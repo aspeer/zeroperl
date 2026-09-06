@@ -53,14 +53,25 @@ Generated Wrangler configurations now enable `enable_request_signal`, allowing
 the existing abort listener to deliver PAGI disconnect and release the session.
 Custom Wrangler configurations must enable this flag too; see WEBDYNE.md.
 
-Earlier hosted Cloudflare preview tests with WebDyne 3.026 and this configuration
-fix passed the same 45+45-second lifetime test and 100 overlap rounds (600
-requests). That preview used an earlier 3.026 binary. Repeating the hosted test
-with the exact final rebuilt binary was rejected by automatic approval review
-because it uploads package/application content to Cloudflare. Thus the final
-binary has local acceptance; exact-final hosted acceptance still needs explicit
-upload approval. Hosted D1/KV/R2 were not exercised. No production Worker was
-modified. These results do not certify browser, Deno or Windows deployments.
+The maintainer subsequently approved the exact-final hosted upload. Cloudflare
+remote preview acceptance passed using the checksum-matched final 5.44 binary:
+
+- HTTP confirms WebDyne 3.026 and Perl 5.44.0; PSP rendering, the application
+  CPAN dependency, writable /tmp and static-file checks pass.
+- The 45-second live SSE/WebSocket and 45-second post-cancellation health test passes.
+- 100 overlap rounds (600 requests), sequential SSE-to-WebSocket use, and
+  20 forced TCP disconnects with healthy follow-up HTTP pass.
+- Another 20 overlap rounds (120 requests) pass after forced disconnects.
+
+Captured preview logs contain no WASM memory trap, SpanParent/cross-request I/O
+error or hung-request diagnostic. Five `Network connection lost` diagnostics
+occurred during deliberate TCP termination; service remained healthy. This does
+not establish that the accepted disconnect warning can never occur in production.
+Cloudflare controls isolate placement; hosted requests are not guaranteed to
+share one isolate. Local persistent-interpreter evidence remains complementary.
+Hosted D1/KV/R2 were not exercised. The temporary preview was stopped; no
+production Worker was modified. Browser, Deno and Windows remain outside this
+acceptance. Hosted evidence is in `/tmp/zeroperl-3026-approved-final-remote-*.log`.
 
 ## Integration and publication
 
@@ -72,8 +83,8 @@ three local build/qualification targets passed.
 Before publication, obtain the user's publication approval, confirm public
 source/submodule access and publisher permissions, host the manifest-matched
 artifacts, and configure the TypeScript artifact base URL. npm dry-run verifies
-packaging; it does not prove publish permissions. Repeat exact-final hosted
-acceptance when the Cloudflare upload is approved.
+packaging; it does not prove publish permissions. Exact-final hosted stream
+acceptance is now complete.
 
 Local build/qualification logs are `/tmp/zeroperl-3026-final-build-<perl>.log`
 and `/tmp/zeroperl-3026-final-qualify-<perl>.log`. Final-package local evidence

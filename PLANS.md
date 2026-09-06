@@ -117,8 +117,8 @@ Work continues from the uncommitted release preparation on
 - [x] Regenerate the runtime bridge from the corrected TypeScript source.
 - [x] Implement approved Cloudflare waitUntil correction for all sessions and
   qualify overlap, storage and long-lived WebSocket behaviour locally on 5.44.
-- [ ] Investigate forced WebSocket termination diagnostics and qualify hosted
-  request lifetimes. Publication is not approved.
+- [x] Investigate forced WebSocket termination diagnostics and qualify hosted
+  request lifetimes with the final 5.44 binary. Publication is not approved.
 
 ## Forced WebSocket disconnect investigation
 
@@ -126,7 +126,8 @@ Work continues from the uncommitted release preparation on
 - [x] Isolate the same warning in a standalone JavaScript Worker on two workerd
   versions; retain a dependency-free reproduction and remove instrumentation.
 - [x] Recheck normal overlap after forced disconnects.
-- [ ] Pursue upstream resolution and separately authorized hosted comparison.
+- [x] Complete the separately authorized hosted comparison.
+- [ ] Pursue upstream resolution of the accepted disconnect diagnostic.
 
 ## WebDyne 3.026 final release qualification
 
@@ -137,4 +138,4 @@ Work continues from the uncommitted release preparation on
 - [x] Merge qualified feature branches into local main; publication stays paused.
 
 Final evidence: [RELEASE-QUALIFICATION.md](RELEASE-QUALIFICATION.md). Exact-final
-hosted preview upload and npm publication remain separately approval-gated.
+hosted preview acceptance passes. npm publication remains approval-gated.
