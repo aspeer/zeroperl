@@ -1,6 +1,50 @@
 # Final release qualification — 2026-09-06
 
-## Lean npm release 1.0.3
+## Current 1.0.3 candidate: externally hosted third-party licences
+
+This candidate supersedes the earlier 8.40 MB package below. Both unpublished
+local tags were updated to clean source `a90f925048b76249e698114691f1607137fc31ef`
+after verifying that neither 1.0.3 tag existed on GitHub. The bridge remains
+`7e91d2c`; Perl 5.44.0 includes WebDyne 3.026.
+
+- npm: 23 files, **4,771,603 bytes compressed**, 14,645,103 bytes unpacked.
+- npm SHA-256: `3d64b6f382d9388fadf6f76681b9822812f9d1026eb0cec6fcda0a364ad75b1a`.
+- WASM SHA-256: `1a52c47daab3134ccf25d18caf38c7d97dcccd45b64e4d5586680b63cc5a4e99`.
+- Separate licence archive: 16 files, 3,630,260 bytes compressed.
+- Licence SHA-256: `e4bacb124b3e30aca49c30bceda6a056ba6ed2e9106deee64dd4b01c111d05c8`.
+
+npm contains a generated third-party notice reference with the exact release
+URL and archive checksum. Third-party licence text files and the licenses
+folder are absent. The separate archive contains the verbatim legal texts,
+SDK/bridge notices, build manifest and file inventory. The interpreter is
+unchanged; the packaging budget is now 6 MB compressed.
+
+Passed: 26 Node tests; three notice extraction tests; modified release workflow
+lint; locked CPAN/XS checks; XS magic; 24 lifecycle checks; 100 Asyncify re-entry
+rounds; embedded INC/core/Socket/release probes; full attribution verification;
+source and artifact hashes; exact npm inventory; external licence inventory and
+build provenance; local staging and licence-publisher check-only. Negative
+checks reject bundled licence payloads, extra WASM, diagnostic archives and
+packages over 6 MB. Publisher tests cover upload verification, identical reruns,
+replacement refusal, permission failure and tampered input without real uploads.
+
+Offline installation of the final tarball passed, followed by 100 local Worker
+overlap rounds (600 requests), SSE completion followed by WebSocket echo and
+WebDyne 3.026/Perl 5.44 HTTP output. Lifecycle checks also passed against the
+packaged bridge and WASM. No hung-request, memory-trap, SpanParent or cross-request
+I/O diagnostic appeared in these smoke tests. The earlier long-lived and
+storage tests below were not repeated for this packaging-only revision.
+
+Repository-wide actionlint additionally reports existing shellcheck findings in
+unchanged nodefs.yml; the modified release workflow passes independently.
+No hosted Worker upload, GitHub push, licence publication or npm staging was
+performed. The tag-triggered workflow must publish and verify the licence assets
+before npm staging; the URLs are not yet live. See RELEASING.md for manual
+bootstrap ordering. The local files are under `dist/npm/5.44.0-1.0.3/` and logs
+under `/tmp/zeroperl-external-licenses-*.log`.
+
+
+## Superseded initial lean npm release 1.0.3
 
 Built and qualified from clean source
 `59fe8bfa284eaec850d86c8789f9fa8197fc099f`, tagged locally as

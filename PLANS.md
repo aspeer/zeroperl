@@ -167,5 +167,5 @@ per-Perl numbering or disabled staging are historical.
 - [x] Replace npm licence payloads with a versioned release link and checksum.
 - [x] Create a deterministic licence archive with build provenance and inventory.
 - [x] Publish and verify licence assets before npm staging; reject replacements.
-- [ ] Qualify the revised 1.0.3 package and update the unpublished local tag pair.
+- [x] Qualify the revised 1.0.3 package and update the unpublished local tag pair.
 - [ ] Push the release to publish licence assets and stage npm when initiated.
