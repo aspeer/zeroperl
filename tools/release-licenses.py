@@ -10,13 +10,15 @@ import sys
 import tarfile
 import tempfile
 
-evidence, destination, source_manifest = map(Path, sys.argv[1:])
+evidence, destination, source_manifest, runtime_notices, policy = map(Path, sys.argv[1:])
 repo = Path(__file__).resolve().parent.parent
 with tempfile.TemporaryDirectory() as scratch:
     compact = Path(scratch) / 'THIRD-PARTY-LICENSES.txt'
     subprocess.run([sys.executable, '-B', str(repo / 'tools/compact-notices.py'),
                     str(evidence), str(compact)], check=True)
     files = {'THIRD-PARTY-LICENSES.txt': compact.read_bytes(),
+             'NPM-THIRD-PARTY-LICENSES.txt': runtime_notices.read_bytes(),
+             'runtime-notice-policy.json': policy.read_bytes(),
              'build-manifest.json': source_manifest.read_bytes()}
     for path in sorted((repo / 'licenses').rglob('*')):
         if path.is_file():

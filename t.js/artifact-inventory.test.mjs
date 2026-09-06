@@ -24,12 +24,22 @@ test("npm packaging rejects a changed prefix even when file counts and sizes mat
     execFileSync("tar", ["-czf", join(root, "notices.tar.gz"), "-C", root, "third-party-notices"]);
     const noticeBytes = await readFile(join(root, "notices.tar.gz"));
     const noticeHash = createHash("sha256").update(noticeBytes).digest("hex");
+    const prefixInventory = await directoryInventory(prefix);
     await writeFile(join(root, "manifest.json"), JSON.stringify({
       perlVersion: "5.44.0", buildNumber: 1,
-      artifacts: {wasm: {sha256}, reactor: {sha256}, notices: {filename: "notices.tar.gz", sha256: noticeHash}, prefix: {directory: "prefix", ...await directoryInventory(prefix)}},
+      artifacts: {wasm: {sha256}, reactor: {sha256}, config: {sha256}, notices: {filename: "notices.tar.gz", sha256: noticeHash}, prefix: {directory: "prefix", ...prefixInventory}},
+    }));
+    await writeFile(join(root, "policy.json"), JSON.stringify({schemaVersion: 1,
+      perlVersion: "5.44.0", profile: {},
+      payloadIdentity: {
+        paths: createHash("sha256").update(JSON.stringify(["Example.pm"])).digest("hex"),
+        content: createHash("sha256").update(JSON.stringify({"Example.pm": createHash("sha256").update("original").digest("hex")})).digest("hex"),
+      },
+      buildInputs: {}, components: ["Fixture"],
+      sources: [{location: "evidence", path: "LICENSE", component: "Fixture", sha256, ranges: [[0, bytes.length]]}],
     }));
     const args = ["tools/prepare-npm-package.mjs", "--source", root, "--destination", join(root, "package"),
-      "--manifest", "manifest.json", "--wasm", "runtime.wasm", "--reactor", "reactor.wasm"];
+      "--manifest", "manifest.json", "--wasm", "runtime.wasm", "--reactor", "reactor.wasm", "--notice-policy", join(root, "policy.json")];
     execFileSync(process.execPath, args, {stdio: "pipe"});
     const metadata = JSON.parse(await readFile(join(root, "package/package.json"), "utf8"));
     assert.equal(metadata.license, "MIT");
@@ -37,7 +47,8 @@ test("npm packaging rejects a changed prefix even when file counts and sizes mat
     assert.ok(!metadata.files.includes("reactor.wasm"));
     assert.ok(!metadata.files.includes("third-party-notices.tar.gz"));
     const packaged = await readdir(join(root, "package"));
-    assert.ok(!packaged.includes("THIRD-PARTY-LICENSES.txt"));
+    assert.ok(packaged.includes("THIRD-PARTY-LICENSES.txt"));
+    assert.match(await readFile(join(root, "package/THIRD-PARTY-LICENSES.txt"), "utf8"), /fixture/);
     assert.ok(!packaged.includes("licenses"));
     assert.ok(!metadata.files.includes("licenses"));
     assert.match(await readFile(join(root, "package/THIRD-PARTY-NOTICES.md"), "utf8"), /releases\/download\/aspeer-zeroperl_1\.0\.1\/third-party-licenses-5\.44\.0-1\.0\.1\.tar\.gz/);
@@ -46,11 +57,13 @@ test("npm packaging rejects a changed prefix even when file counts and sizes mat
     assert.equal(createHash("sha256").update(await readFile(archive)).digest("hex"), notice.sha256);
     assert.match(execFileSync("tar", ["-xOzf", archive, "THIRD-PARTY-LICENSES.txt"], {encoding: "utf8"}), /fixture/);
     assert.match(execFileSync("tar", ["-tzf", archive], {encoding: "utf8"}), /licenses\/zeroperl-ts-LICENSE/);
+    assert.match(execFileSync("tar", ["-xOzf", archive, "NPM-THIRD-PARTY-LICENSES.txt"], {encoding: "utf8"}), /fixture/);
     // Repacking cleans obsolete on-disk payloads and produces identical licences.
     await mkdir(join(root, "package/licenses"));
     await writeFile(join(root, "package/THIRD-PARTY-LICENSES.txt"), "stale");
     execFileSync(process.execPath, args, {stdio: "pipe"});
     assert.ok(!(await readdir(join(root, "package"))).includes("licenses"));
+    assert.ok(!(await readFile(join(root, "package/THIRD-PARTY-LICENSES.txt"), "utf8")).includes("stale"));
     assert.equal(createHash("sha256").update(await readFile(archive)).digest("hex"), notice.sha256);
     assert.ok(!(await readFile(join(root, "package/index.js"), "utf8")).includes("reactorWasmUrl"));
     await writeFile(join(root, "notices.tar.gz"), "changed");

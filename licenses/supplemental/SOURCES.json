@@ -1,0 +1,20 @@
+{
+  "retrieved": "2026-09-06",
+  "files": [
+    {
+      "file": "Unicode-3.0.txt",
+      "url": "https://www.unicode.org/license.txt",
+      "sha256": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96"
+    },
+    {
+      "file": "Unicode-DFS-2016.txt",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/Unicode-DFS-2016.txt",
+      "sha256": "1a33fc12a3abb0b3eb14db70e36ef1d0af51c93b1cc1f80f022c3bd406e9b874"
+    },
+    {
+      "file": "compiler-rt-CREDITS.TXT",
+      "url": "https://raw.githubusercontent.com/llvm/llvm-project/87f0227cb60147a26a1eeb4fb06e3b505e9c7261/compiler-rt/CREDITS.TXT",
+      "sha256": "a9901f47a089da41e4690682d00ce4cedaa2baf41fedbe79beee366d43ac2461"
+    }
+  ]
+}

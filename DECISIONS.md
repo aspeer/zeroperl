@@ -276,3 +276,15 @@ staging and refuses to overwrite differing existing assets. Full source
 evidence and the raw reactor remain diagnostic artifacts. The compressed npm
 budget is 6 MB. This supersedes the initial in-package compact-notice layout;
 it does not change component licence obligations or runtime behavior.
+
+
+## Propagate reviewed notices inside the lean npm package
+
+The link-only 1.0.3 candidate is superseded. npm includes a small reviewed
+collection of actual runtime licence/copyright notices, deduplicating shared
+terms and retaining vendor exceptions. The broad archive remains on GitHub.
+Perl's Artistic option is selected where available; component-specific terms
+remain intact. A pinned source-range inventory fails closed on unreviewed
+payload/dependency/linking/licence changes while allowing identified generated
+host metadata differences. This avoids both the earlier 11.9 MB broad text
+and relying on a URL alone for licence propagation.

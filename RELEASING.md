@@ -100,23 +100,29 @@ for TypeScript; runtime binary bundle: 90 days).
 
 ## Lean runtime package (1.0.3 onward)
 
-npm contains one production WASM and the files needed to run or build WebDyne
-applications. A small THIRD-PARTY-NOTICES.md links to the matching third-party
-licence archive and records its SHA-256. Licence texts, SDK/bridge notice files,
-the pre-Asyncify reactor and full source-attribution archive are outside npm.
-Reactor exports are removed from the npm interface. CI verifies the file
-inventory and imposes a 6 MB compressed-package budget.
+npm contains one production WASM, application tooling and the reviewed
+`THIRD-PARTY-LICENSES.txt`. Shared terms are deduplicated; component-specific
+copyright notices and exceptions remain. A short THIRD-PARTY-NOTICES.md links
+to broader attribution evidence on the matching GitHub Release. The full
+licence/source directories, reactor and diagnostic archive are outside npm.
+CI enforces 500 KB raw notices and a 6 MB compressed-package budget.
 
-Packaging creates a deterministic archive under
-`dist/npm/<perl>-<version>/release-licenses/`. It contains verbatim legal texts,
-SDK/bridge licences, the build manifest and an inventory. The workflow publishes
-it and its checksum on the canonical tag's GitHub Release, verifies downloaded
-bytes and public release state, then stages npm. Existing differing assets fail
-rather than being replaced. The release job needs `contents: write`; npm retains
-stage-only OIDC permission. Publishing these GitHub licence assets does not
-approve the npm package for publication.
+The default Perl 5.44.0 profile has a reviewed inventory in `release/licences/`.
+A changed runtime module, version, linked component or notice source fails
+packaging until its inventory is reviewed. Host-generated metadata differences
+are permitted without discarding the relevant copyright notices. See
+[the review procedure](release/licences/README.md). Other Perl variants still
+build, but need notice inventories before release packaging.
 
-For a manual first-package bootstrap, publish the matching licence archive
+Packaging creates a deterministic supplemental archive under
+`dist/npm/<perl>-<version>/release-licenses/`. It contains the npm notices,
+review inventory, broader attribution texts, SDK/bridge licences, build manifest
+and file hashes. The workflow publishes it and its checksum on the canonical
+tag's GitHub Release, verifies downloaded bytes and public state, then stages
+npm. Existing differing assets fail rather than being replaced. The release
+job needs `contents: write`; npm retains stage-only OIDC permission.
+
+For a manual first-package bootstrap, publish the matching supplemental archive
 before uploading npm. With the canonical tag already pushed:
 
 ```sh
@@ -125,10 +131,9 @@ node tools/publish-release-licenses.mjs \
   dist/npm/5.44.0-1.0.3/release-licenses
 ```
 
-Add `--check-only` to validate local inputs without accessing GitHub. Do not
-publish an npm candidate whose licence URL is not yet available.
+Add `--check-only` to validate local inputs without accessing GitHub. This
+GitHub publication does not approve the npm package for publication.
 
 The full prefix, reactor and source evidence remain in the separate
-zeroperl-diagnostics-* Actions artifact (90-day retention). The public licence
-archive is a GitHub Release asset, so it is not subject to Actions retention.
-See THIRD-PARTY-NOTICES.md for scope and redistribution requirements.
+zeroperl-diagnostics-* Actions artifact (90-day retention). The supplemental
+licence archive is a GitHub Release asset without Actions retention expiry.

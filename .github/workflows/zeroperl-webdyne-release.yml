@@ -74,6 +74,7 @@ jobs:
         run: |
           node --test t.js/*.test.mjs
           python3 -B tests/test_compact_notices.py
+          python3 -B tests/test_runtime_notices.py
       - name: Build once from the tagged source
         env:
           BUILD_EXIFTOOL: 'false'
@@ -183,6 +184,7 @@ jobs:
           {
             echo package/LICENSE
             echo package/THIRD-PARTY-NOTICES.md
+            echo package/THIRD-PARTY-LICENSES.txt
             echo package/README.md
             echo package/bin/pagi-runner.pl
             echo package/bin/webdyne-app.pl

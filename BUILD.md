@@ -334,9 +334,9 @@ archive preserves upstream attribution. ExifTool builds add its script artifact.
 artifacts to prepare a runtime package directory. The canonical TypeScript
 repository bundles the selected WASM, matching manifest and notice archive.
 Keep these build inputs together for verification. The WebDyne npm package
-ships only the production WASM, a versioned licence link and application tooling.
-Third-party licence texts are packaged separately for the matching GitHub
-Release; the reactor and full evidence stay in diagnostic Actions artifacts.
+ships the production WASM, reviewed and deduplicated runtime notices, a
+versioned evidence link and application tooling. The broader attribution
+collection is packaged separately for the matching GitHub Release; the reactor and full evidence stay in diagnostic Actions artifacts.
 See RELEASING.md for the 6 MB npm size gate and licence publication order. Applications
 install the published packages directly from npm; see
 [WEBDYNE.md](WEBDYNE.md) for installation and usage.
@@ -539,3 +539,14 @@ comments. The manifest checksums `third-party-notices-<perl>-<build>.tar.gz`;
 packaging verifies both that archive and the full prefix inventory. npm includes
 the archive and separate bridge notices. See THIRD-PARTY-NOTICES.md for the
 attribution scope. The runtime source license remains MIT.
+
+
+## Runtime licence review
+
+Package preparation renders the reviewed inventory in `release/licences/` and
+fails if the runtime payload, dependency snapshot, linked components or notice
+sources have changed. The supported release profile currently has a Perl 5.44.0
+inventory. See [the review procedure](release/licences/README.md) when updating
+CPAN dependencies or adding an XS module; the new module's applicable notices
+must accompany its compiled code. The full extraction/audit material stays
+outside npm, while the reviewed legal texts remain in the installed package.
