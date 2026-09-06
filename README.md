@@ -1,5 +1,7 @@
 # ZeroPerl — WebDyne integration fork
 
+For maintainers: [release tagging and npm staging](RELEASING.md).
+
 This is a fork of the original [6over3/zeroperl](https://github.com/6over3/zeroperl)
 project. It supports a WASM implementation of WebDyne, primarily on Cloudflare
 Workers at this time, with the potential to support other WASM providers later.

@@ -18,7 +18,7 @@ The npm packages have different roles:
 
 | Package | Contents | Consumer |
 | --- | --- | --- |
-| `@webdyne/webdyne-zeroperl-5.44.0@1.0.0` | Versioned Perl WASM, embedded WebDyne modules, compiled bridge, PAGI runtime and deployment CLI | WebDyne applications |
+| `@webdyne/webdyne-zeroperl-5.44.0@1.0.1` | Versioned Perl WASM, embedded WebDyne modules, compiled bridge, PAGI runtime and deployment CLI | WebDyne applications |
 | `@aspeer/zeroperl-ts@1.1.0` | ESM/CommonJS bridge, TypeScript declarations and bundled WASM | JavaScript/TypeScript applications embedding Perl directly |
 
 The normal Asyncify WASM and pre-Asyncify reactor are separate artifacts;

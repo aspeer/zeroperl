@@ -25,7 +25,7 @@ Arguments:
 
 Environment variables:
   PERL_VERSION         Perl version to build (default: 5.44.0)
-  BUILD_NUMBER         WebDyne build number (default: release/versions.json)
+  BUILD_NUMBER         Project patch number (default: release/versions.json version)
   ZEROPERL_OVERWRITE   Replace the exact version/build output (default: false)
   EXIFTOOL_VERSION     ExifTool version (default: 13.55)
   ZLIB_VERSION         zlib version (default: 1.3.2)
@@ -73,7 +73,8 @@ ZEROPERL_EMBED_PREFIX="${ZEROPERL_EMBED_PREFIX:-true}"
 ZEROPERL_OVERWRITE="${ZEROPERL_OVERWRITE:-false}"
 BUILD_EXIFTOOL="${BUILD_EXIFTOOL:-false}"
 
-RELEASE_ID="${PERL_VERSION}-${BUILD_NUMBER}"
+RELEASE_VERSION="$(node tools/release-metadata.mjs version "${PERL_VERSION}" "${BUILD_NUMBER}")"
+RELEASE_ID="${PERL_VERSION}-${RELEASE_VERSION}"
 ARTIFACT_BASE="zeroperl-webdyne-${RELEASE_ID}"
 WASM_NAME="${ARTIFACT_BASE}.wasm"
 REACTOR_NAME="zeroperl-webdyne-reactor-${RELEASE_ID}.wasm"
@@ -197,6 +198,7 @@ node tools/create-release-manifest.mjs \
   --artifact-dir "${VERSION_OUTPUT_DIR}" \
   --perl-version "${PERL_VERSION}" \
   --build-number "${BUILD_NUMBER}" \
+  --release-version "${RELEASE_VERSION}" \
   --wasm "${WASM_NAME}" \
   --reactor "${REACTOR_NAME}" \
   --config "${CONFIG_NAME}" \

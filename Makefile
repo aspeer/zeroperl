@@ -6,3 +6,7 @@ cpanfile.snapshot:
 
 cpanfile.snapshot-update:
 	PERL_VERSION="$(PERL_VERSION)" bash tools/cpan-snapshot.sh update
+
+.PHONY: release
+release:
+	node tools/release.mjs prepare

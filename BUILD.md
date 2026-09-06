@@ -55,8 +55,9 @@ make cpanfile.snapshot PERL_VERSION=5.18.4
 PERL_VERSION=5.18.4 ./build.sh run off
 ```
 
-Build numbers come from [release/versions.json](release/versions.json). Choose
-an unused build number for a new build; for example, if 7 is unused:
+The project version comes from [release/versions.json](release/versions.json).
+See [RELEASING.md](RELEASING.md) for make release, paired tags and npm staging.
+For local experiments, override its patch component; for example:
 
 ```sh
 PERL_VERSION=5.44.0 BUILD_NUMBER=7 ./build.sh run off
@@ -278,13 +279,13 @@ module, archive and bootstrap registration survive that profile.
 
 `build.sh` performs container checks and host module smoke tests before moving
 artifacts into their final versioned output paths. The release workflow adds
-further checks. Substitute the build number being validated:
+further checks. Substitute the project release version being validated:
 
 ```sh
 version=5.44.0
-build=7
+release=1.0.7
 artifact_dir="output/$version"
-release_id="$version-$build"
+release_id="$version-$release"
 wasm="$artifact_dir/zeroperl-webdyne-$release_id.wasm"
 prefix="$artifact_dir/perl-wasi-prefix-$release_id"
 
@@ -315,13 +316,13 @@ A normal artifact set contains:
 
 ```text
 output/<perl-version>/
-  zeroperl-webdyne-<perl-version>-<build>.wasm
-  zeroperl-webdyne-reactor-<perl-version>-<build>.wasm
-  perl-wasi-prefix-<perl-version>-<build>/
-  config-<perl-version>-<build>.h
-  third-party-notices-<perl-version>-<build>.tar.gz
-  manifest-<perl-version>-<build>.json
-  SHA256SUMS-<perl-version>-<build>
+  zeroperl-webdyne-<perl-version>-<release-version>.wasm
+  zeroperl-webdyne-reactor-<perl-version>-<release-version>.wasm
+  perl-wasi-prefix-<perl-version>-<release-version>/
+  config-<perl-version>-<release-version>.h
+  third-party-notices-<perl-version>-<release-version>.tar.gz
+  manifest-<perl-version>-<release-version>.json
+  SHA256SUMS-<perl-version>-<release-version>
 ```
 
 The reactor is the linked output before Asyncify; the normal runtime WASM is

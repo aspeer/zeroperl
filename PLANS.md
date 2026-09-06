@@ -139,3 +139,16 @@ Work continues from the uncommitted release preparation on
 
 Final evidence: [RELEASE-QUALIFICATION.md](RELEASE-QUALIFICATION.md). Exact-final
 hosted preview acceptance passes. npm publication remains approval-gated.
+
+
+## Project tags and npm staging
+
+- [x] Use a single project version and paired annotated project/v tags.
+- [x] Add make release for local version preparation and atomic tag creation.
+- [x] Consolidate build, package verification and stage-only submission.
+- [x] Restrict automatic staging to project release tags; normal pushes do not stage.
+- [ ] Configure/verify the npm stage-only trusted publisher and run the first
+  tagged workflow after main integration and an explicitly initiated tag push.
+
+See RELEASING.md for the current release procedure. Earlier entries describing
+per-Perl numbering or disabled staging are historical.

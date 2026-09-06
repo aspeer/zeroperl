@@ -31,3 +31,6 @@ if (!result.success) throw new AggregateError(result.logs, "Bridge build failed"
 const lifecycle = await Bun.file(resolve(bridge, "tools/check-runtime-lifecycle.mjs")).text();
 await Bun.write("tools/check-runtime-lifecycle.mjs", lifecycle.replace("\n",
   "\n// Generated from zeroperl-ts by tools/build-bridge.ts; edit the canonical source.\n"));
+
+const reentry = await Bun.file(resolve(bridge, "tools/check-asyncify-reentry.mjs")).text();
+await Bun.write("tools/check-asyncify-reentry.mjs", reentry.replace("../dist/esm/index.js", "../js/zeroperl.js"));

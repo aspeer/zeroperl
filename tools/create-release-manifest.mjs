@@ -44,6 +44,7 @@ const required = [
   "artifact-dir",
   "perl-version",
   "build-number",
+  "release-version",
   "wasm",
   "reactor",
   "config",
@@ -68,6 +69,7 @@ const manifest = {
   distribution: "zeroperl-webdyne",
   perlVersion: options["perl-version"],
   buildNumber: Number(options["build-number"]),
+  releaseVersion: options["release-version"],
   source: {
     repository: "https://github.com/aspeer/zeroperl",
     revision: options["source-revision"],

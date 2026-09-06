@@ -249,3 +249,21 @@ checks against both the standalone Worker and Perl 5.44; both log the diagnostic
 Temporary tracing confirms WebDyne session removal and extension release.
 Another 200 normal overlap rounds pass after disconnects. No runtime code
 change or warning suppression was retained; hosted behaviour remains untested.
+
+
+## Tag-triggered staging verification
+
+Release-helper integration tests use temporary Git repositories and local bare
+remotes: patch selection, clean-main enforcement, paired annotated tags,
+alias conflicts/mismatches, package-lock updates and no implicit push. Staging
+input integrity tests reject changed tarball bytes without registry access.
+Runtime metadata additionally checks project-version consistency across Perl
+variants. Workflow/action and shell lint pass.
+
+The runtime package builder produced a 1.0.1 package from the previously
+qualified 5.44 binary using a manifest with releaseVersion. The pinned npm
+11.19.1 staging command passed --dry-run; it did not upload. The standalone
+bridge passes 167 Bun tests and installed ESM/CJS/NodeNext checks against the
+exact already-packed archive. No interpreter changes or WASM recompilation were
+needed for these workflow/metadata changes. A real tagged GitHub/OIDC staging
+run remains to be exercised after the maintainer initiates the release push.

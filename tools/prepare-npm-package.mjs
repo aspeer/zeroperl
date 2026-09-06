@@ -69,7 +69,7 @@ const buildNumber = Number(manifest.buildNumber);
 if (!/^5\.(18\.4|36\.3|44\.0)$/.test(perlVersion)) {
   fail(`Unsupported Perl version in manifest: ${perlVersion}`);
 }
-if (!Number.isInteger(buildNumber) || buildNumber < 1) {
+if (!Number.isInteger(buildNumber) || buildNumber < 0) {
   fail(`Invalid build number in manifest: ${manifest.buildNumber}`);
 }
 
@@ -89,7 +89,10 @@ if ((await sha256(noticesPath)) !== manifest.artifacts.notices.sha256) {
 }
 
 const packageName = `@webdyne/webdyne-zeroperl-${perlVersion}`;
-const packageVersion = `${buildNumber}.0.0`;
+const packageVersion = manifest.releaseVersion || `1.0.${buildNumber}`;
+if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(packageVersion) || Number(packageVersion.split(".")[2]) !== buildNumber) {
+  fail("Release version must be valid and its patch component must match buildNumber");
+}
 const wasmName = basename(options.wasm);
 const reactorName = basename(options.reactor);
 const prefixPath = resolve(source, manifest.artifacts.prefix.directory);
@@ -200,7 +203,7 @@ Place the complete application tree in \`app/\`. A minimal project only needs
 the project does not provide its own \`wrangler.jsonc\`.
 
 \`\`\`sh
-npm install ${packageName}@${buildNumber}
+npm install ${packageName}@${packageVersion}
 npx webdyne-cloudflare dev
 \`\`\`
 

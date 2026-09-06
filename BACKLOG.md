@@ -1,10 +1,14 @@
 # Backlog
 
+Current release procedure: [RELEASING.md](RELEASING.md). Project tag staging
+is implemented; verify external package bootstrap/OIDC setup and the first
+tagged GitHub run. Direct publication still requires maintainer approval.
+
 - Configure the binary distribution repository and add its GitHub App-scoped
   promotion job after the repository is supplied.
 - Bootstrap the public `@webdyne` npm package names, configure npm Trusted
-  Publishing for the `webdyne-zeroperl` packages, and replace the deliberately
-  disabled final publication message with an approved OIDC publish step.
+  Publishing for the `webdyne-zeroperl` packages with stage-only permission.
+  The tag-triggered workflow is implemented; its first hosted run remains to be verified.
 - [x] Rebuild and qualify final WebDyne 3.026 artifacts for all three Perls.
 - Automate refreshing `js/zeroperl.js` from the canonical `zeroperl-ts`
   submodule and fail CI if the generated bridge is stale.

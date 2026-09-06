@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import {releaseMetadata} from './release-metadata.mjs';
 import { WASI } from 'node:wasi';
 
 const args = process.argv.slice(2);
@@ -13,12 +14,7 @@ const caseArg = args.find((arg) => arg.startsWith('--case='));
 const requestedCase = caseArg?.slice('--case='.length);
 const positionalArgs = args.filter((arg) => !arg.startsWith('--case='));
 const perlVersion = process.env.PERL_VERSION ?? '5.44.0';
-const versions = JSON.parse(
-  fs.readFileSync(new URL('../release/versions.json', import.meta.url), 'utf8'),
-);
-const buildNumber = process.env.BUILD_NUMBER ?? versions[perlVersion]?.build;
-if (!buildNumber) throw new Error(`Unsupported Perl version: ${perlVersion}`);
-const releaseId = `${perlVersion}-${buildNumber}`;
+const {releaseId} = releaseMetadata(perlVersion, process.env.BUILD_NUMBER ?? '');
 const wasmPath = path.resolve(
   positionalArgs[0] ?? `output/${perlVersion}/zeroperl-webdyne-${releaseId}.wasm`,
 );

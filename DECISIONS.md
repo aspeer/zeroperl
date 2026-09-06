@@ -251,3 +251,15 @@ connection disconnected; a later write can suspend the shared interpreter
 indefinitely. This flag supplies the missing provider event without changing
 Perl, Asyncify or the persistent interpreter architecture. Custom configurations
 must include it too. Long-SSE acceptance checks post-cancellation service.
+
+
+## Project releases through paired tags and npm staging
+
+The project version identifies a source release; Perl versions identify its
+build variants. A prefixed annotated tag triggers the release workflow and a
+matching annotated v tag is an alias. Both must match the version at the same
+main commit. A local helper increments the patch version and creates the tag
+pair; CI does not mutate source, allocate versions, or approve npm publication.
+The inspected tarball is submitted using npm stage publish with stage-only
+OIDC permission. The maintainer approves in npm. This supersedes independent
+Perl build numbering and the previous two-workflow/manual artifact transfer.
