@@ -267,10 +267,12 @@ Perl build numbering and the previous two-workflow/manual artifact transfer.
 
 ## Separate npm runtime payload from diagnostic build evidence
 
-Starting with 1.0.3, the npm package ships only the Asyncify-enabled runtime.
-The raw reactor and full attribution-source archive remain diagnostic build
-artifacts. Compact redistribution notices are generated from verified evidence;
-dedicated legal files and legal comment/POD blocks are preserved verbatim, with
-whole-source fallback for unrecognized formats. SDK notices remain separately
-included. The package budget is 10 MB compressed; the interpreter and provider
-behavior do not change.
+Starting with 1.0.3, npm ships only the Asyncify-enabled runtime, application
+helpers and a version-specific reference to third-party licences. At the
+maintainer's request, legal texts and SDK/bridge notices are delivered in a
+separate deterministic GitHub Release archive. Its link and checksum are
+recorded in npm. The workflow verifies the public licence asset before npm
+staging and refuses to overwrite differing existing assets. Full source
+evidence and the raw reactor remain diagnostic artifacts. The compressed npm
+budget is 6 MB. This supersedes the initial in-package compact-notice layout;
+it does not change component licence obligations or runtime behavior.

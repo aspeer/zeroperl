@@ -334,9 +334,10 @@ archive preserves upstream attribution. ExifTool builds add its script artifact.
 artifacts to prepare a runtime package directory. The canonical TypeScript
 repository bundles the selected WASM, matching manifest and notice archive.
 Keep these build inputs together for verification. The WebDyne npm package
-ships only the production WASM, compact notices and application tooling; the
-reactor and full attribution evidence stay in diagnostic Actions artifacts.
-See RELEASING.md for the 10 MB npm size gate. Applications
+ships only the production WASM, a versioned licence link and application tooling.
+Third-party licence texts are packaged separately for the matching GitHub
+Release; the reactor and full evidence stay in diagnostic Actions artifacts.
+See RELEASING.md for the 6 MB npm size gate and licence publication order. Applications
 install the published packages directly from npm; see
 [WEBDYNE.md](WEBDYNE.md) for installation and usage.
 

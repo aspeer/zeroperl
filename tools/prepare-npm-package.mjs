@@ -3,7 +3,7 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { copyFile, cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { basename, join, relative, resolve } from "node:path";
 
 import { directoryInventory } from "./artifact-inventory.mjs";
@@ -106,23 +106,51 @@ for (const field of ["files", "bytes", "sha256"]) {
 }
 const embeddedFiles = await embeddedFileInventory(prefixPath, perlVersion);
 
+const licenseDirectory = resolve(options["license-destination"] || resolve(destination, "..", "release-licenses"));
+if (licenseDirectory === destination || licenseDirectory.startsWith(destination + "/")) {
+  fail("Release licences must be outside the npm package directory");
+}
+const licenseName = `third-party-licenses-${perlVersion}-${packageVersion}.tar.gz`;
+const licenseArchive = resolve(licenseDirectory, licenseName);
+execFileSync("python3", ["-B", fileURLToPath(new URL("./release-licenses.py", import.meta.url)), noticesPath, licenseArchive, sourceManifestPath], {stdio: "inherit"});
+const releaseUrl = `https://github.com/aspeer/zeroperl/releases/tag/aspeer-zeroperl_${packageVersion}`;
+const licenseUrl = `https://github.com/aspeer/zeroperl/releases/download/aspeer-zeroperl_${packageVersion}/${licenseName}`;
+const licenseHash = await sha256(licenseArchive);
+await writeFile(licenseArchive + ".sha256", `${licenseHash}  ${licenseName}\n`);
+
 await mkdir(destination, { recursive: true });
+// Remove payloads left by an earlier packaging run in this same destination.
+for (const path of ["THIRD-PARTY-LICENSES.txt", "licenses", "third-party-notices.tar.gz", reactorName]) {
+  await rm(resolve(destination, path), {recursive: true, force: true});
+}
 await Promise.all([
   copyFile(wasmPath, resolve(destination, wasmName)),
   copyFile(resolve("LICENSE"), resolve(destination, "LICENSE")),
-  copyFile(resolve("THIRD-PARTY-NOTICES.md"), resolve(destination, "THIRD-PARTY-NOTICES.md")),
-  cp(resolve("licenses"), resolve(destination, "licenses"), { recursive: true }),
   cp(resolve("bin"), resolve(destination, "bin"), { recursive: true }),
   cp(resolve("js"), resolve(destination, "js"), { recursive: true }),
   cp(resolve("lib"), resolve(destination, "lib"), { recursive: true }),
   cp(resolve("scripts"), resolve(destination, "scripts"), { recursive: true }),
 ]);
-const compactNotices = resolve(destination, "THIRD-PARTY-LICENSES.txt");
-execFileSync("python3", [fileURLToPath(new URL("./compact-notices.py", import.meta.url)), noticesPath, compactNotices], {stdio: "inherit"});
+await writeFile(resolve(destination, "THIRD-PARTY-NOTICES.md"), `# Third-party licences and notices
+
+This runtime includes Perl, CPAN modules, WASI support libraries and the
+ZeroPerl JavaScript bridge. These components retain their respective licences.
+The top-level LICENSE covers this project's MIT-licensed source only.
+
+Matching third-party licence and attribution texts, including bridge and SDK
+notices, are supplied separately with release ${packageVersion} (Perl ${perlVersion}):
+
+- [GitHub Release](${releaseUrl})
+- [Download third-party licences](${licenseUrl})
+- SHA-256: \`${licenseHash}\`
+
+The archive includes a build manifest and an inventory of its files and hashes.
+Consult the component licences before redistributing this runtime.
+`);
 const packageManifest = {...manifest, npmPackage: {
   name: packageName, version: packageVersion,
   includedArtifacts: ["wasm"],
-  notices: {filename: "THIRD-PARTY-LICENSES.txt", sha256: await sha256(compactNotices)},
+  notices: {filename: licenseName, url: licenseUrl, releaseUrl, sha256: licenseHash},
 }};
 await writeFile(resolve(destination, "manifest.json"), `${JSON.stringify(packageManifest, null, 2)}\n`);
 await writeFile(resolve(destination, "embedded-files.json"), `${JSON.stringify(embeddedFiles, null, 2)}\n`);
@@ -154,8 +182,6 @@ const packageJson = {
     "lib",
     "manifest.json",
     "THIRD-PARTY-NOTICES.md",
-    "THIRD-PARTY-LICENSES.txt",
-    "licenses",
     "scripts",
     wasmName,
   ],
@@ -195,9 +221,9 @@ The runtime is \`${wasmName}\`. The pre-Asyncify reactor and full attribution
 source archive are diagnostic build artifacts and are not included in npm.
 
 The manifest records build provenance and hashes; not every build artifact is
-shipped in this package. \`THIRD-PARTY-LICENSES.txt\` preserves upstream legal
-texts from the verified build evidence; \`licenses/\` adds bridge and SDK
-licenses. See \`THIRD-PARTY-NOTICES.md\` for scope. The runtime source is
+shipped in this package. Third-party licence and attribution texts are available
+from the [matching GitHub Release](${releaseUrl}). See
+\`THIRD-PARTY-NOTICES.md\` for the archive link and checksum. The runtime source is
 MIT-licensed; embedded components retain their own licenses.
 
 Place the complete application tree in \`app/\`. A minimal project only needs

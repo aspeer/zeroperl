@@ -94,3 +94,11 @@ changes. Curation of the broad notice archive is an optional size improvement.
 - [x] Add a 10 MB package budget and reject diagnostic payloads in npm.
 - [x] Build and qualify 1.0.3, including packed runtime consumers.
 - [ ] Push/stage only when initiated by the maintainer; no public publication.
+
+## GitHub-hosted third-party licences
+
+- [x] Replace npm licence payloads with a versioned release link and checksum.
+- [x] Create a deterministic licence archive with build provenance and inventory.
+- [x] Publish and verify licence assets before npm staging; reject replacements.
+- [ ] Qualify the revised 1.0.3 package and update the unpublished local tag pair.
+- [ ] Push the release to publish licence assets and stage npm when initiated.

@@ -45,7 +45,7 @@ jobs:
       matrix:
         perl: ${{ fromJSON(needs.release.outputs.perls) }}
     permissions:
-      contents: read
+      contents: write
       id-token: write
       attestations: write
     env:
@@ -183,8 +183,6 @@ jobs:
           {
             echo package/LICENSE
             echo package/THIRD-PARTY-NOTICES.md
-            echo package/THIRD-PARTY-LICENSES.txt
-            find licenses -type f -print | sed 's#^#package/#'
             echo package/README.md
             echo package/bin/pagi-runner.pl
             echo package/bin/webdyne-app.pl
@@ -237,6 +235,7 @@ jobs:
             dist/npm/${{ env.RELEASE_ID }}/package/
             dist/npm/${{ env.RELEASE_ID }}/tarball/*.tgz
             dist/npm/${{ env.RELEASE_ID }}/tarball/pack.json
+            dist/npm/${{ env.RELEASE_ID }}/release-licenses/
           if-no-files-found: error
           retention-days: 30
 
@@ -247,5 +246,9 @@ jobs:
           path: dist/github/
           if-no-files-found: error
           retention-days: 90
+      - name: Publish and verify matching third-party licences on GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/publish-release-licenses.mjs "$PACKAGE_DIR/manifest.json" "dist/npm/$RELEASE_ID/release-licenses"
       - name: Submit validated tarball to npm staging
         run: node tools/stage-package.mjs "$NPM_TARBALL" "dist/npm/$RELEASE_ID/tarball/pack.json"

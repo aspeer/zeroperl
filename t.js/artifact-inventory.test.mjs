@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { directoryInventory } from "../tools/artifact-inventory.mjs";
@@ -36,7 +36,22 @@ test("npm packaging rejects a changed prefix even when file counts and sizes mat
     assert.equal(metadata.exports["./zeroperl-reactor.wasm"], undefined);
     assert.ok(!metadata.files.includes("reactor.wasm"));
     assert.ok(!metadata.files.includes("third-party-notices.tar.gz"));
-    assert.match(await readFile(join(root, "package/THIRD-PARTY-LICENSES.txt"), "utf8"), /fixture/);
+    const packaged = await readdir(join(root, "package"));
+    assert.ok(!packaged.includes("THIRD-PARTY-LICENSES.txt"));
+    assert.ok(!packaged.includes("licenses"));
+    assert.ok(!metadata.files.includes("licenses"));
+    assert.match(await readFile(join(root, "package/THIRD-PARTY-NOTICES.md"), "utf8"), /releases\/download\/aspeer-zeroperl_1\.0\.1\/third-party-licenses-5\.44\.0-1\.0\.1\.tar\.gz/);
+    const notice = JSON.parse(await readFile(join(root, "package/manifest.json"), "utf8")).npmPackage.notices;
+    const archive = join(root, "release-licenses", notice.filename);
+    assert.equal(createHash("sha256").update(await readFile(archive)).digest("hex"), notice.sha256);
+    assert.match(execFileSync("tar", ["-xOzf", archive, "THIRD-PARTY-LICENSES.txt"], {encoding: "utf8"}), /fixture/);
+    assert.match(execFileSync("tar", ["-tzf", archive], {encoding: "utf8"}), /licenses\/zeroperl-ts-LICENSE/);
+    // Repacking cleans obsolete on-disk payloads and produces identical licences.
+    await mkdir(join(root, "package/licenses"));
+    await writeFile(join(root, "package/THIRD-PARTY-LICENSES.txt"), "stale");
+    execFileSync(process.execPath, args, {stdio: "pipe"});
+    assert.ok(!(await readdir(join(root, "package"))).includes("licenses"));
+    assert.equal(createHash("sha256").update(await readFile(archive)).digest("hex"), notice.sha256);
     assert.ok(!(await readFile(join(root, "package/index.js"), "utf8")).includes("reactorWasmUrl"));
     await writeFile(join(root, "notices.tar.gz"), "changed");
     assert.throws(() => execFileSync(process.execPath, args, {stdio: "pipe"}), error => {

@@ -1,40 +1,30 @@
 # Third-party notices
 
-The runtime source is distributed under the MIT license in `LICENSE`.
-The generated JavaScript bridge comes from `aspeer/zeroperl-ts`; its Apache 2.0
-license and attribution notice are preserved in `licenses/zeroperl-ts-*`.
-These source licenses do not replace the licenses of the interpreter or its
-embedded modules.
+The runtime source is distributed under the MIT licence in `LICENSE`.
+Perl, embedded CPAN modules, WASI support libraries and the generated
+JavaScript bridge retain their own licences.
 
-Release artifacts also contain Perl, CPAN modules, WASI libc/compiler support,
-zlib, bzip2, and LZ4. The build strips comments from embedded Perl sources, so
-notices must be collected from the matching untrimmed build sources. A prefix
-file/hash inventory identifies the installed payload but does not by itself
-supply those upstream notices.
+The npm package contains a generated `THIRD-PARTY-NOTICES.md` with links to
+its exact GitHub Release and the matching third-party licence archive, plus
+its SHA-256 checksum. The archive is named
+`third-party-licenses-<perl-version>-<package-version>.tar.gz` and attached to
+`https://github.com/aspeer/zeroperl/releases/tag/aspeer-zeroperl_<package-version>`.
+It contains:
 
-Each build preserves complete attribution evidence before comment/POD stripping
-in a checksummed diagnostic archive. That archive includes upstream source,
-metadata and installed SDK files; it is retained with the GitHub Actions
-diagnostic artifacts, not distributed in the npm package.
+- `THIRD-PARTY-LICENSES.txt`: deduplicated verbatim legal texts from verified
+  build evidence, including complete legal comment/POD blocks and whole-file
+  fallback for unfamiliar syntax.
+- `licenses/`: the bridge licence/NOTICE and the matching WASI SDK licences
+  and source references, including `licenses/wasi-sdk-27/SOURCES.json`.
+- `build-manifest.json` and `inventory.json`: provenance and file hashes.
 
-The npm package carries THIRD-PARTY-LICENSES.txt instead. It retains verbatim
-dedicated notice/license/README files and complete source comment or POD blocks
-containing legal text, deduplicated by content with all original source paths.
-Unrecognized legal-text syntax falls back to the complete original source file.
-The scope conservatively includes build-only components. No license is inferred
-solely from npm's top-level license field. tools/compact-notices.py generates
-this file from checksum-verified evidence.
+`tools/release-licenses.py` creates this deterministic archive outside the npm
+package. The release workflow uploads it and its checksum to the public GitHub
+Release before npm staging. Existing assets are verified and never overwritten.
+The full source-evidence archive remains in the diagnostic Actions artifact.
 
-The installed SDK evidence is excluded from the compact text because the
-matching SDK licenses and source references are shipped in licenses/wasi-sdk-27.
-This separates redistribution notices from bulky development evidence without
-requiring npm users to download a second archive.
-
-The standalone toolchain notices omitted from the installed SDK archive have
-been added under `licenses/wasi-sdk-27`. `SOURCES.json` records the exact
-wasi-libc and LLVM/compiler-rt revisions selected by the
-[WASI SDK 27 source tree](https://github.com/WebAssembly/wasi-sdk/tree/wasi-sdk-27),
-upstream URLs, and SHA-256 hashes. The collection includes the additional
-licenses referenced by wasi-libc's top-level LICENSE. These supplement the
-compact notices in the WebDyne runtime package. The standalone TypeScript
-package retains its separate packaging policy.
+This external distribution layout is the maintainer's requested packaging
+policy; it does not change any component's redistribution requirements or
+establish that a link alone satisfies them. The top-level npm MIT field does
+not replace embedded-component licences. The standalone TypeScript package
+retains its separate packaging policy.
