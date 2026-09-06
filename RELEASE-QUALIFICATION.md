@@ -1,6 +1,61 @@
 # Final release qualification — 2026-09-06
 
-## Current 1.0.3 candidate: externally hosted third-party licences
+## Current 1.0.3 candidate: minimal propagated runtime notices
+
+This candidate supersedes both the link-only and broad in-package notice
+candidates below. The shared local artifact paths now contain this candidate.
+The unpublished annotated tag pair points to clean source
+`8b6a9f816b0a7cd23c754e1f35a0d257108b6846`; GitHub was checked before updating
+the tags. The bridge remains pinned to `7e91d2c`, Perl is 5.44.0 and WebDyne is
+3.026. A packaged bridge comment identifies its upstream origin and modifications.
+
+- npm: **4,835,121 bytes**, 24 files, 14,980,298 bytes unpacked.
+- npm SHA-256: `e9a56ed8a9ad6f375b41bbc26cbbe8ac4628340b41a8eb37bf2bf4bfa5fd73e6`.
+- WASM SHA-256: `94f5261359a3107881f8bdfad367a4b39520d08cc5b6cf13718e4b27aee34cac`.
+- Bundled notices: **334,334 bytes** (about 59 KB gzip), down from 11,898,252.
+- Notice SHA-256: `c7dae973ec7fedb4a79959ef2075ac3482ccf18593cc97fc4b9e86ade81ec4d4`.
+- Review inventory SHA-256: `8b16ae4c8892741c973543593d6bc1aad60a4ef3b5bb182739ab4b0980e1588b`.
+- Supplemental GitHub archive: 3,761,264 bytes.
+- Supplemental SHA-256: `c0743f7f526121de1231a724ac8b8d03dd908b505d63b2cf604bf0273bab3825`.
+
+The reviewed inventory covers 82 component groups, including 74 installed CPAN
+distributions. It excludes 18 absent CPAN tool distributions and implementation/
+manual bulk while preserving applicable copyright notices, grants and exceptions.
+Common Apache and Artistic terms are shared; the Artistic option is selected
+where offered. Unicode licences and compiler-rt's referenced contributor list
+are included. The broader collection and reviewed extraction inventory remain
+outside npm in the supplemental archive. See `release/licences/README.md`.
+
+The final notice file is byte-identical when generated from the earlier GitHub
+x86_64 evidence and this local aarch64 build. Guards permit identified generated
+host metadata differences while binding actual payload paths/code, snapshots,
+linking/build inputs and notice sources. New module or licence changes require
+review. Only the default 5.44.0 release profile is currently qualified by this
+inventory; other buildable Perl versions need their own notice inventories.
+
+Passed: 26 Node tests; the runtime-notice regression test (exact excerpt
+preservation, shared attribution, stale/changed/invalid source rejection and
+host metadata tolerance); three broad-extraction tests; release workflow lint;
+CPAN/XS versions; XS magic; 24 lifecycle checks; 100 Asyncify re-entry rounds;
+embedded INC/core/Socket/release probes; attribution and artifact checksums;
+exact npm inventory; bundled notice/policy hashes; supplemental archive inventory
+and matching build provenance; staging and licence-publisher check-only.
+
+Offline installation of this exact tarball passed. Local Worker acceptance
+passed 100 overlap rounds (600 requests), SSE completion followed by WebSocket
+echo and HTTP verification of WebDyne 3.026/Perl 5.44. Lifecycle checks also
+passed against the packaged bridge with its attribution banner. No hung-request,
+memory-trap, SpanParent or cross-request I/O diagnostic appeared. Earlier
+long-lived/storage/hosted results below remain historical; this packaging
+revision was not uploaded to Cloudflare.
+
+No push, GitHub licence upload, npm staging or npm approval was performed.
+The local tarball is under `dist/npm/5.44.0-1.0.3/tarball/`, with notices in
+`package/THIRD-PARTY-LICENSES.txt` and supplemental evidence in `release-licenses/`.
+Temporary evidence logs use `/tmp/zeroperl-reviewed-notices-*.log`.
+
+
+## Superseded 1.0.3 candidate: externally hosted third-party licences
 
 This candidate supersedes the earlier 8.40 MB package below. Both unpublished
 local tags were updated to clean source `a90f925048b76249e698114691f1607137fc31ef`

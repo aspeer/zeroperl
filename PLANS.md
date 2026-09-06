@@ -177,6 +177,6 @@ per-Perl numbering or disabled staging are historical.
 - [x] Supplement Unicode licences and compiler-rt's referenced contributor list.
 - [x] Bind packaging to the reviewed inventory, allowing known host metadata differences.
 - [x] Confirm identical notices from local and GitHub build evidence.
-- [ ] Qualify the final 1.0.3 package and update unpublished release tags.
+- [x] Qualify the final 1.0.3 package and update unpublished release tags.
 - [ ] Add separate inventories before packaging Perl 5.18/5.36 variants.
 - [ ] Push/stage when initiated by the maintainer; no npm approval performed.
