@@ -16,5 +16,6 @@
     "build:bridge": "bun tools/build-bridge.ts",
     "test:cloudflare-package": "node --test t.js/*.test.mjs",
     "verify:embedded-inc": "node tools/verify-embedded-inc.mjs"
-  }
+  },
+  "version": "1.0.0"
 }
