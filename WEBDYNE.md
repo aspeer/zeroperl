@@ -167,7 +167,55 @@ after 10 seconds fails waiting requests instead of serving a partially started
 application. The timer cannot interrupt CPU-bound Perl that does not yield.
 Diagnostics are logged and requests receive the normal runtime error response.
 
-This initial implementation supplies startup dispatch only. It does not call
-shutdown on retirement, configure user callbacks, copy lifespan state into
-requests, or expose Cloudflare service capabilities to lifespan. Existing
-request-scoped D1/KV/R2 access is unchanged. No package.json setting is required.
+The host currently supplies startup dispatch only. It does not call shutdown
+on retirement, copy lifespan state into requests, or expose Cloudflare service
+capabilities to lifespan. Existing request-scoped D1/KV/R2 access is unchanged.
+No setting is required for the default WebDyne stub.
+
+
+### Optional lifespan callbacks (development)
+
+Configure qualified Perl function names, without parentheses:
+
+```json
+{
+  "webdyne": {
+    "perlLibrary": "lib",
+    "lifespan": {
+      "startup": "My::App::startup",
+      "shutdown": "My::App::shutdown"
+    }
+  }
+}
+```
+
+Place the module in `lib/My/App.pm`. The existing `perlLibrary` packaging
+mechanism makes it available through Perl's `@INC`; a CPAN or extension library
+can also supply the module. Neither callback is required. Omit the key to disable
+it; empty strings, nulls, unqualified names and Perl expressions are rejected.
+
+Generated Wrangler configuration contains `WEBDYNE_STARTUP` and
+`WEBDYNE_SHUTDOWN`. If you supply your own Wrangler configuration, set those
+string bindings there: the scaffold preserves supplied configuration. Callback
+settings are fixed for each interpreter generation.
+
+The bootstrap loads the modules and resolves the named functions before creating
+WebDyne. Each callback receives `($app_or, $scope_hr)`. A normal return succeeds;
+a returned Future is awaited before acknowledgement. An exception or failed
+Future produces the matching lifespan failure event. Missing modules/functions
+fail bootstrap. The existing 10-second startup acknowledgement limit includes
+callback execution after application loading. Callback code has a lifespan
+scope, not a PSP request object or Cloudflare request capabilities.
+
+Both names are loaded and passed to WebDyne, but the current Worker dispatches
+only startup. A configured shutdown callback will not run until graceful
+shutdown dispatch is implemented. State propagation and shared D1/KV/R2 objects
+remain separate work.
+
+**Runtime prerequisite:** these settings require the WebDyne implementation
+merged in `pm-WebDyne` commit `645cf4d5` (or its callback-supporting successor).
+Existing 1.0.4 WASM artifacts predate this change. The bootstrap detects missing
+callback support and fails clearly instead of silently ignoring it. Until a new
+artifact is built, development verification uses an explicit updated WebDyne
+library overlay through the existing `perlLibrary` mechanism. No runtime binary
+or published package was updated by this change.

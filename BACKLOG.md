@@ -139,8 +139,8 @@ changes. Curation of the broad notice archive is an optional size improvement.
 
 - Add graceful shutdown dispatch for controlled, healthy interpreter disposal;
   do not promise a callback on isolate eviction or WASM traps.
-- Design optional portable WebDyne startup/shutdown callbacks and their scaffold
-  configuration only when requested.
+- [x] Add portable WebDyne startup/shutdown callbacks and scaffold function-name
+  configuration (core merge 645cf4d5; development integration 2026-09-07).
 - Add Perl-owned lifespan state and shallow request-state propagation.
 - Define interpreter-lifetime Cloudflare capabilities before sharing D1/KV/R2
   facades created during startup. Current capabilities remain request-scoped.
@@ -155,3 +155,6 @@ changes. Curation of the broad notice archive is an optional size improvement.
 - Investigate large base64-heavy JSON encoding only if profiling warrants it:
   the shared XS codec improves small events/polling substantially but the 64 KiB
   body microbenchmark is 12% slower in WASM. See `t/runtime/bench-runner.pl.md`.
+
+- Rebuild/qualify a runtime with the merged WebDyne lifespan callbacks before
+  publishing a package that supports callbacks without a library overlay.

@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { buildApplicationArchives } from "./build-vfs.mjs";
 import { installCpanDependencies } from "./install-cpan.mjs";
 import { defaultAssetsIgnore, readAssetsPolicy } from "./assets.mjs";
+import { lifespanCallbackName } from "../js/runtime/config.js";
 import {
   extensionConfiguration,
   extensionWorkerSource,
@@ -65,6 +66,18 @@ function assertObject(value, description) {
     throw new Error(`${description} must be an object`);
   }
   return value;
+}
+
+function lifespanBindings(value) {
+  const lifespan = assertObject(value, "package.json webdyne.lifespan");
+  const bindings = {};
+  for (const [phase, callback] of Object.entries(lifespan)) {
+    if (!["startup", "shutdown"].includes(phase)) {
+      throw new Error(`Unknown package.json webdyne.lifespan option: ${phase}`);
+    }
+    bindings[`WEBDYNE_${phase.toUpperCase()}`] = lifespanCallbackName(callback, `webdyne.lifespan.${phase}`);
+  }
+  return bindings;
 }
 
 // Check lexical containment, including the parent itself; symlinks are checked separately.
@@ -147,6 +160,7 @@ async function readProject(projectRoot) {
   }
   const packageJson = JSON.parse(await readFile(packagePath, "utf8"));
   const webdyne = assertObject(packageJson.webdyne, "package.json webdyne");
+  lifespanBindings(webdyne.lifespan);
   const cloudflare = assertObject(webdyne.cloudflare, "package.json webdyne.cloudflare");
   const extensions = extensionConfiguration(webdyne.extensions);
   const libraries = webdyne.perlLibrary === undefined
@@ -409,6 +423,7 @@ export async function generatedWranglerConfig(projectRoot, project, options, out
       WEBDYNE_ROOT: "/app",
       WEBDYNE_INDEX: options.entry,
       WEBDYNE_STATIC: project.webdyne.static === false ? "0" : "1",
+      ...lifespanBindings(project.webdyne.lifespan),
     },
     rules: [
       { type: "Text", globs: ["**/*.pl", "**/*.pm"], fallthrough: false },

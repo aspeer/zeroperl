@@ -368,3 +368,19 @@ and no Cloudflare request extensions are attached to lifespan. State propagation
 custom callbacks and persistent service capabilities are separate follow-ups.
 The retained lifespan Future is not attached to `waitUntil`: request completion
 already waits for startup, and the stub thereafter waits without active I/O.
+
+
+## Named WebDyne lifespan callbacks (2026-09-07)
+
+The portable WebDyne constructor owns callback execution and event replies.
+The scaffold carries qualified function names in WEBDYNE_STARTUP/SHUTDOWN;
+Perl loads the module by a validated filename and resolves its symbol without
+evaluating configuration as source. The runtime validates names before attaching
+request extensions so malformed configuration cannot leak capabilities.
+
+Callback settings are opt-in. Bootstrap checks the public lifespan_callback
+method as a capability marker because the unreleased core change does not yet
+have a distinct release version. Existing binaries remain usable without
+callbacks; configured callbacks require a new core or explicit library overlay.
+Both callbacks are passed through, while the host continues to dispatch startup
+only. This preserves the established incremental lifecycle scope.

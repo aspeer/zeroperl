@@ -435,6 +435,7 @@ export function createWebDyneRuntime({
   }
 
   function dispatch(request, bindings = {}) {
+    const runtimeConfig = webdyneRuntimeConfig(bindings);
     const scope = buildPagiScope(request);
     const releaseExtensions = extensionManager.attachScope({ scope, bindings, request });
     let transport;
@@ -448,7 +449,7 @@ export function createWebDyneRuntime({
       scope,
       request,
       transport,
-      webdyneRuntimeConfig(bindings),
+      runtimeConfig,
     ).catch((error) => {
       if (!error?.pagiErrorId) console.error("PAGI application failed:", error);
     }).finally(() => {

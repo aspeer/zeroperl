@@ -374,3 +374,26 @@ input preservation and recovery after malformed JSON. Run with `prove`, or use
 `t/runtime/test-runner-json.mjs <artifact.wasm>` for the same assertions in WASM.
 The reproducible native/WASM benchmark commands, measurements and limitations
 are recorded in `t/runtime/bench-runner.pl.md`.
+
+
+## Named lifespan callback integration (2026-09-07)
+
+- `npm run test:cloudflare-package`: all 50 JavaScript tests pass. New tests
+  cover callback names, generated bindings, invalid settings before building,
+  and preservation of explicit Wrangler configuration.
+- `prove -I/path/to/pm-WebDyne/lib t/runtime/lifespan-callbacks.t
+  t/runtime/lifespan.t t/runtime/webdyne-error-isolation.t` (one command):
+  35 native assertions pass against the merged core.
+- `node t/runtime/smoke-lifespan-callbacks.mjs
+  output/5.44.0/zeroperl-webdyne-5.44.0-1.0.4.wasm /path/to/pm-WebDyne/lib`
+  (one command): passes old-core rejection, configured async startup once
+  before concurrent/warm requests, missing modules/functions and callback errors.
+  The new core module is explicitly overlaid into the test VFS.
+- Local Wrangler 4.127.1 with generated callback bindings, the existing 1.0.4
+  Perl 5.44 artifact, and the merged core overlay passes concurrent cold HTTP,
+  SSE, WebSocket echo and warm HTTP; PSP observes startup-count=1.
+
+Shutdown invocation is covered by native bootstrap and the core's native/WASM
+callback tests. The Worker does not yet send shutdown. No TypeScript changed,
+no root lint configuration exists, and no new binary or remote deployment was
+produced.

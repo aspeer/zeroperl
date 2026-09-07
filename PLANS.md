@@ -288,3 +288,20 @@ No WASM rebuild, commit, push, merge or deployment was performed for this step.
   Cpanel::JSON::XS codec on `codex/pagi-runner-json-xs`.
 - [x] Compare warmed native/WASM runner benchmarks and validate JSON semantics,
   lifespan integration, and package tests. See `t/runtime/bench-runner.pl.md`.
+
+
+## Named lifespan callbacks (2026-09-07)
+
+After successful native/WASM tests, portable startup/shutdown callbacks were
+merged into `pm-WebDyne` main as `645cf4d5`. Continued on this repository's
+existing development branch without modifying its earlier checkpoints.
+
+- [x] Validate `webdyne.lifespan.startup` and `.shutdown` function names.
+- [x] Emit generated Worker bindings and translate them into bootstrap config.
+- [x] Load modules, resolve coderefs and pass both callbacks to WebDyne.
+- [x] Reject older embedded cores that would silently ignore callback options.
+- [x] Test native bootstrap, async startup in WASM and local Worker HTTP/SSE/WS.
+
+No core binary rebuild, shutdown host dispatch, shared state or Cloudflare
+capability changes are included. Source and runtime compatibility requirements
+are documented in WEBDYNE.md.

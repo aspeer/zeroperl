@@ -36,6 +36,14 @@ Future::IO->override_impl('Future::IO::Impl::ZeroPerl');
 use vars qw($CONFIG);
 $CONFIG={} unless defined($CONFIG);
 
+my %callback;
+foreach my $phase (qw(startup shutdown)) {
+    next unless defined($CONFIG->{$phase});
+    die "Configured lifespan callbacks require updated WebDyne::PAGI; update the WASM runtime or provide a Perl library overlay\n"
+        unless WebDyne::PAGI->can('lifespan_callback');
+    $callback{$phase}=resolve_callback($CONFIG->{$phase});
+}
+
 #  The root is inside the ZeroPerl virtual filesystem. No filename override is
 #  supplied, so WebDyne performs its normal request-path to PSP-file dispatch.
 #
@@ -44,7 +52,24 @@ my $app_cr=WebDyne::PAGI->new(
     index  => defined($CONFIG->{'index'}) ? $CONFIG->{'index'} : 'app.psp',
     static => defined($CONFIG->{'static'}) ? $CONFIG->{'static'} : 1,
     conf   => defined($CONFIG->{'conf'}) ? $CONFIG->{'conf'} : 0,
+    %callback,
 )->to_app();
+
+
+sub resolve_callback {
+
+    my ($name)=@_;
+    die "Lifespan callback must be a qualified Perl function name without parentheses\n"
+        unless (!ref($name)&&($name=~/\A([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)::([A-Za-z_][A-Za-z0-9_]*)\z/));
+    my $module=$1;
+    my $module_fn=$module;
+    $module_fn=~s{::}{/}g;
+    $module_fn.='.pm';
+    eval { require $module_fn; 1 } or die "Unable to load lifespan callback $name: $@";
+    no strict 'refs';
+    my $callback_cr=*{$name}{'CODE'} or die "Lifespan callback $name is not defined\n";
+    return $callback_cr;
+}
 
 
 sub application {
