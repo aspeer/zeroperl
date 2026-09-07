@@ -152,3 +152,22 @@ maintain your own Wrangler configuration, include this flag in
 `compatibility_flags` as well. The runtime uses `Request.signal` to stop a
 disconnected SSE session before a later stream write can block the persistent
 interpreter. A recent compatibility date alone does not enable this behaviour.
+
+
+## Application startup (development)
+
+The development runtime sends `lifespan.startup` through the PAGI application
+when it lazily creates a Perl interpreter. This reaches WebDyne's existing
+`handler_lifespan` stub. Requests wait for `lifespan.startup.complete`; concurrent
+first requests share one startup, and warm requests reuse that interpreter.
+Startup runs again if a failed interpreter is replaced.
+
+Startup failure, premature application completion, or a missing acknowledgement
+after 10 seconds fails waiting requests instead of serving a partially started
+application. The timer cannot interrupt CPU-bound Perl that does not yield.
+Diagnostics are logged and requests receive the normal runtime error response.
+
+This initial implementation supplies startup dispatch only. It does not call
+shutdown on retirement, configure user callbacks, copy lifespan state into
+requests, or expose Cloudflare service capabilities to lifespan. Existing
+request-scoped D1/KV/R2 access is unchanged. No package.json setting is required.

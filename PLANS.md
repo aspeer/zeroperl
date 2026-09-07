@@ -236,6 +236,51 @@ Only main and development remain locally and on github/origin, verified against
 remote heads after deleting branches already contained in main. Both branches
 contain the release changes; development tracks origin/development.
 
+
+## Conventional test directory (2026-09-07)
+
+Move tests/ to t/ on development, preserving its subdirectory structure and
+keeping t.js/ for JavaScript package tests. Update Docker, CI, smoke runners
+and documentation; refresh the reviewed Dockerfile hash for the path-only
+change. Verify native, WASM and release-tooling checks from the new locations.
+
+Completed: all 26 test files moved and old path references removed. Verification
+passes: 45 JavaScript tests, four Python notice tests, SFS C/generator suites,
+12 native request assertions, 10 container CPAN-lock assertions, WASM smoke,
+actionlint and npm package preparation with the refreshed inventory hash.
+The separate host-native XS test cannot start because Sub::Name is missing;
+no dependency installation or release rebuild was performed for this rename.
+
+
+## Cloudflare CLI cleanup (2026-09-07)
+
+Completed on `codex/cloudflare-cli-cleanup`: documented every function in
+`scripts/webdyne-cloudflare.mjs`, moved option lookup setup outside the parser
+loop, and shared check/deploy dry-run dispatch. Configuration and command
+behavior are preserved. D1/KV/R2 binding translation remains in the deployment
+CLI; service calls and Perl marshalling belong to `pm-WebDyne-Cloudflare`.
+Validation: all 45 JavaScript package tests and Node syntax checking pass.
+No Perl or WASM runtime changes, dependency additions or publication.
+
+
+## Basic PAGI lifespan startup (2026-09-07)
+
+Implemented on the user-requested `development` branch, preserving existing
+uncommitted work. This first step connects the host to the existing
+`WebDyne::PAGI::handler_lifespan` through the normal application interface.
+
+- [x] Add a dedicated startup transport using the existing PAGI session runner.
+- [x] Gate first requests on `lifespan.startup.complete`, once per interpreter
+  generation, with a 10-second acknowledgement timeout and failure containment.
+- [x] Retain the lifespan session until interpreter retirement; release pending
+  host waits during reset without attempting to re-enter a broken interpreter.
+- [x] Verify native WebDyne, real Perl 5.44 WASM, and local Worker HTTP/SSE/WS.
+- [x] Document the limited scope and subsequent increments in BACKLOG.md.
+
+No custom callback configuration, lifespan state propagation, generic app
+loading, service capability changes, or graceful shutdown dispatch is included.
+No WASM rebuild, commit, push, merge or deployment was performed for this step.
+
 ## PAGI runner JSON optimization (2026-09-07)
 
 - [x] Preserve the current working runner as the benchmark baseline.

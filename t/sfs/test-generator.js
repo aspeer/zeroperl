@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// tests/sfs/test-generator.js
+// t/sfs/test-generator.js
 // Unit-style tests for tools/sfs.js output generation only.
 // Limitation: these tests do not execute stubs/zeroperl.c runtime decode path;
 // runtime behavior must be validated separately in integration tests.
 //
-// Run: node tests/sfs/test-generator.js
+// Run: node t/sfs/test-generator.js
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
@@ -136,7 +136,7 @@ function makeTestCorpus(dir) {
 // Tests
 // ---------------------------------------------------------------------------
 
-console.log("\ntests/sfs/test-generator.js");
+console.log("\nt/sfs/test-generator.js");
 console.log("=====================================");
 
 test("produces all three output files", () => {

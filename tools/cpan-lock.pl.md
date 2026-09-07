@@ -16,5 +16,5 @@ Internal build helper using Carton's snapshot parser under the selected Perl.
 
 This helper does not resolve versions. Missing files, changed inputs, invalid
 archive paths, and checksum failures are fatal. Metadata records checksums, not
-another version selection. Test with `prove tests/cpan/lock.t` under a Perl with
+another version selection. Test with `prove t/cpan/lock.t` under a Perl with
 Carton installed (the `native-perl-tools` image provides it).

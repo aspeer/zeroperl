@@ -396,7 +396,7 @@ Smoke testing:
 - [tools/wasm-smoke.mjs](tools/wasm-smoke.mjs) runs core and core-mod smoke tests.
 - When `ZEROPERL_EMBED_PREFIX=true`, it runs inside the Dockerfile build (embedded SFS provides modules).
 - When `false`, it runs on the host via [build.sh](build.sh) with the prefix directory mounted into the MemoryFileSystem.
-- [tests/smoke/core-smoke.pl](tests/smoke/core-smoke.pl) exercises: strict, warnings, File::Spec, Data::Dumper, Encode, Digest::MD5, List::Util, IO::File, Cwd, Fcntl, File::Glob, MIME::Base64, POSIX, and basic regex/string operations.
+- [t/smoke/core-smoke.pl](t/smoke/core-smoke.pl) exercises: strict, warnings, File::Spec, Data::Dumper, Encode, Digest::MD5, List::Util, IO::File, Cwd, Fcntl, File::Glob, MIME::Base64, POSIX, and basic regex/string operations.
 
 ## Source Directory Roles
 
@@ -405,8 +405,8 @@ Smoke testing:
 - [tools/](tools): shrink generation, smoke tooling, size reporting, utility scripts.
 - [gen/](gen): generated and tracked shrink artifacts plus generated embedding inputs.
 - [patches/](patches): source patches applied during WASI Perl build (`patch_glob.pl` for all versions, `patch_mg.pl` when `OLD_PERL`, `patch_sv_locale.pl` for 5.28.x).
-- [tests/smoke/](tests/smoke): sample corpus for smoke coverage.
-- [tests/sfs/](tests/sfs): native C unit tests for the SFS runtime and compression layer.
+- [t/smoke/](t/smoke): sample corpus for smoke coverage.
+- [t/sfs/](t/sfs): native C unit tests for the SFS runtime and compression layer.
 
 ## Extension and Change Guidelines
 

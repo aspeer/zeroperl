@@ -348,3 +348,23 @@ only the greatest supported Perl version. Both use the same project semver and
 runtime bytes. Each package has independent npm trusted-publisher configuration
 and staging/approval. Refresh CPAN locks and review the 3.027 notice inventory
 before qualification. Download any first-name seed candidate locally.
+
+
+## Basic PAGI lifespan startup (2026-09-07)
+
+The provider-neutral JavaScript runtime starts a dedicated `lifespan` session
+through `Pagi::ZeroPerl::Runner::start_session` and the same
+`Pagi::WebDyne::application` entry point used for requests. WebDyne dispatches
+to its existing `handler_lifespan`; the host does not call framework methods
+directly. Startup acknowledgement gates the shared runtime promise, while
+the application Future stays pending. A missing acknowledgement times out after
+10 seconds of schedulable host time; this is not a CPU-interruption mechanism.
+Startup errors retire the generation and fail waiting requests; a later request
+may construct a replacement and repeat startup.
+
+This increment implements startup only. Retirement drops the session and its
+host waiters, with no fabricated shutdown event. No `state` field is advertised,
+and no Cloudflare request extensions are attached to lifespan. State propagation,
+custom callbacks and persistent service capabilities are separate follow-ups.
+The retained lifespan Future is not attached to `waitUntil`: request completion
+already waits for startup, and the stub thereafter waits without active I/O.

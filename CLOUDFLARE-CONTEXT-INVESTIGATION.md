@@ -74,7 +74,7 @@ The approved provider correction now registers every session completion with
 acceptance installation, which rebuilt the Worker before testing.
 
 - All 17 runtime JavaScript tests pass.
-- `ROUNDS=1000 node tests/runtime/smoke-stream-overlap.mjs BASE_URL` passes:
+- `ROUNDS=1000 node t/runtime/smoke-stream-overlap.mjs BASE_URL` passes:
   6,000 overlapping HTTP/SSE/WebSocket requests in the persistent interpreter.
 - D1 (including 24 concurrent reads and 8 batch checks), KV and R2 operation
   and cleanup suites pass while overlap traffic runs.
@@ -110,7 +110,7 @@ on Wrangler 4.127.1 / workerd 1.20260828.1 and on 4.129.0 / 1.20260903.1.
 A no-echo control also reproduces it. Explicit server close/error handlers merely
 change the diagnostic to 'Network connection lost'; no workaround was retained.
 
-The dependency-free fixture and client in `tests/runtime/hung-request` provide
+The dependency-free fixture and client in `t/runtime/hung-request` provide
 an upstream reproduction. Its client also reproduces the WebDyne warning while
 follow-up HTTP succeeds. Following forced disconnects, another 200 normal overlap
 rounds pass. No production runtime changes are justified by these experiments.

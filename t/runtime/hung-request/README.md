@@ -9,8 +9,8 @@ WebSocket close handshake:
 Using an installed Wrangler CLI, from the repository root:
 
 ```sh
-wrangler dev --config tests/runtime/hung-request/wrangler.json --local --ip 127.0.0.1 --port 8898
-node tests/runtime/hung-request/smoke.mjs http://127.0.0.1:8898/
+wrangler dev --config t/runtime/hung-request/wrangler.json --local --ip 127.0.0.1 --port 8898
+node t/runtime/hung-request/smoke.mjs http://127.0.0.1:8898/
 ```
 
 The dependency-free Node client performs 20 WebSocket handshakes, sends masked

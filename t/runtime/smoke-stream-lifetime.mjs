@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {setTimeout as delay} from 'node:timers/promises';
 const base=process.argv[2];
-if (!base) throw new Error('Usage: node tests/runtime/smoke-stream-lifetime.mjs BASE_URL');
+if (!base) throw new Error('Usage: node t/runtime/smoke-stream-lifetime.mjs BASE_URL');
 const socket=new WebSocket(new URL('ws.psp',base.replace(/^http/,'ws')));
 await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});
 async function echo(text){
