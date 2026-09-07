@@ -2,7 +2,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import ignore from "ignore";
 
-export const defaultAssetsIgnore = "*.psp\n*.pm\n*.pl\n*.conf\n";
+export const defaultAssetsIgnore = "*.psp\n*.pagi\n*.pm\n*.pl\n*.conf\n";
 
 // Wrangler 4.127.1 reads one root file, with these defaults, using node-ignore.
 // Keep the matching order (including user negations) identical to Wrangler.

@@ -21,4 +21,15 @@ cause a shutdown invocation. No shared state or Cloudflare capability lifetime
 change is implied.
 
 `Future::IO` timer setup precedes callback module loading. Existing WebDyne
-environment setup and per-request diagnostic clearing remain in this bootstrap.
+environment setup applies only to the PSP branch. WebDyne 3.028 handles
+per-request diagnostic clearing internally.
+
+When `index` (the `WEBDYNE_INDEX` binding) ends in `.pagi`, the bootstrap loads
+that file relative to `root` once. Absolute filenames are also accepted. The
+file must return a PAGI application coderef accepting `(scope, receive, send)`.
+Every scope and path is passed directly to it, including lifespan, HTTP, SSE
+and WebSocket traffic. No WebDyne modules, routing or static middleware are
+loaded, and WebDyne startup/shutdown callback settings do not apply. The app
+must acknowledge lifespan startup using the PAGI protocol before requests run.
+Newly initialized projects exclude `*.pagi` from static uploads; existing
+custom `.assetsignore` files remain unchanged and must include that rule.

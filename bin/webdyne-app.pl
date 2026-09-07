@@ -6,25 +6,6 @@ use warnings;
 use Future::IO;
 use Future::IO::Impl::ZeroPerl;
 
-#  WebDyne::PAGI deliberately localizes %ENV to a small request-safe set while
-#  rendering a page. Register the runtime-owned temporary directory before that
-#  module captures its environment baseline, so File::Temp and application code
-#  continue to see TMPDIR during every HTTP, SSE, and WebSocket request.
-#
-BEGIN {
-    $ENV{'TMPDIR'}='/tmp' unless defined($ENV{'TMPDIR'});
-
-    #  Loading the PAGI constants before WebDyne::PAGI would otherwise make
-    #  WebDyne's normal module-presence probe observe a partially initialized
-    #  runtime. This public environment override states the known host mode.
-    #
-    $ENV{'WEBDYNE_PAGI'}='1' unless defined($ENV{'WEBDYNE_PAGI'});
-    require WebDyne::PAGI::Constant;
-    $WebDyne::PAGI::Constant::Constant{'WEBDYNE_PAGI_ENV_SET'}->{'TMPDIR'}=$ENV{'TMPDIR'};
-}
-
-use WebDyne::PAGI;
-
 #  Install the Worker timer backend before any PSP can call PAGI::SSE->every().
 #
 Future::IO->override_impl('Future::IO::Impl::ZeroPerl');
@@ -36,25 +17,42 @@ Future::IO->override_impl('Future::IO::Impl::ZeroPerl');
 use vars qw($CONFIG);
 $CONFIG={} unless defined($CONFIG);
 
-my %callback;
-foreach my $phase (qw(startup shutdown)) {
-    next unless defined($CONFIG->{$phase});
-    die "Configured lifespan callbacks require updated WebDyne::PAGI; update the WASM runtime or provide a Perl library overlay\n"
-        unless WebDyne::PAGI->can('lifespan_callback');
-    $callback{$phase}=resolve_callback($CONFIG->{$phase});
+my $root=defined($CONFIG->{'root'}) ? $CONFIG->{'root'} : '/app';
+my $index=defined($CONFIG->{'index'}) ? $CONFIG->{'index'} : 'app.psp';
+my $app_cr;
+if ($index=~/\.pagi\z/) {
+    require File::Spec;
+    require Scalar::Util;
+    my $app_fn=File::Spec->rel2abs($index, $root);
+    $app_cr=do $app_fn;
+    die "Unable to load PAGI application $app_fn: $@" if $@;
+    die "Unable to load PAGI application $app_fn: $!\n" unless defined($app_cr);
+    die "PAGI application $app_fn must return a coderef\n"
+        unless (Scalar::Util::reftype($app_cr) || '') eq 'CODE';
 }
-
-#  The root is inside the ZeroPerl virtual filesystem. No filename override is
-#  supplied, so WebDyne performs its normal request-path to PSP-file dispatch.
-#
-my $app_cr=WebDyne::PAGI->new(
-    root   => defined($CONFIG->{'root'}) ? $CONFIG->{'root'} : '/app',
-    index  => defined($CONFIG->{'index'}) ? $CONFIG->{'index'} : 'app.psp',
-    static => defined($CONFIG->{'static'}) ? $CONFIG->{'static'} : 1,
-    conf   => defined($CONFIG->{'conf'}) ? $CONFIG->{'conf'} : 0,
-    %callback,
-)->to_app();
-
+else {
+    #  Register TMPDIR before WebDyne captures its request environment.
+    #
+    $ENV{'TMPDIR'}='/tmp' unless defined($ENV{'TMPDIR'});
+    $ENV{'WEBDYNE_PAGI'}='1' unless defined($ENV{'WEBDYNE_PAGI'});
+    require WebDyne::PAGI::Constant;
+    $WebDyne::PAGI::Constant::Constant{'WEBDYNE_PAGI_ENV_SET'}->{'TMPDIR'}=$ENV{'TMPDIR'};
+    require WebDyne::PAGI;
+    my %callback;
+    foreach my $phase (qw(startup shutdown)) {
+        next unless defined($CONFIG->{$phase});
+        die "Configured lifespan callbacks require updated WebDyne::PAGI; update the WASM runtime or provide a Perl library overlay\n"
+            unless WebDyne::PAGI->can('lifespan_callback');
+        $callback{$phase}=resolve_callback($CONFIG->{$phase});
+    }
+    $app_cr=WebDyne::PAGI->new(
+        root   => $root,
+        index  => $index,
+        static => defined($CONFIG->{'static'}) ? $CONFIG->{'static'} : 1,
+        conf   => defined($CONFIG->{'conf'}) ? $CONFIG->{'conf'} : 0,
+        %callback,
+    )->to_app();
+}
 
 sub resolve_callback {
 
@@ -74,11 +72,6 @@ sub resolve_callback {
 
 sub application {
 
-    #  WebDyne 3.023 can retain a caught API exception in its global error
-    #  stack. A new request must not inherit that diagnostic from an earlier
-    #  request served by this persistent interpreter.
-    #
-    WebDyne::Util::errclr();
     return $app_cr->(@_);
 }
 

@@ -169,3 +169,19 @@ test("authentication uses bundled Wrangler without requiring a project or buildi
     assert.deepEqual(calls, [[command, "--help"]]);
   }
 });
+
+test("PAGI entry and nested applications stay private after initialization", async (t) => {
+  const root = await fixture(t, { entry: "app.pagi" });
+  await mkdir(join(root, "app/nested"));
+  await writeFile(join(root, "app/nested/other.pagi"), "sub {}\n");
+  await main(["init"], root);
+  const policy = await readAssetsPolicy(join(root, "app"));
+  assert.equal(policy.isPublic(join(root, "app/app.pagi")), false);
+  assert.equal(policy.isPublic(join(root, "app/nested/other.pagi")), false);
+  await main(["check"], root, async () => {});
+  const files = await names(root);
+  assert.ok(files.includes("app/app.pagi"));
+  assert.ok(files.includes("app/nested/other.pagi"));
+  const config = JSON.parse(await readFile(join(root, ".webdyne/wrangler.jsonc")));
+  assert.equal(config.vars.WEBDYNE_INDEX, "app.pagi");
+});

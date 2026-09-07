@@ -219,3 +219,17 @@ callback support and fails clearly instead of silently ignoring it. Until a new
 artifact is built, development verification uses an explicit updated WebDyne
 library overlay through the existing `perlLibrary` mechanism. No runtime binary
 or published package was updated by this change.
+
+### Plain PAGI applications
+
+Set `webdyne.entry` to `app.pagi` (or set `WEBDYNE_INDEX` directly). The file
+is loaded once beneath `WEBDYNE_ROOT` and must return a PAGI application
+coderef. It receives all request paths and scope types directly, including
+lifespan startup, without loading WebDyne. The application must acknowledge
+startup before HTTP, SSE or WebSocket requests can run. WebDyne-specific
+startup/shutdown callback settings do not apply to this mode.
+
+`init` now includes `*.pagi` in new `.assetsignore` files. Add the pattern
+manually to existing custom files to keep application source out of static
+uploads. WebDyne 3.028 is pinned for PSP applications and clears its own
+request diagnostics; the bootstrap no longer calls `errclr()`.
