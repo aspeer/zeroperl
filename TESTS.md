@@ -418,3 +418,9 @@ produced.
   All 72 substantive payload file changes are WebDyne; other content changes
   are generated metadata. Attribution and artifact checksums pass.
 - Prepared npm archive passes staging-input and size checks (4,841,407 bytes).
+
+- GitHub 1.0.5 passed build, runtime verification (including PAGI/callbacks),
+  and notice packaging. Exact archive inspection found two stale expected-file
+  entries: lifespan.js and webdyne-app.pl.md. Both are now listed; the exact
+  CI inventory passes against the local npm archive. Release 1.0.6 retries
+  staging with this workflow-only correction; 1.0.5 was never staged.

@@ -190,6 +190,7 @@ jobs:
             echo package/README.md
             echo package/bin/pagi-runner.pl
             echo package/bin/webdyne-app.pl
+            echo package/bin/webdyne-app.pl.md
             echo package/embedded-files.json
             echo package/index.js
             echo package/js/provider/cloudflare.js
@@ -198,6 +199,7 @@ jobs:
             echo package/js/runtime/perl-filesystem.js
             echo package/js/runtime/webdyne-runtime.js
             echo package/js/transport/fetch-pagi.js
+            echo package/js/transport/lifespan.js
             echo package/js/worker.js
             echo package/js/zeroperl.js
             echo package/lib/Future/IO/Impl/ZeroPerl.pm
