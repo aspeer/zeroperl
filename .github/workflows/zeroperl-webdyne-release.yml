@@ -107,6 +107,8 @@ jobs:
           node tools/check-cpan-versions.mjs "$wasm" "$PERL_VERSION"
           node tools/check-xs-magic.mjs "$wasm"
           node tools/check-asyncify-reentry.mjs "$wasm"
+          node t/runtime/smoke-pagi-application.mjs "$wasm"
+          node t/runtime/smoke-lifespan-callbacks.mjs "$wasm"
           node --input-type=module - "$wasm" "$reactor" <<'NODE'
           import { readFile } from "node:fs/promises";
           for (const path of process.argv.slice(2)) {

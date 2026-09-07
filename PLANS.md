@@ -305,3 +305,11 @@ existing development branch without modifying its earlier checkpoints.
 No core binary rebuild, shutdown host dispatch, shared state or Cloudflare
 capability changes are included. Source and runtime compatibility requirements
 are documented in WEBDYNE.md.
+
+## 1.0.5 release
+
+- [x] Merge development and pin the published WebDyne 3.028 archive.
+- [x] Add direct `.pagi` entry dispatch and default private asset rules.
+- [x] Remove bootstrap error clearing, qualify the new WASM and npm payload,
+  and update the reviewed WebDyne attribution inventory.
+- [ ] Push paired 1.0.5 release tags and confirm GitHub npm staging.

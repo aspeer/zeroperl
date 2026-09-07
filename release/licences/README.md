@@ -6,7 +6,7 @@ never decides a new component's licence using a keyword scan. The broader
 collection and this inventory remain available in the GitHub licence archive.
 
 The current reviewed profile is Perl 5.44.0 with the default embedded WebDyne
-build, shrink off, WebDyne 3.027 and the pinned CPAN snapshot. Other Perl
+build, shrink off, WebDyne 3.028 and the pinned CPAN snapshot. Other Perl
 versions require their own inventory before npm packaging. This is an artifact
 qualification restriction, not removal of their build support.
 

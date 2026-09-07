@@ -1,4 +1,4 @@
-// Run: node t/runtime/smoke-lifespan-callbacks.mjs qualified.wasm /path/to/pm-WebDyne/lib
+// Run: node t/runtime/smoke-lifespan-callbacks.mjs qualified.wasm [old-runtime-overlay-lib]
 import assert from "node:assert/strict";
 import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { register } from "node:module";
@@ -8,7 +8,7 @@ import { buildApplicationArchives } from "../../scripts/build-vfs.mjs";
 import { generatedWranglerConfig } from "../../scripts/webdyne-cloudflare.mjs";
 register("./perl-source-loader.mjs", import.meta.url);
 const { createWebDyneRuntime } = await import("../../js/runtime/webdyne-runtime.js");
-if (!process.argv[3]) throw new Error("Supply WASM artifact and updated WebDyne library directory");
+if (!process.argv[2]) throw new Error("Supply WASM artifact (optionally an updated core overlay for an old runtime)");
 const zeroperlModule = await WebAssembly.compile(await readFile(process.argv[2]));
 const root = await mkdtemp(join(tmpdir(), "lifespan-callbacks-"));
 const interpreters = [];
@@ -24,7 +24,7 @@ try {
   const configPath = await generatedWranglerConfig(root, project, {entry: "app.psp"}, root);
   const bindings = JSON.parse(await readFile(configPath, "utf8")).vars;
   async function runtime(overlay) {
-    if (overlay) await cp(join(process.argv[3], "WebDyne/PAGI.pm"), join(root, "lib/WebDyne/PAGI.pm"));
+    if (overlay && process.argv[3]) await cp(join(process.argv[3], "WebDyne/PAGI.pm"), join(root, "lib/WebDyne/PAGI.pm"));
     const files = await buildApplicationArchives({projectRoot: root, appDirectory: "app", libraryDirectories: ["lib"], outputDirectory: join(root, "out")});
     return createWebDyneRuntime({
       zeroperlModule,
@@ -41,10 +41,12 @@ try {
     return {status: response.status, body};
   }
   // An old artifact must not silently accept callback settings it cannot execute.
-  const old = await runtime(false);
-  assert.equal((await request(old)).status, 500);
-  assert.match(JSON.stringify(errors), /require updated WebDyne/);
-  console.log("PASS: old embedded core reports unsupported callbacks");
+  if (process.argv[3]) {
+    const old = await runtime(false);
+    assert.equal((await request(old)).status, 500);
+    assert.match(JSON.stringify(errors), /require updated WebDyne/);
+    console.log("PASS: old embedded core reports unsupported callbacks");
+  }
 
   const app = await runtime(true);
   const env = {...bindings, WEBDYNE_TEST_STARTUP_DELAY: "1"};

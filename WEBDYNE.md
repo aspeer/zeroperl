@@ -18,8 +18,8 @@ The npm packages have different roles:
 
 | Package | Contents | Consumer |
 | --- | --- | --- |
-| `@webdyne/webdyne-zeroperl-5.44.0@1.0.4` | Versioned Perl WASM, embedded WebDyne modules, compiled bridge, PAGI runtime and deployment CLI | WebDyne applications |
-| `@webdyne/webdyne-zeroperl@1.0.4` | Same complete runtime for the newest supported Perl version | WebDyne applications following the latest Perl |
+| `@webdyne/webdyne-zeroperl-5.44.0@1.0.5` | Versioned Perl WASM, embedded WebDyne modules, compiled bridge, PAGI runtime and deployment CLI | WebDyne applications |
+| `@webdyne/webdyne-zeroperl@1.0.5` | Same complete runtime for the newest supported Perl version | WebDyne applications following the latest Perl |
 | `@aspeer/zeroperl-ts@1.1.0` | ESM/CommonJS bridge, TypeScript declarations and bundled WASM | JavaScript/TypeScript applications embedding Perl directly |
 
 The normal Asyncify WASM and pre-Asyncify reactor are separate artifacts;
@@ -33,7 +33,7 @@ release lines: **5.18.4**, **5.36.3**, and **5.44.0**.
 ## Runtime contents
 
 This is the canonical ZeroPerl runtime for WebDyne::PAGI WASM targets. It
-consolidates upstream fork improvements, embeds WebDyne 3.027 and PAGI::Tools
+consolidates upstream fork improvements, embeds WebDyne 3.028 and PAGI::Tools
 0.002002 with their runtime dependencies, and statically compiles the XS
 modules needed by WebDyne, plus Sub::Name, Params::Util, Class::XSAccessor
 (including its array accessors), Text::CSV_XS and Variable::Magic for common
@@ -212,13 +212,9 @@ only startup. A configured shutdown callback will not run until graceful
 shutdown dispatch is implemented. State propagation and shared D1/KV/R2 objects
 remain separate work.
 
-**Runtime prerequisite:** these settings require the WebDyne implementation
-merged in `pm-WebDyne` commit `645cf4d5` (or its callback-supporting successor).
-Existing 1.0.4 WASM artifacts predate this change. The bootstrap detects missing
-callback support and fails clearly instead of silently ignoring it. Until a new
-artifact is built, development verification uses an explicit updated WebDyne
-library overlay through the existing `perlLibrary` mechanism. No runtime binary
-or published package was updated by this change.
+**Runtime prerequisite:** version 1.0.5 embeds WebDyne 3.028 with callback
+support. Older 1.0.4 binaries require an updated WebDyne library overlay when
+callbacks are configured; the bootstrap reports missing support explicitly.
 
 ### Plain PAGI applications
 

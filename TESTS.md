@@ -397,3 +397,24 @@ Shutdown invocation is covered by native bootstrap and the core's native/WASM
 callback tests. The Worker does not yet send shutdown. No TypeScript changed,
 no root lint configuration exists, and no new binary or remote deployment was
 produced.
+
+## 1.0.5 plain PAGI and WebDyne 3.028 verification
+
+- Native bootstrap, named lifespan callbacks and request error isolation:
+  34 assertions pass against the released WebDyne 3.028 library.
+- JavaScript suite: 51 tests pass, including private `.pagi` asset selection.
+- Real WASM: direct PAGI startup, concurrent/warm requests and arbitrary paths
+  pass, with an assertion that no WebDyne modules were loaded.
+- Local Wrangler: plain PAGI HTTP, SSE and WebSocket traffic reaches arbitrary
+  paths, reuses one startup and never loads WebDyne.
+- Carton integrity checks pass under Perl 5.18.4, 5.36.3 and 5.44.0.
+  Only the locked WebDyne distribution changed; the GitHub and CPAN 3.028
+  archives match SHA-256, and the dependency metadata matches 3.027.
+- The new 1.0.5 binary passes direct PAGI and named asynchronous callback tests
+  without a WebDyne overlay, plus 28 bundled-core error-isolation assertions.
+- Release qualification passes pinned module versions, XS magic, interpreter
+  lifecycle, Asyncify reentry/release, embedded INC, socket and WASM smoke tests.
+- Reviewed all 36 WebDyne notice sources: licence excerpts are unchanged.
+  All 72 substantive payload file changes are WebDyne; other content changes
+  are generated metadata. Attribution and artifact checksums pass.
+- Prepared npm archive passes staging-input and size checks (4,841,407 bytes).

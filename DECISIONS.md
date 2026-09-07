@@ -384,3 +384,13 @@ have a distinct release version. Existing binaries remain usable without
 callbacks; configured callbacks require a new core or explicit library overlay.
 Both callbacks are passed through, while the host continues to dispatch startup
 only. This preserves the established incremental lifecycle scope.
+
+
+## Direct PAGI entry applications (2026-09-08)
+
+A case-sensitive `.pagi` suffix in the configured index selects a single
+application coderef loaded once from the runtime filesystem. All paths and
+scope types pass through unchanged. This branch does not load WebDyne or its
+callback modules; the PAGI app owns lifespan acknowledgement. The existing
+PSP path keeps WebDyne routing and now relies on 3.028 for error isolation.
+New asset ignore files exclude `.pagi`; customized existing files are preserved.
