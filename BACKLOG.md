@@ -119,3 +119,12 @@ changes. Curation of the broad notice archive is an optional size improvement.
 - Watch server-side application/library files and `.assetsignore` during dev,
   rebuilding archives without restarting Wrangler. Current dev builds once;
   manual build or restart is documented.
+
+
+## 1.0.4 latest-Perl alias
+
+- [x] Duplicate the newest Perl package under @webdyne/webdyne-zeroperl.
+- [x] Update and qualify WebDyne 3.027 and all supported CPAN snapshots.
+- [ ] Seed the unsuffixed npm name with the GitHub-built candidate, then
+  configure its independent stage-only trusted publisher (see RELEASING.md).
+- [ ] Approve the versioned 1.0.4 staged package in npm after review.

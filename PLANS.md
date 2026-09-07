@@ -203,3 +203,21 @@ No push, release, deployment, or merge is part of this change.
 - [x] Add destroy, explicit confirmation, and no-build configuration reuse.
 - [x] Test cancellation, acceptance, noninteractive rejection and force rejection.
 - [x] Build and verify the updated local development tarball.
+
+
+## Latest-Perl npm alias and WebDyne 3.027 (2026-09-07)
+
+The maintainer authorized work on development, verification, merging to main,
+pushing to GitHub for a tagged build/staging run, and removal of merged branches
+locally and from github/origin. npm approval remains manual.
+
+The versioned npm name retains its Perl suffix; the unsuffixed name duplicates
+only the greatest supported Perl version. Both use the same project semver and
+runtime bytes. Each package has independent npm trusted-publisher configuration
+and staging/approval. Refresh CPAN locks and review the 3.027 notice inventory
+before qualification. Download any first-name seed candidate locally.
+
+Qualification complete: both package identities, native/wasm regressions,
+notice preservation, and installed-alias SSE/WebSocket acceptance pass.
+See RELEASE-QUALIFICATION.md for evidence. Proceed with the authorized
+main merge, paired 1.0.4 tags and GitHub staging build.

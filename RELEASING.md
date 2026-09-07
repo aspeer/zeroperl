@@ -1,7 +1,7 @@
 # Preparing a release
 
 Release versions belong to the project. Perl versions select build variants.
-The first new release is 1.0.1; the checked-in 1.0.0 is the pre-release baseline.
+The next release increments the version recorded in release/versions.json.
 Earlier local 1.0.0 candidates remain historical test artifacts.
 
 On a clean main checkout containing the changes to release:
@@ -55,9 +55,12 @@ variant through its npm trusted publisher. The previous separate npm workflow
 has been removed. Configure npm to trust **zeroperl-webdyne-release.yml** in
 **aspeer/zeroperl**. No GitHub environment is specified by this workflow.
 
-For the first release, the package is
-`@webdyne/webdyne-zeroperl-5.44.0@1.0.1`. Selecting multiple Perl variants creates
-one candidate per variant; npm approval is per candidate, not atomic across
+The Perl-specific package is `@webdyne/webdyne-zeroperl-5.44.0@<semver>`.
+The newest supported Perl also produces `@webdyne/webdyne-zeroperl@<semver>`
+as a complete duplicate with the same version, runtime and exports. Only its
+package identity and README differ. Semver is the npm version, not part of
+the package name. Older Perl variants never update the unsuffixed alias.
+Selecting multiple Perl variants creates one candidate per variant plus the alias; npm approval is per candidate, not atomic across
 packages. The standalone TypeScript package has its own independent release.
 
 ## Staging and approval
@@ -182,3 +185,28 @@ create-package initializer convention. Here the installed CLI's `init`
 subcommand performs WebDyne setup. Installing the tarball saves the local file
 reference; installing a later tarball replaces it. Wrangler and other npm
 dependencies may still need registry access on the first installation.
+
+
+## Seeding the latest-Perl alias
+
+If a name is absent from npm, download its verified tarball from the tagged
+workflow's `webdyne-zeroperl-npm-<perl>-<semver>` artifact. Candidates are uploaded
+before staging, so they remain available if the missing name stops staging.
+The same workflow publishes and verifies the referenced licence archive first.
+Check the package identity with `tar -xOf PACKAGE.tgz package/package.json`.
+
+With an npm account permitted to publish under `@webdyne`:
+
+```sh
+npm login
+npm publish /absolute/path/to/PACKAGE.tgz --access public
+```
+
+Run this only for each missing name; already-published versions cannot be reused.
+Then open that package's npm Settings → Trusted publishing and add GitHub Actions:
+owner `aspeer`, repository `zeroperl`, workflow `zeroperl-webdyne-release.yml`,
+no environment, with stage-only permission. Configure both names independently.
+Future tagged releases build, attest and stage both candidates automatically;
+approval in npm remains manual. Do not rerun the seeded version expecting it to
+stage again: use the next release. A successful sibling staging operation remains
+pending even when the other name needs seeding; review it separately in npm.

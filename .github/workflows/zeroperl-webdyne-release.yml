@@ -201,6 +201,7 @@ jobs:
             echo package/lib/Future/IO/Impl/ZeroPerl.pm
             echo package/manifest.json
             echo package/package.json
+            echo package/scripts/assets.mjs
             echo package/scripts/build-vfs.mjs
             echo package/scripts/extensions.mjs
             echo package/scripts/install-cpan.mjs
@@ -224,10 +225,30 @@ jobs:
           npm stage publish "$tarball" --access public --dry-run
           echo "NPM_TARBALL=$tarball" >> "$GITHUB_ENV"
 
+      - name: Duplicate and qualify the latest-Perl alias
+        if: env.NPM_ALIAS == 'true'
+        run: |
+          set -euo pipefail
+          alias_dir="dist/npm/${RELEASE_ID}/alias"
+          node tools/prepare-npm-alias.mjs "$PACKAGE_DIR" "$alias_dir/package"
+          mkdir -p "$alias_dir/tarball"
+          npm pack "./$alias_dir/package" --pack-destination "$alias_dir/tarball" --json > "$alias_dir/tarball/pack.json"
+          tarball="$(find "$alias_dir/tarball" -maxdepth 1 -name '*.tgz' -print -quit)"
+          node tools/stage-package.mjs "$tarball" "$alias_dir/tarball/pack.json" --check-only
+          node tools/check-npm-size.mjs "$tarball" "$alias_dir/tarball/pack.json"
+          mkdir -p "$alias_dir/unpacked"
+          tar -xzf "$tarball" -C "$alias_dir/unpacked"
+          diff -r --exclude=package.json --exclude=manifest.json --exclude=README.md "dist/npm/$RELEASE_ID/tarball/unpacked/package" "$alias_dir/unpacked/package"
+          node tools/check-runtime-lifecycle.mjs "$alias_dir/unpacked/package/zeroperl-webdyne-${RELEASE_ID}.wasm" "$alias_dir/unpacked/package/js/zeroperl.js"
+          npm stage publish "$tarball" --access public --dry-run
+          echo "NPM_ALIAS_TARBALL=$tarball" >> "$GITHUB_ENV"
+
       - name: Attest the npm package candidate
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
-          subject-path: ${{ env.NPM_TARBALL }}
+          subject-path: |
+            dist/npm/${{ env.RELEASE_ID }}/tarball/*.tgz
+            dist/npm/${{ env.RELEASE_ID }}/alias/tarball/*.tgz
 
       - name: Upload npm package candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -238,6 +259,7 @@ jobs:
             dist/npm/${{ env.RELEASE_ID }}/tarball/*.tgz
             dist/npm/${{ env.RELEASE_ID }}/tarball/pack.json
             dist/npm/${{ env.RELEASE_ID }}/release-licenses/
+            dist/npm/${{ env.RELEASE_ID }}/alias/tarball/
           if-no-files-found: error
           retention-days: 30
 
@@ -249,8 +271,12 @@ jobs:
           if-no-files-found: error
           retention-days: 90
       - name: Publish and verify matching third-party licences on GitHub
+        id: licenses
         env:
           GH_TOKEN: ${{ github.token }}
         run: node tools/publish-release-licenses.mjs "$PACKAGE_DIR/manifest.json" "dist/npm/$RELEASE_ID/release-licenses"
       - name: Submit validated tarball to npm staging
         run: node tools/stage-package.mjs "$NPM_TARBALL" "dist/npm/$RELEASE_ID/tarball/pack.json"
+      - name: Submit validated alias to npm staging
+        if: ${{ !cancelled() && env.NPM_ALIAS_TARBALL != '' && steps.licenses.outcome == 'success' }}
+        run: node tools/stage-package.mjs "$NPM_ALIAS_TARBALL" "dist/npm/$RELEASE_ID/alias/tarball/pack.json"

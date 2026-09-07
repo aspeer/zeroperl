@@ -13,3 +13,8 @@ test('a patch build shares its project version across Perl variants', () => {
     assert.equal(metadata.wasm, `zeroperl-webdyne-${perl}-${expectedVersion}.wasm`);
   }
 });
+
+test('only the latest supported Perl emits an alias', () => {
+  assert.equal(releaseMetadata('5.44.0').npmAlias, true);
+  assert.equal(releaseMetadata('5.36.3').npmAlias, false);
+});

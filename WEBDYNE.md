@@ -18,7 +18,8 @@ The npm packages have different roles:
 
 | Package | Contents | Consumer |
 | --- | --- | --- |
-| `@webdyne/webdyne-zeroperl-5.44.0@1.0.1` | Versioned Perl WASM, embedded WebDyne modules, compiled bridge, PAGI runtime and deployment CLI | WebDyne applications |
+| `@webdyne/webdyne-zeroperl-5.44.0@1.0.4` | Versioned Perl WASM, embedded WebDyne modules, compiled bridge, PAGI runtime and deployment CLI | WebDyne applications |
+| `@webdyne/webdyne-zeroperl@1.0.4` | Same complete runtime for the newest supported Perl version | WebDyne applications following the latest Perl |
 | `@aspeer/zeroperl-ts@1.1.0` | ESM/CommonJS bridge, TypeScript declarations and bundled WASM | JavaScript/TypeScript applications embedding Perl directly |
 
 The normal Asyncify WASM and pre-Asyncify reactor are separate artifacts;
@@ -32,7 +33,7 @@ release lines: **5.18.4**, **5.36.3**, and **5.44.0**.
 ## Runtime contents
 
 This is the canonical ZeroPerl runtime for WebDyne::PAGI WASM targets. It
-consolidates upstream fork improvements, embeds WebDyne 3.023 and PAGI::Tools
+consolidates upstream fork improvements, embeds WebDyne 3.027 and PAGI::Tools
 0.002002 with their runtime dependencies, and statically compiles the XS
 modules needed by WebDyne, plus Sub::Name, Params::Util, Class::XSAccessor
 (including its array accessors), Text::CSV_XS and Variable::Magic for common
@@ -44,12 +45,15 @@ files without another WebDyne checkout.
 
 ## Cloudflare package usage
 
-Install the Perl 5.44.0 runtime from npm using
-`@webdyne/webdyne-zeroperl-5.44.0@1`. Put the complete application tree below
+Install the latest-Perl runtime using `@webdyne/webdyne-zeroperl@1`.
+Use `@webdyne/webdyne-zeroperl-5.44.0@1` to stay on Perl 5.44.0.
+The unsuffixed package is a complete duplicate, updated only from the newest
+supported Perl; each package uses the same project semver.
+Put the complete application tree below
 `app/`, including the default `app/app.psp`, then install the runtime:
 
 ```bash
-npm install @webdyne/webdyne-zeroperl-5.44.0@1
+npm install @webdyne/webdyne-zeroperl@1
 ```
 
 The package includes its qualified Wrangler version. Add these convenient

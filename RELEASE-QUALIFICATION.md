@@ -238,3 +238,27 @@ Local build/qualification logs are `/tmp/zeroperl-3026-final-build-<perl>.log`
 and `/tmp/zeroperl-3026-final-qualify-<perl>.log`. Final-package local evidence
 is `/tmp/zeroperl-3026-package-{lifetime,overlap,disconnect}.log`. These temporary
 logs supplement this committed record; they are not distributed artifacts.
+
+
+## 1.0.4 / WebDyne 3.027 / latest-Perl alias (2026-09-07)
+
+- Refreshed all three CPAN snapshots with Carton; only WebDyne changed.
+  Verified manifest/snapshot/source SHA-256 values against the CPAN archive.
+- Reviewed 3.026 → 3.027 source changes (lazy JSON, cookie, SSE and WebSocket
+  loading). All 36 retained licence sources preserve their exact excerpts;
+  payload differences are confined to WebDyne and generated host metadata.
+- Built Perl 5.44.0 with WebDyne 3.027. Embedded @INC, 15 XS/WebDyne version
+  checks, socket checks, asynchronous release probes, Variable::Magic, 100
+  Asyncify re-entry rounds and 24 runtime lifecycle checks pass.
+- 45 JavaScript package/release tests, four Python notice tests, 10 native
+  CPAN-lock tests (container), and 12 native request-isolation assertions
+  against the downloaded 3.027 library pass. Workflow actionlint passes.
+- Prepared both full npm packages at 1.0.4 (approximately 4.84 MB each).
+  Alias integrity and the 6 MB budget pass; legal text is unchanged except
+  the WebDyne component version. Installed the alias in an independent
+  temporary application; initialization and Wrangler dry-run pass.
+  SSE completion followed by WebSocket echo also passes from the installed alias.
+
+GitHub builds the tagged clean source again and attests/downloads its own
+candidates before staging. Local qualification artifacts retain their honest
+pre-commit build provenance and are not the seed delivery artifact.

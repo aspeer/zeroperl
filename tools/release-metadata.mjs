@@ -3,7 +3,7 @@
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { versionParts } from "./release.mjs";
+import { compareVersions, versionParts } from "./release.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const versionsPath = resolve(projectRoot, "release/versions.json");
@@ -49,6 +49,7 @@ export function releaseMetadata(version, override) {
     checksums: `SHA256SUMS-${releaseId}`,
     npmName: `@webdyne/webdyne-zeroperl-${version}`,
     npmVersion,
+    npmAlias: version === [...versions.supportedPerlVersions].sort(compareVersions).at(-1),
   };
 }
 

@@ -54,7 +54,7 @@ requires 'Tie::IxHash';
 requires 'Time::HiRes';
 requires 'URI';
 requires 'URI::Escape';
-requires 'WebDyne', '== 3.026';
+requires 'WebDyne', '== 3.027';
 requires 'perl', '5.018';
 
 on configure => sub {

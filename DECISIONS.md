@@ -335,3 +335,16 @@ so the wrapper requires a terminal and a full Yes (default No) before invoking
 it. Keep Wrangler's own named-target and dependency confirmations: its --force
 also bypasses dependent-Worker protection, so it must not be used merely to
 avoid a second prompt. No real Worker is deleted during regression testing.
+
+
+## Latest-Perl npm alias and WebDyne 3.027 (2026-09-07)
+
+The maintainer authorized work on development, verification, merging to main,
+pushing to GitHub for a tagged build/staging run, and removal of merged branches
+locally and from github/origin. npm approval remains manual.
+
+The versioned npm name retains its Perl suffix; the unsuffixed name duplicates
+only the greatest supported Perl version. Both use the same project semver and
+runtime bytes. Each package has independent npm trusted-publisher configuration
+and staging/approval. Refresh CPAN locks and review the 3.027 notice inventory
+before qualification. Download any first-name seed candidate locally.

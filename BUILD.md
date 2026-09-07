@@ -26,7 +26,7 @@ itself additionally uses Bun and its own build instructions.
 [release/defaults.mk](release/defaults.mk) supplies the default `PERL_VERSION`
 for Make and `build.sh`, currently **5.44.0**. The supported release targets are
 **5.18.4, 5.36.3, and 5.44.0**. The release profile locks WebDyne
-**3.026**, including its Carp 1.50 minimum. This default is a repository setting, not a lookup
+**3.027**, including its Carp 1.50 minimum. This default is a repository setting, not a lookup
 of the latest upstream Perl release. Direct Dockerfile builds have their own
 `ARG` defaults; pass `--build-arg PERL_VERSION=...` explicitly when using them.
 
