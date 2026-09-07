@@ -276,3 +276,34 @@ npm 11.19.1. A clean source export with the pinned bridge source passed npm ci
 --ignore-scripts and all 25 runtime/release tests. This check does not rely on
 the developer checkout node_modules or ignored lockfile. A new release tag is
 needed to include this correction; rerunning an older tag uses its old source.
+
+## Application initialization and assets (2026-09-07)
+
+`t.js/assets-init.test.mjs` adds ten regression cases covering repeatable setup,
+preserved metadata/scripts and ignore files, custom roots (including spaces),
+saved options, gitignore negation/anchoring/directory semantics, dynamic rebuild
+selection, default metadata rules, explicit asset roots, dev/check/deploy
+argument forwarding, legacy packaging, malformed ignore locations, public entry
+rejection, symlink boundaries, and authentication without an application.
+
+Validation on `development`:
+
+- `npm run test:cloudflare-package`: all 36 JavaScript tests pass.
+- `prove tests/runtime/webdyne-error-isolation.t`: all 12 native Perl checks pass.
+- ESLint recommended rules with Node globals pass for the changed JavaScript;
+  this repository has no configured root lint command. No TypeScript changed.
+- Prepared the real 5.44.0/1.0.3 candidate from existing verified WASM artifacts
+  into a temporary directory and installed it into an independent npm consumer.
+- Real `npx --no-install webdyne-cloudflare init` and `npm run check` pass.
+- Real local Wrangler 4.127.1: `/app.psp` returns 200 with WASM-rendered content;
+  `/site.css` returns 200, the expected CSS content type and exact source bytes.
+  Unpacked the application archive and confirmed CSS is absent from VFS.
+- `git diff --check` passes. No remote deployment or publication performed.
+
+The initial local run exposed that today's compatibility date (2026-09-07) is
+newer than bundled workerd supports (2026-09-04). Initialization now preserves
+the existing package default (2026-08-27) or a user's explicit date. The rerun
+passes. The first sandboxed attempt could not bind localhost or write Wrangler
+logs; the local serving check succeeded with sandbox escalation. CGI::Simple
+emits its existing ambiguous `lc` warnings during first-page startup; both
+responses succeed. The test server was stopped after acceptance.

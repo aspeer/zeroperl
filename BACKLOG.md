@@ -113,3 +113,9 @@ changes. Curation of the broad notice archive is an optional size improvement.
 - [x] Qualify the final 1.0.3 package and update unpublished release tags.
 - [ ] Add separate inventories before packaging Perl 5.18/5.36 variants.
 - [ ] Push/stage when initiated by the maintainer; no npm approval performed.
+
+## Application CLI follow-ups
+
+- Watch server-side application/library files and `.assetsignore` during dev,
+  rebuilding archives without restarting Wrangler. Current dev builds once;
+  manual build or restart is documented.

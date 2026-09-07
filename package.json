@@ -4,6 +4,7 @@
   "type": "module",
   "dependencies": {
     "fflate": "0.8.3",
+    "ignore": "5.3.2",
     "modern-tar": "0.8.4"
   },
   "devDependencies": {

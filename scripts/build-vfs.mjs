@@ -139,6 +139,7 @@ export async function buildApplicationArchives({
   libraryDirectories = [],
   outputDirectory,
   embeddedFiles = {},
+  assets,
 }) {
   const root = resolve(projectRoot);
   const applicationRoot = await checkedDirectory(root, appDirectory, "WebDyne application directory");
@@ -155,7 +156,8 @@ export async function buildApplicationArchives({
   await writeArchive(
     [{ type: "directory", source: applicationRoot, target: "app" }],
     appVfsArchive,
-    applicationFilter,
+    (name, stat) => applicationFilter(name)
+      && (stat.isDirectory() || !assets?.isPublic(name)),
   );
 
   const duplicates = await collectIdenticalEmbeddedFiles(libraries, embeddedFiles);

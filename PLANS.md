@@ -180,3 +180,14 @@ per-Perl numbering or disabled staging are historical.
 - [x] Qualify the final 1.0.3 package and update unpublished release tags.
 - [ ] Add separate inventories before packaging Perl 5.18/5.36 variants.
 - [ ] Push/stage when initiated by the maintainer; no npm approval performed.
+
+## Application initialization and Cloudflare assets (2026-09-07)
+
+Work on the requested `development` branch, based on the existing local main.
+
+- [x] Add repeatable initialization and bundled Wrangler authentication commands.
+- [x] Share root `.assetsignore` semantics between VFS selection and Wrangler assets.
+- [x] Verify custom roots, ignore patterns, preserved configuration, and local serving.
+- [x] Document workflow and archive ownership; review the final diff.
+
+No push, release, deployment, or merge is part of this change.

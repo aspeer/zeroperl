@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
-import { access, readFile, realpath, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { spawn } from "node:child_process";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildApplicationArchives } from "./build-vfs.mjs";
 import { installCpanDependencies } from "./install-cpan.mjs";
+import { defaultAssetsIgnore, readAssetsPolicy } from "./assets.mjs";
 import {
   extensionConfiguration,
   extensionWorkerSource,
@@ -30,6 +31,8 @@ async function exists(path) {
 function usage(error) {
   if (error) console.error(error);
   console.error(`Usage:
+  webdyne-cloudflare init [options]
+  webdyne-cloudflare login|logout|whoami [-- wrangler-options]
   webdyne-cloudflare build [options]
   webdyne-cloudflare check [options] [-- wrangler-options]
   webdyne-cloudflare dev [options] [-- wrangler-options]
@@ -70,7 +73,7 @@ function safeProjectPath(projectRoot, requested, description) {
 function parseArguments(argv, defaults) {
   const command = argv.shift();
   if (!command || command === "--help" || command === "-h") usage();
-  if (!["build", "check", "dev", "deploy"].includes(command)) usage(`Unknown command: ${command}`);
+  if (!["init", "build", "check", "dev", "deploy"].includes(command)) usage(`Unknown command: ${command}`);
 
   const options = {
     command,
@@ -78,7 +81,7 @@ function parseArguments(argv, defaults) {
     entry: defaults.entry,
     libraries: [...defaults.libraries],
     output: defaults.output,
-    wranglerConfig: undefined,
+    wranglerConfig: defaults.wranglerConfig,
     wranglerArguments: [],
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -141,8 +144,75 @@ async function readProject(projectRoot) {
       entry: webdyne.entry ?? "app.psp",
       libraries,
       output: webdyne.outputDirectory ?? ".webdyne",
+      wranglerConfig: cloudflare.wranglerConfig,
     },
   };
+}
+
+async function initialize(projectRoot, project, options) {
+  const appRoot = safeProjectPath(projectRoot, options.appDirectory, "WebDyne application directory");
+  const output = safeProjectPath(projectRoot, options.output, "WebDyne output directory");
+  safeProjectPath(appRoot, options.entry, "WebDyne entry page");
+  if (options.wranglerConfig) safeProjectPath(projectRoot, options.wranglerConfig, "Wrangler configuration");
+  if (isInside(appRoot, output)) throw new Error("Generated output must be outside the assets directory");
+  await mkdir(appRoot, { recursive: true });
+  if (!isInside(projectRoot, await realpath(appRoot))) throw new Error("Application symlink escapes the project root");
+  await readAssetsPolicy(appRoot);
+  const packageJson = project.packageJson;
+  const scripts = assertObject(packageJson.scripts, "package.json scripts");
+  for (const command of ["build", "check", "dev", "deploy", "login", "logout", "whoami"]) {
+    const value = `webdyne-cloudflare ${command}`;
+    if (scripts[command] !== undefined && scripts[command] !== value) {
+      console.log(`Preserved existing npm script: ${command}`);
+    }
+    scripts[command] ??= value;
+  }
+  packageJson.scripts = scripts;
+  packageJson.webdyne = {
+    ...project.webdyne,
+    appDirectory: options.appDirectory,
+    entry: options.entry,
+    static: false,
+    outputDirectory: options.output,
+    ...(options.libraries.length ? { perlLibrary: [...new Set(options.libraries)] } : {}),
+  };
+  if (options.wranglerConfig) {
+    packageJson.webdyne.cloudflare = { ...project.cloudflare, wranglerConfig: options.wranglerConfig };
+  }
+  const ignorePath = resolve(appRoot, ".assetsignore");
+  if (!(await exists(ignorePath))) await writeFile(ignorePath, defaultAssetsIgnore, { flag: "wx" });
+  const gitignorePath = resolve(projectRoot, ".gitignore");
+  const previous = (await exists(gitignorePath)) ? await readFile(gitignorePath, "utf8") : "";
+  const lines = previous.split(/\r?\n/);
+  const outputPattern = `/${relative(projectRoot, output).replaceAll("\\", "/")}/`;
+  const missing = ["/node_modules/", "/.wrangler/", outputPattern].filter((line) => !lines.includes(line));
+  if (missing.length) {
+    await writeFile(gitignorePath, `${previous}${previous && !previous.endsWith("\n") ? "\n" : ""}${missing.join("\n")}\n`);
+  }
+  await writeFile(resolve(projectRoot, "package.json"), `${JSON.stringify(packageJson, null, 2)}\n`);
+  console.log(`Initialized ${options.appDirectory}/${options.entry}. Run npm run dev; npm run login; npm run whoami; npm run deploy.`);
+  if (!(await exists(resolve(appRoot, options.entry)))) console.log(`Create ${options.appDirectory}/${options.entry} before building.`);
+}
+
+async function applicationAssets(projectRoot, options) {
+  // An explicit Wrangler --assets takes precedence, including Scratch's scripts.
+  const args = options.wranglerArguments;
+  let requested = options.appDirectory;
+  let explicit = false;
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === "--assets" || args[index].startsWith("--assets=")) {
+      requested = args[index] === "--assets" ? args[++index] : args[index].slice(9);
+      if (!requested || requested.startsWith("--")) throw new Error("--assets requires a directory");
+      explicit = true;
+    }
+  }
+  const directory = safeProjectPath(projectRoot, requested, "Cloudflare assets directory");
+  if (!isInside(projectRoot, await realpath(directory))) throw new Error("Assets symlink escapes the project root");
+  const policy = await readAssetsPolicy(directory);
+  if (policy && isInside(directory, resolve(projectRoot, options.output))) {
+    throw new Error("Generated output must be outside the assets directory");
+  }
+  return { policy, arguments: policy && !explicit ? ["--assets", directory] : [] };
 }
 
 async function readEmbeddedFiles() {
@@ -150,7 +220,7 @@ async function readEmbeddedFiles() {
   return (await exists(inventory)) ? JSON.parse(await readFile(inventory, "utf8")) : {};
 }
 
-async function build(projectRoot, project, options) {
+async function build(projectRoot, project, options, assets) {
   const outputDirectory = safeProjectPath(projectRoot, options.output, "WebDyne output directory");
   const appDirectory = relative(
     projectRoot,
@@ -158,6 +228,9 @@ async function build(projectRoot, project, options) {
   );
   const entryPath = safeProjectPath(resolve(projectRoot, appDirectory), options.entry, "WebDyne entry page");
   if (!(await exists(entryPath))) throw new Error(`WebDyne entry page does not exist: ${options.entry}`);
+  if (assets?.isPublic(entryPath)) {
+    throw new Error(`The entry ${options.entry} would be public: add it to ${resolve(assets.directory, ".assetsignore")}`);
+  }
 
   const libraries = [...options.libraries];
   const extensions = await resolveWebDyneExtensions(projectRoot, project.packageJson, project.extensions);
@@ -171,6 +244,7 @@ async function build(projectRoot, project, options) {
     libraryDirectories: libraries,
     outputDirectory,
     embeddedFiles: await readEmbeddedFiles(),
+    assets,
   });
 
   const extensionSource = extensionWorkerSource(extensions);
@@ -337,30 +411,38 @@ function runWrangler(arguments_, projectRoot) {
   });
 }
 
-export async function main(argv = process.argv.slice(2), projectRoot = process.cwd()) {
+export async function main(argv = process.argv.slice(2), projectRoot = process.cwd(), wrangler = runWrangler) {
   // Canonicalize once so package-manager symlinks and macOS' /var -> /private/var
   // alias cannot make a resolved extension appear to escape the project root.
   const root = await realpath(resolve(projectRoot));
+  if (!argv.length || ["--help", "-h"].includes(argv[0])) return usage();
+  if (["login", "logout", "whoami"].includes(argv[0])) {
+    const args = argv.slice(1);
+    if (args[0] === "--") args.shift();
+    return wrangler([argv[0], ...args], root);
+  }
   const project = await readProject(root);
   const options = parseArguments([...argv], project.defaults);
-  const built = await build(root, project, options);
+  if (options.command === "init") return initialize(root, project, options);
+  const assets = await applicationAssets(root, options);
+  const built = await build(root, project, options, assets.policy);
   if (options.command === "build") return;
 
   const config = await generatedWranglerConfig(root, project, options, built.outputDirectory);
-  const configArguments = ["--config", config];
+  const configArguments = ["--config", config, ...assets.arguments];
   if (options.command === "check") {
-    await runWrangler([
+    await wrangler([
       "deploy", "--dry-run", "--outdir", resolve(built.outputDirectory, "dist"),
       ...configArguments, ...options.wranglerArguments,
     ], root);
   } else if (options.command === "dev") {
-    await runWrangler(["dev", ...configArguments, ...options.wranglerArguments], root);
+    await wrangler(["dev", ...configArguments, ...options.wranglerArguments], root);
   } else if (options.command === "deploy") {
-    await runWrangler([
+    await wrangler([
       "deploy", "--dry-run", "--outdir", resolve(built.outputDirectory, "dist"),
       ...configArguments, ...options.wranglerArguments,
     ], root);
-    await runWrangler(["deploy", ...configArguments, ...options.wranglerArguments], root);
+    await wrangler(["deploy", ...configArguments, ...options.wranglerArguments], root);
   }
 }
 

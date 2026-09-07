@@ -288,3 +288,31 @@ remain intact. A pinned source-range inventory fails closed on unreviewed
 payload/dependency/linking/licence changes while allowing identified generated
 host metadata differences. This avoids both the earlier 11.9 MB broad text
 and relying on a URL alone for licence propagation.
+
+## Explicit project initialization and asset ownership (2026-09-07)
+
+The distribution CLI owns initialization; npm installation never edits the
+consumer's scripts. `init` preserves existing scripts and ignore contents,
+sets WebDyne static serving off, and creates Scratch's default ignore patterns.
+The tested Wrangler remains a regular distribution dependency; authentication
+commands invoke its resolved entry point without requiring an app build.
+
+Asset ownership comes from the effective assets root's `.assetsignore` on each
+build. Ignored files remain in VFS; public files are served by Cloudflare.
+Without that marker, retain legacy full-VFS behavior. Explicit forwarded assets
+flags win over the source root. Automatic flags intentionally override custom
+config asset-directory settings; custom configurations remain otherwise intact.
+
+Use node-ignore 5.3.2 (the same library/major as Wrangler 4.127.1) for gitignore
+semantics and Wrangler's three default metadata patterns. Read only the root
+file, as Cloudflare does. Reject nested/misspelled ignore files instead of
+inventing cascading semantics that could expose server files. Reject a public
+entry page and generated output within an active assets root. Keep legacy VFS
+exclusions and Pure-Perl library handling unchanged. The default four patterns
+are deliberately identical to Scratch; application-specific private files need
+explicit ignore patterns.
+
+Initialization leaves compatibility-date selection with the existing generator
+and user configuration. Setting today's date broke the pinned Wrangler runtime
+in acceptance testing; updating the supported default belongs with Wrangler
+qualification, not each invocation of `init`.

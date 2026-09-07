@@ -75,3 +75,11 @@
   separate 8 MiB WebAssembly execution stack.
 - Rejected the 5.44 mini candidate after its compressed size increased by
   7.3%, despite a 16.1% raw-size reduction.
+
+## Unreleased — application setup and Cloudflare assets
+
+- Add repeatable `webdyne-cloudflare init` and bundled login/logout/whoami.
+- Initialize Scratch-compatible assets rules and disable WebDyne static serving.
+- Automatically route assets through Wrangler and omit public files from VFS,
+  with root gitignore semantics, custom roots and explicit asset-flag support.
+- Reject misplaced ignore files and accidental public entry pages.

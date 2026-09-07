@@ -205,6 +205,7 @@ const packageJson = {
   ],
   dependencies: {
     fflate: "0.8.3",
+    ignore: "5.3.2",
     "modern-tar": "0.8.4",
     wrangler: "4.127.1",
   },
@@ -250,14 +251,42 @@ Place the complete application tree in \`app/\`. A minimal project only needs
 the project does not provide its own \`wrangler.jsonc\`.
 
 \`\`\`sh
+npm init
 npm install ${packageName}@${packageVersion}
-npx webdyne-cloudflare dev
+npx webdyne-cloudflare init
+npm run dev
 \`\`\`
 
 Use \`webdyne-cloudflare check\` for a Wrangler dry run,
 \`webdyne-cloudflare dev\` for local development, and
 \`webdyne-cloudflare deploy\` for a checked deployment. The package includes
 its tested Wrangler version. Installation has no deployment side effects.
+
+
+The explicit \`init\` command adds npm scripts for \`build\`, \`check\`, \`dev\`,
+\`deploy\`, \`login\`, \`logout\`, and \`whoami\`, retaining existing scripts.
+It sets \`webdyne.static: false\` and creates a root \`.assetsignore\` containing
+\`*.psp\`, \`*.pm\`, \`*.pl\`, and \`*.conf\` unless the file already exists.
+Use \`npm run login\`, \`npm run whoami\`, then \`npm run deploy\` to publish.
+
+When the application root contains \`.assetsignore\`, the CLI automatically
+passes \`--assets\` with that directory to Wrangler. Public assets are omitted
+from the application VFS; ignored files remain available to Perl. Add patterns
+for any data or templates Perl must read. Patterns are reread on every build.
+Only the root ignore file is supported by Wrangler; nested ignore files and
+misspelled \`.assetignore\` files produce an actionable error. Root patterns can
+match subdirectories. Existing explicit \`--assets DIR\` arguments take precedence;
+VFS filtering uses that directory's root ignore file. Without a root ignore file,
+VFS packaging remains unchanged. Automatic assets arguments override an assets
+directory in a custom Wrangler configuration; use explicit \`--assets\` to choose
+another root. Custom configurations remain responsible for \`WEBDYNE_STATIC=0\`.
+
+Initialization accepts \`--app-directory DIR\` (alias \`--document-root\`),
+\`--entry FILE\`, \`--output DIR\`, \`--library DIR\`, and \`--wrangler-config FILE\`,
+and saves those settings. The default source root is \`webdyne.appDirectory\` or
+\`app\`; the runtime VFS root stays \`/app\`. Generated output must be outside the
+assets root. \`dev\` builds once before Wrangler starts; rerun \`npm run build\`
+after changing server-side files or ignore rules, or restart \`npm run dev\`.
 
 Custom Wrangler configurations must include the \`enable_request_signal\`
 compatibility flag so disconnected SSE sessions stop promptly. Generated
