@@ -137,3 +137,48 @@ GitHub publication does not approve the npm package for publication.
 The full prefix, reactor and source evidence remain in the separate
 zeroperl-diagnostics-* Actions artifact (90-day retention). The supplemental
 licence archive is a GitHub Release asset without Actions retention expiry.
+
+## Local development tarballs
+
+On the development checkout, after `npm install`:
+
+```sh
+npm run pack:dev
+```
+
+This validates and reuses existing WASM artifacts under `output/5.44.0` for the
+version in `release/versions.json`, combines them with current checkout tooling,
+and writes a genuine npm `.tgz` and inventory JSON under `dist/dev/`. `.tgz` is
+npm's conventional name for a gzip-compressed tar archive. No Docker rebuild is
+needed for CLI-only changes. Runtime/embedded-Perl changes still require rebuilding
+and qualifying the WASM artifacts first; this command does not compile them.
+
+Select another existing, qualified artifact set with:
+
+```sh
+npm run pack:dev -- --perl-version 5.44.0 --runtime-version 1.0.3
+```
+
+The package version becomes the next patch with a unique development suffix,
+for example `1.0.4-dev.20260907040506007.gabcdef012345`. The timestamp prevents
+confusion between rebuilds; the hash identifies the tooling checkout. Manifest
+metadata also records whether uncommitted changes were included. The WASM's
+original version, hashes, source provenance and attribution remain unchanged.
+The development package is marked private. No tracked release version, git tag,
+registry dist-tag, push, staging or publication is performed.
+
+In the application repository, use the actual filename printed by the build:
+
+```sh
+npm init                          # only if package.json does not exist
+npm install /absolute/path/to/webdyne-webdyne-zeroperl-5.44.0-VERSION.tgz
+npx --no-install webdyne-cloudflare init
+npm run dev
+```
+
+`npm install file:/absolute/path/to/package.tgz` is also supported. Use
+`npm install`, not `npm init file:...`: npm init's package argument follows its
+create-package initializer convention. Here the installed CLI's `init`
+subcommand performs WebDyne setup. Installing the tarball saves the local file
+reference; installing a later tarball replaces it. Wrangler and other npm
+dependencies may still need registry access on the first installation.

@@ -191,3 +191,9 @@ Work on the requested `development` branch, based on the existing local main.
 - [x] Document workflow and archive ownership; review the final diff.
 
 No push, release, deployment, or merge is part of this change.
+
+## Local development package (2026-09-07)
+
+- [x] Add a repeatable private development tarball command using verified WASM.
+- [x] Verify version provenance and install/init/build from the actual tarball.
+- [x] Deliver the artifact and document local installation versus npm init.

@@ -316,3 +316,13 @@ Initialization leaves compatibility-date selection with the existing generator
 and user configuration. Setting today's date broke the pinned Wrangler runtime
 in acceptance testing; updating the supported default belongs with Wrangler
 qualification, not each invocation of `init`.
+
+## Development package versions (2026-09-07)
+
+Local CLI-only builds reuse a qualified runtime and delegate to the existing
+packager's checksum, inventory and notice checks. Only the generated package's
+version gains a next-patch `-dev.<timestamp>.g<revision>` suffix. Its manifest
+records current tooling provenance separately; the embedded binary retains its
+original version/provenance and stable release attribution links. Packages are
+private, packed with npm, and checked against the existing 6 MB inventory gate.
+No release version, build counter, tag or publishing path changes.

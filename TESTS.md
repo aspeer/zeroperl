@@ -307,3 +307,17 @@ passes. The first sandboxed attempt could not bind localhost or write Wrangler
 logs; the local serving check succeeded with sandbox escalation. CGI::Simple
 emits its existing ambiguous `lc` warnings during first-page startup; both
 responses succeed. The test server was stopped after acceptance.
+
+## Local development tarball (2026-09-07)
+
+- `t.js/pack-dev.test.mjs` checks next-patch prerelease naming, timestamps,
+  revision identification and rejection of malformed/runtime-prerelease input.
+- All 37 JavaScript tests pass; changed files pass ESLint recommended rules.
+- `npm run pack:dev` produced a 4,838,894-byte npm tarball, passing the existing
+  package size/content check and the underlying WASM/prefix/notice validation.
+- Installed that exact .tgz with `npm install file:...` in an independent app.
+  `npx --no-install webdyne-cloudflare init`, `npm run build`, and real Wrangler
+  `npm run check` pass. Verified private development version, unchanged 1.0.3
+  runtime provenance, Scratch ignore defaults, PSP in VFS and CSS omitted.
+- This repackages the previously tested WASM; no native/TypeScript/runtime code
+  changes or compiler rebuild are involved. Nothing published or deployed.

@@ -83,3 +83,9 @@
 - Automatically route assets through Wrangler and omit public files from VFS,
   with root gitignore semantics, custom roots and explicit asset-flag support.
 - Reject misplaced ignore files and accidental public entry pages.
+
+## Unreleased — local development tarballs
+
+- Add `npm run pack:dev` to validate existing runtime artifacts and package current
+  tooling as a private, uniquely versioned development .tgz without a release.
+- Record tooling revision/dirty state separately from original WASM provenance.
