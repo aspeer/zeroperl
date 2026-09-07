@@ -235,3 +235,11 @@ instructions. No npm publication or approval was performed by this task.
 Only main and development remain locally and on github/origin, verified against
 remote heads after deleting branches already contained in main. Both branches
 contain the release changes; development tracks origin/development.
+
+## PAGI runner JSON optimization (2026-09-07)
+
+- [x] Preserve the current working runner as the benchmark baseline.
+- [x] Replace per-operation JSON::PP allocation with a shared bundled
+  Cpanel::JSON::XS codec on `codex/pagi-runner-json-xs`.
+- [x] Compare warmed native/WASM runner benchmarks and validate JSON semantics,
+  lifespan integration, and package tests. See `t/runtime/bench-runner.pl.md`.

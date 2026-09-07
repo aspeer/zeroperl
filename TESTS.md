@@ -334,3 +334,11 @@ The updated development tarball passes the 6 MB inventory gate (4,839,408
 bytes). Installed it over the previous local package in the independent test
 app, reran init, and verified the destroy script was added. A real subprocess
 with piped Yes exits with the interactive-terminal error before Wrangler runs.
+
+## PAGI runner JSON codec
+
+`t/runtime/runner-json.t` checks Unicode and binary wire values, booleans,
+input preservation and recovery after malformed JSON. Run with `prove`, or use
+`t/runtime/test-runner-json.mjs <artifact.wasm>` for the same assertions in WASM.
+The reproducible native/WASM benchmark commands, measurements and limitations
+are recorded in `t/runtime/bench-runner.pl.md`.

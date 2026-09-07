@@ -4,9 +4,15 @@ use strict;
 use warnings;
 use Future;
 use Future::AsyncAwait;
-use JSON::PP;
+use Cpanel::JSON::XS ();
 use MIME::Base64 qw(decode_base64 encode_base64);
 use Encode qw(decode encode FB_CROAK);
+
+#  Reuse the bundled XS codec across synchronous JSON operations. The bridge
+#  passes character strings, so leave utf8 disabled and retain canonical keys.
+#  No incremental parsing or application callbacks are installed on this codec.
+#
+my $json_or=Cpanel::JSON::XS->new()->canonical()->allow_nonref();
 
 #  `/tmp` is created as a writable directory by the provider-neutral runtime.
 #  Keep temporary-file behaviour out of provider configuration and available to
@@ -56,7 +62,7 @@ sub refresh {
 
     my ($self)=@_;
     return unless $self->{'connected'};
-    my $state_hr=JSON::PP->new()->decode(main::worker_connection_status($self->{'session_id'}));
+    my $state_hr=$json_or->decode(main::worker_connection_status($self->{'session_id'}));
     $self->disconnect($state_hr->{'reason'}) unless $state_hr->{'connected'};
 }
 
@@ -184,7 +190,7 @@ sub encode_send_event {
             ? ($wire{'text_base64'}=encode_base64(encode('UTF-8', delete $wire{'text'}, FB_CROAK), ''))
             : ($wire{'bytes_base64'}=encode_base64(delete $wire{'bytes'}, ''));
     }
-    return JSON::PP->new()->canonical()->encode(\%wire);
+    return $json_or->encode(\%wire);
 }
 
 
@@ -311,7 +317,7 @@ sub deliver_receive {
     my $entry_ar=delete $session_hr->{'receive'}{$id} or return;
     my ($future_or, $connection_or)=@$entry_ar;
     my $ok=eval {
-        my $event_hr=JSON::PP->new()->decode($event_json);
+        my $event_hr=$json_or->decode($event_json);
         $event_hr->{'body'}=decode_base64(delete $event_hr->{'body_base64'}) if exists($event_hr->{'body_base64'});
         $event_hr->{'bytes'}=decode_base64(delete $event_hr->{'bytes_base64'}) if exists($event_hr->{'bytes_base64'});
         $event_hr->{'text'}=decode('UTF-8', decode_base64(delete $event_hr->{'text_base64'}), FB_CROAK) if exists($event_hr->{'text_base64'});
@@ -357,14 +363,14 @@ sub report_application_failure {
     return if $session_hr->{'failure_reported'}++;
     delete $SESSION{$session_id};
     my %status=(
-        done  => JSON::PP::true(),
+        done  => Cpanel::JSON::XS::true(),
         error => "$error",
         phase => $phase,
     );
     #  This is a JS host callback, so it must itself not turn a recovered Perl
     #  exception back into an escaping bridge exception.
     #
-    eval { main::worker_application_finished($session_id, JSON::PP->new()->canonical()->encode(\%status)); 1 };
+    eval { main::worker_application_finished($session_id, $json_or->encode(\%status)); 1 };
     return;
 }
 
@@ -373,7 +379,7 @@ sub finish_application {
 
     my ($session_id, $future_or)=@_;
     return unless $SESSION{$session_id};
-    my %status=(done => JSON::PP::true());
+    my %status=(done => Cpanel::JSON::XS::true());
     if ($future_or->is_failed()) {
         my ($error)=$future_or->failure();
         $status{'error'}="$error";
@@ -383,7 +389,7 @@ sub finish_application {
         $status{'error'}='PAGI application was cancelled';
     }
     delete $SESSION{$session_id};
-    main::worker_application_finished($session_id, JSON::PP->new()->canonical()->encode(\%status));
+    main::worker_application_finished($session_id, $json_or->encode(\%status));
     return;
 }
 
@@ -406,7 +412,7 @@ sub start_session {
     die "Duplicate PAGI session $session_id\n" if $SESSION{$session_id};
     no strict 'refs';
     my $app_cr=*{$entrypoint}{'CODE'} or die "PAGI application entry point $entrypoint is not defined\n";
-    my $scope_hr=JSON::PP->new()->decode($scope_json);
+    my $scope_hr=$json_or->decode($scope_json);
     die "PAGI scope must decode to a hash\n" unless ref($scope_hr) eq 'HASH';
     my $connection_or=Pagi::ZeroPerl::Connection->new($session_id);
     $scope_hr->{'pagi.connection'}=$connection_or;

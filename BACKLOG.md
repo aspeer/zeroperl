@@ -133,3 +133,11 @@ changes. Curation of the broad notice archive is an optional size improvement.
   automatic staging of the existing Perl-specific package. Alias seeding is
   the sole remaining bootstrap step; its candidate is downloaded locally.
 - [x] Remove all merged extra branches locally and on github/origin.
+
+## PAGI JSON performance follow-up (2026-09-07)
+
+- Measure hosted request/stream performance if needed: local runner benchmarks
+  exclude bridge crossings, rendering and networking.
+- Investigate large base64-heavy JSON encoding only if profiling warrants it:
+  the shared XS codec improves small events/polling substantially but the 64 KiB
+  body microbenchmark is 12% slower in WASM. See `t/runtime/bench-runner.pl.md`.
