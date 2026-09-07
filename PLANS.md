@@ -312,4 +312,8 @@ are documented in WEBDYNE.md.
 - [x] Add direct `.pagi` entry dispatch and default private asset rules.
 - [x] Remove bootstrap error clearing, qualify the new WASM and npm payload,
   and update the reviewed WebDyne attribution inventory.
-- [ ] Push paired 1.0.5 release tags and confirm GitHub npm staging.
+- [x] Push paired release tags; 1.0.5 exposed a stale CI file list, corrected
+  in 1.0.6 without changing application code.
+- [x] Confirm 1.0.6 Perl-specific npm staging after full GitHub qualification.
+- [ ] Correct npm authentication/Trusted Publishing for the unsuffixed alias;
+  its qualified 1.0.6 candidate received E401 and was not staged.

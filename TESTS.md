@@ -424,3 +424,11 @@ produced.
   entries: lifespan.js and webdyne-app.pl.md. Both are now listed; the exact
   CI inventory passes against the local npm archive. Release 1.0.6 retries
   staging with this workflow-only correction; 1.0.5 was never staged.
+
+- GitHub run 34138265604 built and qualified 1.0.6, passed exact tarball and
+  alias checks, and published the matching licence archive. The Perl-specific
+  package staged successfully (stage ID c2ea3ee9-936f-482f-a038-8c147d865757).
+  Unsuffixed alias staging returned npm E401; its authentication/Trusted
+  Publishing setup must be checked. Neither candidate was approved by CI.
+  The qualified npm artifact remains available in the run. Do not blindly
+  rerun both submissions: the Perl-specific candidate is already pending.
