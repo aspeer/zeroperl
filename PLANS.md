@@ -221,3 +221,17 @@ Qualification complete: both package identities, native/wasm regressions,
 notice preservation, and installed-alias SSE/WebSocket acceptance pass.
 See RELEASE-QUALIFICATION.md for evidence. Proceed with the authorized
 main merge, paired 1.0.4 tags and GitHub staging build.
+
+
+GitHub run [34116837410](https://github.com/aspeer/zeroperl/actions/runs/34116837410)
+rebuilt clean tagged commit `4d2593f` and passed qualification for both packages.
+It published/verified the licence assets and successfully staged the Perl-specific
+1.0.4 package. Only alias staging failed: npm returned 404 because the unsuffixed
+name needs its first publication. The attested alias was downloaded to
+`dist/downloads/github-34116837410/alias/tarball/` and its SHA-512 pack integrity
+was verified. Local `NPM-SEED.md` contains exact upload and trusted-publisher
+instructions. No npm publication or approval was performed by this task.
+
+Only main and development remain locally and on github/origin, verified against
+remote heads after deleting branches already contained in main. Both branches
+contain the release changes; development tracks origin/development.

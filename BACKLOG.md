@@ -128,3 +128,8 @@ changes. Curation of the broad notice archive is an optional size improvement.
 - [ ] Seed the unsuffixed npm name with the GitHub-built candidate, then
   configure its independent stage-only trusted publisher (see RELEASING.md).
 - [ ] Approve the versioned 1.0.4 staged package in npm after review.
+
+- [x] Verify GitHub 1.0.4 build, both npm candidates, public licence assets and
+  automatic staging of the existing Perl-specific package. Alias seeding is
+  the sole remaining bootstrap step; its candidate is downloaded locally.
+- [x] Remove all merged extra branches locally and on github/origin.
