@@ -261,7 +261,7 @@ guard, not proof that a core extension or a new XS module works in WASM.
 
 ### 5. Build and exercise the module in WASM
 
-Add a functional case to [tests/smoke/lib/Core/TestMod.pm](tests/smoke/lib/Core/TestMod.pm)
+Add a functional case to [t/smoke/lib/Core/TestMod.pm](t/smoke/lib/Core/TestMod.pm)
 or an appropriate dedicated test. Exercise a real XS-backed operation, including
 relevant error paths; a successful `require` alone is insufficient. Confirm
 supporting modules and data files survive prefix trimming.
@@ -299,12 +299,12 @@ python3 tools/verify-notices.py "$artifact_dir/third-party-notices-$release_id.t
 (cd "$artifact_dir" && shasum -a 256 -c "SHA256SUMS-$release_id")
 ```
 
-The container also runs [tests/cpan/lock.t](tests/cpan/lock.t) under the selected
+The container also runs [t/cpan/lock.t](t/cpan/lock.t) under the selected
 native Perl. To run that suite independently after creating a tools image:
 
 ```sh
 container run --rm -v "$PWD:/review:ro" zeroperl-cpan-tools:5.44.0 \
-  /build/native/prefix/bin/prove /review/tests/cpan/lock.t
+  /build/native/prefix/bin/prove /review/t/cpan/lock.t
 ```
 
 Use `docker` instead of `container` when the image was built with Docker.
@@ -432,7 +432,7 @@ Shrink implementation notes:
 - `TRACE_EXPLICIT_PACKAGES` registers `--explicit-package` modules; when `TRACE_EXPAND_EXPLICIT_PACKAGE_TREES=true`, those packages are retained as full directory subtrees.
 - When `TRACE_EXPAND_DEPENDENCY_PACKAGE_TREES=true`, traced dependency modules are also retained as full package trees.
 - Generated shrink artifacts live in `gen/` and can be refreshed via `tools/regen-wasm-shrink.sh`.
-- Checked-in smoke corpus sources live in `tests/smoke/` (`sample.jpg.b64`, `sample.tiff.b64`, `sample.xmp`).
+- Checked-in smoke corpus sources live in `t/smoke/` (`sample.jpg.b64`, `sample.tiff.b64`, `sample.xmp`).
 - Prefix/full image builds with `BUILD_EXIFTOOL=true` now run shrink smoke automatically in the `wasi-perl` stage and fail if missing paths are detected.
 - Run smoke validation manually inside the wasi build image for version-matched Perl (Apple Containers on macOS):
   - `container run --rm -v $PWD:/work -w /work zeroperl:wasi sh -lc './tools/wasm-smoke.sh .'`

@@ -125,12 +125,12 @@ COPY patches/ /build/repo/patches/
 # the expensive interpreter and CPAN layers.
 COPY stubs/*.h stubs/*.pm stubs/sfs*.c /build/repo/stubs/
 COPY tools/ /build/repo/tools/
-COPY tests/smoke/ /build/repo/tests/smoke/
-COPY tests/sfs/ /build/repo/tests/sfs/
-COPY tests/cpan/ /build/repo/tests/cpan/
-RUN "$NATIVE_DIR/prefix/bin/prove" /build/repo/tests/cpan/lock.t
+COPY t/smoke/ /build/repo/t/smoke/
+COPY t/sfs/ /build/repo/t/sfs/
+COPY t/cpan/ /build/repo/t/cpan/
+RUN "$NATIVE_DIR/prefix/bin/prove" /build/repo/t/cpan/lock.t
 RUN if [ "${BUILD_CPANFILE}" = "true" ]; then \
-      "$NATIVE_DIR/prefix/bin/prove" /build/repo/tests/cpan/xs-runtime.t; \
+      "$NATIVE_DIR/prefix/bin/prove" /build/repo/t/cpan/xs-runtime.t; \
     fi
 RUN chmod +x /build/repo/wasi-bin/* /build/repo/pipeline/*.sh \
     /build/repo/tools/*.sh /build/repo/tools/*.pl && \
@@ -150,9 +150,9 @@ RUN if [ "${BUILD_CPANFILE}" = "true" ]; then /build/repo/pipeline/build-wasi-cp
 
 RUN /build/repo/pipeline/prepare-prefix.sh
 
-RUN node /build/repo/tests/sfs/test-generator.js
+RUN node /build/repo/t/sfs/test-generator.js
 
-RUN make -C /build/repo/tests/sfs test-sfs
+RUN make -C /build/repo/t/sfs test-sfs
 
 RUN if [ "$BUILD_EXIFTOOL" = "true" ] && [ "$ZEROPERL_EMBED_PREFIX" = "true" ]; then \
       /build/repo/tools/wasm-smoke.sh /build/repo; \

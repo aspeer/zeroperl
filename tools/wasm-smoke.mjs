@@ -181,8 +181,8 @@ async function main() {
   // /work is required because core-smoke.pl writes to /work/_smoke_tmp via IO::File
   fileSystem.ensureDir("/work");
 
-  // Always mount tests/smoke/lib so Core::TestMod is available for core-mod-smoke.pl
-  await mountDirectory(fileSystem, path.join(repoRoot, "tests", "smoke", "lib"), "/lib");
+  // Always mount t/smoke/lib so Core::TestMod is available for core-mod-smoke.pl
+  await mountDirectory(fileSystem, path.join(repoRoot, "t", "smoke", "lib"), "/lib");
 
   let mountPoint = "";
   let perlVersion = "";
@@ -264,7 +264,7 @@ async function main() {
   console.log("TESTLIB_INC_OK");
 
   // Core smoke
-  const coreSmoke = await readFile(path.join(repoRoot, "tests", "smoke", "core-smoke.pl"), "utf8");
+  const coreSmoke = await readFile(path.join(repoRoot, "t", "smoke", "core-smoke.pl"), "utf8");
   const coreResult = await perl.eval(coreSmoke);
   perl.flush();
   if (!coreResult.success || coreResult.exitCode !== 0) {
@@ -274,7 +274,7 @@ async function main() {
   console.log("CORE_SMOKE_PL_OK");
 
   // Core mod smoke
-  const coreModSmoke = await readFile(path.join(repoRoot, "tests", "smoke", "core-mod-smoke.pl"), "utf8");
+  const coreModSmoke = await readFile(path.join(repoRoot, "t", "smoke", "core-mod-smoke.pl"), "utf8");
   const modResult = await perl.eval(coreModSmoke);
   perl.flush();
   if (!modResult.success || modResult.exitCode !== 0) {
@@ -287,9 +287,9 @@ async function main() {
   if (exiftoolPath) {
     const exiftoolScript = await readFile(exiftoolPath);
     const [sampleJpgB64, sampleTiffB64, sampleXmp] = await Promise.all([
-      readFile(path.join(repoRoot, "tests", "smoke", "sample.jpg.b64"), "utf8"),
-      readFile(path.join(repoRoot, "tests", "smoke", "sample.tiff.b64"), "utf8"),
-      readFile(path.join(repoRoot, "tests", "smoke", "sample.xmp")),
+      readFile(path.join(repoRoot, "t", "smoke", "sample.jpg.b64"), "utf8"),
+      readFile(path.join(repoRoot, "t", "smoke", "sample.tiff.b64"), "utf8"),
+      readFile(path.join(repoRoot, "t", "smoke", "sample.xmp")),
     ]);
     const smokeFiles = {
       sampleJpg: decodeBase64File(sampleJpgB64),

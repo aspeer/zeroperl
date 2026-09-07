@@ -1,4 +1,4 @@
-# tests/sfs/Makefile
+# t/sfs/Makefile
 # Build and run SFS baseline tests natively on macOS/Linux.
 #
 # Usage:

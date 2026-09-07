@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 const base = process.argv[2];
-if (!base) throw new Error('Usage: node tests/runtime/smoke-stream-sequence.mjs BASE_URL');
+if (!base) throw new Error('Usage: node t/runtime/smoke-stream-sequence.mjs BASE_URL');
 const response = await fetch(new URL('sse.psp', base), {
   headers: {accept: 'text/event-stream'}, signal: AbortSignal.timeout(10000),
 });

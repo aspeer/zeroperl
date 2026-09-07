@@ -238,5 +238,5 @@ The original context cancellation no longer reproduces in 1,000 overlap rounds
 on Perl 5.44.0, including concurrent storage checks. Forced WebSocket termination
 still emits a separate hung-request diagnostic. Publication remains paused for
 that investigation and hosted acceptance; see CLOUDFLARE-CONTEXT-INVESTIGATION.md.
-Fixtures for sequential acceptance remain in `tests/runtime/stream-sequence`;
-run `node tests/runtime/smoke-stream-sequence.mjs http://127.0.0.1:PORT/`.
+Fixtures for sequential acceptance remain in `t/runtime/stream-sequence`;
+run `node t/runtime/smoke-stream-sequence.mjs http://127.0.0.1:PORT/`.

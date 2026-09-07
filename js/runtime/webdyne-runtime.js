@@ -2,6 +2,7 @@ import { ZeroPerl } from "../zeroperl.js";
 import { createPerlFileSystem } from "./perl-filesystem.js";
 import { perlJsonExpression, webdyneRuntimeConfig } from "./config.js";
 import { createExtensionManager } from "./extensions.js";
+import { createLifespanTransport } from "../transport/lifespan.js";
 import {
   buildPagiScope,
   createDisconnectDispatcher,
@@ -100,15 +101,22 @@ export function createWebDyneRuntime({
     });
   }
 
-  function stopPagiSession(session) {
+  function stopPagiSession(session, error) {
     session.receiveDispatcher?.stop();
     session.disconnectDispatcher?.stop();
     session.timers?.cancelAll();
+    session.lifespan?.close(error ?? new Error("PAGI lifespan session retired"));
     pagiSessions.delete(session.id);
   }
 
   function finishPagiSession(session) {
     if (session.finished) return;
+    if (session.lifespan) {
+      const error = new Error("PAGI lifespan application exited before shutdown");
+      failPagiSession(session, error);
+      void persistentPerlQueue.then(() => resetPersistentRuntime(error));
+      return;
+    }
     session.finished = true;
     stopPagiSession(session);
     if (!session.sink.started || (!session.sink.finished && session.connection.status().connected)) {
@@ -141,7 +149,7 @@ export function createWebDyneRuntime({
   function failPagiSession(session, error, { abort = true } = {}) {
     if (session.finished) return;
     session.finished = true;
-    stopPagiSession(session);
+    stopPagiSession(session, error);
     const normalized = describePagiFailure(session, error);
     if (abort) abortPersistentSession(session);
     console.error("PAGI session failed", {
@@ -276,10 +284,11 @@ export function createWebDyneRuntime({
         const load = await perl.runFile(file);
         if (!load.success) throw new Error(load.error);
       }
+      await startLifespan(generation);
       return { perl, generation };
     } catch (error) {
-      persistentPerl = undefined;
-      await perl.dispose();
+      if (persistentPerl === perl) await resetPersistentRuntime(error);
+      else if (persistentRuntimeResetPromise) await persistentRuntimeResetPromise;
       throw error;
     }
   }
@@ -309,7 +318,7 @@ export function createWebDyneRuntime({
       connection: transport.connection,
       finished: false,
       runtimeGeneration: undefined,
-      showFailureDetails: showFailureDetails(request),
+      showFailureDetails: request ? showFailureDetails(request) : false,
       completion: new Promise((nextResolve, nextReject) => { resolve = nextResolve; reject = nextReject; }),
       resolve: () => resolve(),
       reject: (error) => reject(error),
@@ -368,25 +377,13 @@ export function createWebDyneRuntime({
 
   async function startPersistentSession(scope, request, transport, runtimeConfig) {
     const session = createPagiSession(scope, request, transport);
+    // Bootstrap can fail before this function reaches session.completion.
+    void session.completion.catch(() => undefined);
     pagiSessions.set(session.id, session);
     try {
       const runtime = await persistentRuntime(runtimeConfig);
       session.runtimeGeneration = runtime.generation;
-      await enqueuePersistentPerl(session, "Pagi::ZeroPerl::Runner::start_session", (perl) => {
-        const sessionValue = perl.createInt(session.id);
-        // The scope crosses the ABI as an owned JSON value. WebDyne can safely
-        // decorate the decoded Perl graph without retaining JS-owned values.
-        const scopeValue = perl.createString(serializePagiScope(scope));
-        const entrypointValue = perl.createString("Pagi::WebDyne::application");
-        return {
-          args: [sessionValue, scopeValue, entrypointValue],
-          dispose: () => {
-            sessionValue.dispose();
-            scopeValue.dispose();
-            entrypointValue.dispose();
-          },
-        };
-      });
+      await invokeApplication(session);
       return session.completion;
     } catch (error) {
       failPagiSession(session, error);
@@ -394,7 +391,51 @@ export function createWebDyneRuntime({
     }
   }
 
+  function invokeApplication(session) {
+    return enqueuePersistentPerl(session, "Pagi::ZeroPerl::Runner::start_session", (perl) => {
+      const sessionValue = perl.createInt(session.id);
+      // The scope crosses the ABI as an owned JSON value. WebDyne can safely
+      // decorate the decoded Perl graph without retaining JS-owned values.
+      const scopeValue = perl.createString(serializePagiScope(session.scope));
+      const entrypointValue = perl.createString("Pagi::WebDyne::application");
+      return {
+        args: [sessionValue, scopeValue, entrypointValue],
+        dispose: () => {
+          sessionValue.dispose();
+          scopeValue.dispose();
+          entrypointValue.dispose();
+        },
+      };
+    });
+  }
+
+  /** Gate the first requests on startup acknowledgement, not the lifespan Future. */
+  async function startLifespan(generation) {
+    const transport = createLifespanTransport();
+    const session = createPagiSession(transport.scope, null, transport);
+    session.lifespan = transport;
+    session.runtimeGeneration = generation;
+    pagiSessions.set(session.id, session);
+    // Keep the long-lived completion observed; failure also rejects startup.
+    void session.completion.catch((error) => transport.sink.fail(error));
+    const ready = transport.startup;
+    void ready.catch(() => undefined);
+    const timeout = setTimeout(() => {
+      failPagiSession(session, new Error("PAGI lifespan startup timed out after 10000 ms"));
+    }, 10000);
+    try {
+      await invokeApplication(session);
+      await ready;
+      // Finish the acknowledgement's Perl turn before publishing the runtime.
+      await persistentPerlQueue;
+      if (session.finished) throw new Error("PAGI lifespan application failed during startup");
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   function dispatch(request, bindings = {}) {
+    const runtimeConfig = webdyneRuntimeConfig(bindings);
     const scope = buildPagiScope(request);
     const releaseExtensions = extensionManager.attachScope({ scope, bindings, request });
     let transport;
@@ -408,7 +449,7 @@ export function createWebDyneRuntime({
       scope,
       request,
       transport,
-      webdyneRuntimeConfig(bindings),
+      runtimeConfig,
     ).catch((error) => {
       if (!error?.pagiErrorId) console.error("PAGI application failed:", error);
     }).finally(() => {

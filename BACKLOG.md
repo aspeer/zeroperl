@@ -71,13 +71,13 @@ changes. Curation of the broad notice archive is an optional size improvement.
   after verifying changes against every supported Perl version.
 - [x] Fix SSE completion followed by WebSocket startup trapping in the same
   persistent interpreter: corrected Asyncify re-entry stack restoration.
-  Reproducer: `tests/runtime/smoke-stream-sequence.mjs` and adjacent fixtures.
+  Reproducer: `t/runtime/smoke-stream-sequence.mjs` and adjacent fixtures.
 - [x] Register all Cloudflare session completions with waitUntil; original
   overlapping-request context cancellation no longer reproduces on Perl 5.44.0.
 - [x] Isolate forced-WebSocket hung-request diagnostics: standalone JavaScript
   reproduces them on two workerd versions; WebDyne sessions complete cleanup.
 - [x] Maintainer accepts the abrupt-disconnect warning as a known limitation.
-  Standalone reproduction: `tests/runtime/hung-request`.
+  Standalone reproduction: `t/runtime/hung-request`.
 - [x] Fix long-lived SSE cancellation with enable_request_signal and pass
   final-package local lifetime/overlap acceptance. Earlier 3.026 hosted tests pass.
 - [x] Repeat hosted acceptance with the exact final binary after upload approval;
@@ -133,3 +133,28 @@ changes. Curation of the broad notice archive is an optional size improvement.
   automatic staging of the existing Perl-specific package. Alias seeding is
   the sole remaining bootstrap step; its candidate is downloaded locally.
 - [x] Remove all merged extra branches locally and on github/origin.
+
+
+## Lifespan follow-ups after basic startup (2026-09-07)
+
+- Add graceful shutdown dispatch for controlled, healthy interpreter disposal;
+  do not promise a callback on isolate eviction or WASM traps.
+- [x] Add portable WebDyne startup/shutdown callbacks and scaffold function-name
+  configuration (core merge 645cf4d5; development integration 2026-09-07).
+- Add Perl-owned lifespan state and shallow request-state propagation.
+- Define interpreter-lifetime Cloudflare capabilities before sharing D1/KV/R2
+  facades created during startup. Current capabilities remain request-scoped.
+- Add generic `.pagi` application loading and its unsupported-lifespan policy.
+- Qualify custom asynchronous/background lifespan work under Worker request
+  ownership before promising a general background-service lifecycle.
+
+## PAGI JSON performance follow-up (2026-09-07)
+
+- Measure hosted request/stream performance if needed: local runner benchmarks
+  exclude bridge crossings, rendering and networking.
+- Investigate large base64-heavy JSON encoding only if profiling warrants it:
+  the shared XS codec improves small events/polling substantially but the 64 KiB
+  body microbenchmark is 12% slower in WASM. See `t/runtime/bench-runner.pl.md`.
+
+- Rebuild/qualify a runtime with the merged WebDyne lifespan callbacks before
+  publishing a package that supports callbacks without a library overlay.

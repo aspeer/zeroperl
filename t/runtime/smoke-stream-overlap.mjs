@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 const base = process.argv[2];
-if (!base) throw new Error('Usage: node tests/runtime/smoke-stream-overlap.mjs BASE_URL');
+if (!base) throw new Error('Usage: node t/runtime/smoke-stream-overlap.mjs BASE_URL');
 async function socketEcho(id){
  await new Promise((resolve,reject)=>{
   const socket=new WebSocket(new URL('ws.psp',base.replace(/^http/, 'ws')));

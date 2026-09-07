@@ -1,5 +1,5 @@
 /*
- * tests/sfs/test-sfs.c
+ * t/sfs/test-sfs.c
  * Unit tests for production SFS runtime and compression modules.
  */
 
@@ -663,7 +663,7 @@ static void test_system_open_unreadable_propagates_permission(void) {
  *   4. System call pass-through (ENOENT, permission denied)
  */
 int main(void) {
-  printf("tests/sfs/test-sfs.c\n");
+  printf("t/sfs/test-sfs.c\n");
   printf("==============================\n");
 
   test_access_found_and_missing();

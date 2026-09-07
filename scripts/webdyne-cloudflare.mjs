@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// Application CLI: package WebDyne sources and drive the bundled Wrangler.
+// Runtime service bridges are supplied by WebDyne extension packages.
+
 import { access, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { createInterface } from "node:readline/promises";
@@ -9,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { buildApplicationArchives } from "./build-vfs.mjs";
 import { installCpanDependencies } from "./install-cpan.mjs";
 import { defaultAssetsIgnore, readAssetsPolicy } from "./assets.mjs";
+import { lifespanCallbackName } from "../js/runtime/config.js";
 import {
   extensionConfiguration,
   extensionWorkerSource,
@@ -20,6 +24,8 @@ const distributionPackage = JSON.parse(await readFile(resolve(packageRoot, "pack
 const distributionName = distributionPackage.name ?? "@webdyne/webdyne-zeroperl-5.44.0";
 const distributionVersion = distributionPackage.version ?? "development";
 
+// Check whether a path is accessible without making callers handle filesystem errors.
+//
 async function exists(path) {
   try {
     await access(path, constants.F_OK);
@@ -29,6 +35,8 @@ async function exists(path) {
   }
 }
 
+// Print CLI commands and options, then exit with success or a usage error.
+//
 function usage(error) {
   if (error) console.error(error);
   console.error(`Usage:
@@ -50,6 +58,8 @@ Options:
   process.exit(error ? 1 : 0);
 }
 
+// Validate an optional configuration object, treating an omitted value as empty.
+//
 function assertObject(value, description) {
   if (value === undefined) return {};
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -58,11 +68,27 @@ function assertObject(value, description) {
   return value;
 }
 
+function lifespanBindings(value) {
+  const lifespan = assertObject(value, "package.json webdyne.lifespan");
+  const bindings = {};
+  for (const [phase, callback] of Object.entries(lifespan)) {
+    if (!["startup", "shutdown"].includes(phase)) {
+      throw new Error(`Unknown package.json webdyne.lifespan option: ${phase}`);
+    }
+    bindings[`WEBDYNE_${phase.toUpperCase()}`] = lifespanCallbackName(callback, `webdyne.lifespan.${phase}`);
+  }
+  return bindings;
+}
+
+// Check lexical containment, including the parent itself; symlinks are checked separately.
+//
 function isInside(parent, candidate) {
   const path = relative(parent, candidate);
   return path === "" || (!path.startsWith(`..${sep}`) && path !== "..");
 }
 
+// Resolve a non-empty path and reject traversal outside its allowed root.
+//
 function safeProjectPath(projectRoot, requested, description) {
   if (typeof requested !== "string" || requested.length === 0) {
     throw new Error(`${description} must be a non-empty path`);
@@ -72,6 +98,8 @@ function safeProjectPath(projectRoot, requested, description) {
   return path;
 }
 
+// Apply project defaults and parse CLI options, preserving arguments after -- for Wrangler.
+//
 function parseArguments(argv, defaults) {
   const command = argv.shift();
   if (!command || command === "--help" || command === "-h") usage();
@@ -86,6 +114,13 @@ function parseArguments(argv, defaults) {
     wranglerConfig: defaults.wranglerConfig,
     wranglerArguments: [],
   };
+  const names = new Map([
+    ["--app-directory", "appDirectory"],
+    ["--document-root", "appDirectory"],
+    ["--entry", "entry"],
+    ["--output", "output"],
+    ["--wrangler-config", "wranglerConfig"],
+  ]);
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--") {
@@ -98,13 +133,6 @@ function parseArguments(argv, defaults) {
       options.libraries.push(value);
       continue;
     }
-    const names = new Map([
-      ["--app-directory", "appDirectory"],
-      ["--document-root", "appDirectory"],
-      ["--entry", "entry"],
-      ["--output", "output"],
-      ["--wrangler-config", "wranglerConfig"],
-    ]);
     const name = names.get(argument);
     if (!name) usage(`Unknown option: ${argument}`);
     const value = argv[++index];
@@ -114,6 +142,8 @@ function parseArguments(argv, defaults) {
   return options;
 }
 
+// Derive a Worker name from the unscoped npm package name, with a safe fallback.
+//
 function workerName(packageJson) {
   const source = packageJson.name || "webdyne-app";
   const unscoped = source.includes("/") ? source.split("/").at(-1) : source;
@@ -121,6 +151,8 @@ function workerName(packageJson) {
   return (normalized || "webdyne-app").slice(0, 63);
 }
 
+// Load application metadata and normalize WebDyne settings into CLI defaults.
+//
 async function readProject(projectRoot) {
   const packagePath = resolve(projectRoot, "package.json");
   if (!(await exists(packagePath))) {
@@ -128,6 +160,7 @@ async function readProject(projectRoot) {
   }
   const packageJson = JSON.parse(await readFile(packagePath, "utf8"));
   const webdyne = assertObject(packageJson.webdyne, "package.json webdyne");
+  lifespanBindings(webdyne.lifespan);
   const cloudflare = assertObject(webdyne.cloudflare, "package.json webdyne.cloudflare");
   const extensions = extensionConfiguration(webdyne.extensions);
   const libraries = webdyne.perlLibrary === undefined
@@ -151,6 +184,8 @@ async function readProject(projectRoot) {
   };
 }
 
+// Add application defaults, npm commands and ignore files while preserving existing scripts.
+//
 async function initialize(projectRoot, project, options) {
   const appRoot = safeProjectPath(projectRoot, options.appDirectory, "WebDyne application directory");
   const output = safeProjectPath(projectRoot, options.output, "WebDyne output directory");
@@ -196,8 +231,9 @@ async function initialize(projectRoot, project, options) {
   if (!(await exists(resolve(appRoot, options.entry)))) console.log(`Create ${options.appDirectory}/${options.entry} before building.`);
 }
 
+// Resolve Wrangler assets and their privacy policy, honoring an explicit --assets option.
+//
 async function applicationAssets(projectRoot, options) {
-  // An explicit Wrangler --assets takes precedence, including Scratch's scripts.
   const args = options.wranglerArguments;
   let requested = options.appDirectory;
   let explicit = false;
@@ -217,11 +253,15 @@ async function applicationAssets(projectRoot, options) {
   return { policy, arguments: policy && !explicit ? ["--assets", directory] : [] };
 }
 
+// Load the packaged file hashes used to omit byte-identical embedded Perl modules.
+//
 async function readEmbeddedFiles() {
   const inventory = resolve(packageRoot, "embedded-files.json");
   return (await exists(inventory)) ? JSON.parse(await readFile(inventory, "utf8")) : {};
 }
 
+// Package application and Perl libraries, then write the Worker entry with extension imports.
+//
 async function build(projectRoot, project, options, assets) {
   const outputDirectory = safeProjectPath(projectRoot, options.output, "WebDyne output directory");
   const appDirectory = relative(
@@ -274,6 +314,10 @@ export default createCloudflareWorker({
   return { outputDirectory, appDirectory, extensions };
 }
 
+// Validate D1 deployment settings and translate them to Wrangler field names.
+// This belongs to CLI configuration generation; D1 queries and Perl marshalling
+// are implemented by the pm-WebDyne-Cloudflare runtime extension.
+//
 function cloudflareD1Databases(value) {
   if (value === undefined) return undefined;
   if (!Array.isArray(value)) throw new TypeError("package.json webdyne.cloudflare.d1Databases must be an array");
@@ -297,6 +341,8 @@ function cloudflareD1Databases(value) {
   });
 }
 
+// Validate KV deployment settings and translate them to Wrangler namespace bindings.
+//
 function cloudflareKVNamespaces(value) {
   if (value === undefined) return undefined;
   if (!Array.isArray(value)) throw new TypeError("package.json webdyne.cloudflare.kvNamespaces must be an array");
@@ -325,6 +371,8 @@ function cloudflareKVNamespaces(value) {
   });
 }
 
+// Validate R2 deployment settings and translate them to Wrangler bucket bindings.
+//
 function cloudflareR2Buckets(value) {
   if (value === undefined) return undefined;
   if (!Array.isArray(value)) throw new TypeError("package.json webdyne.cloudflare.r2Buckets must be an array");
@@ -351,6 +399,9 @@ function cloudflareR2Buckets(value) {
   });
 }
 
+// Use an explicit or project-root Wrangler config, otherwise write the generated defaults.
+// Binding translation applies only to generated configuration; supplied files are left intact.
+//
 export async function generatedWranglerConfig(projectRoot, project, options, outputDirectory) {
   if (options.wranglerConfig) {
     const explicit = safeProjectPath(projectRoot, options.wranglerConfig, "Wrangler configuration");
@@ -372,6 +423,7 @@ export async function generatedWranglerConfig(projectRoot, project, options, out
       WEBDYNE_ROOT: "/app",
       WEBDYNE_INDEX: options.entry,
       WEBDYNE_STATIC: project.webdyne.static === false ? "0" : "1",
+      ...lifespanBindings(project.webdyne.lifespan),
     },
     rules: [
       { type: "Text", globs: ["**/*.pl", "**/*.pm"], fallthrough: false },
@@ -391,6 +443,8 @@ export async function generatedWranglerConfig(projectRoot, project, options, out
   return generatedConfig;
 }
 
+// Run the bundled Wrangler with inherited terminal streams and report startup or exit failures.
+//
 function runWrangler(arguments_, projectRoot) {
   return new Promise((resolvePromise, reject) => {
     let wranglerCli;
@@ -413,6 +467,8 @@ function runWrangler(arguments_, projectRoot) {
   });
 }
 
+// Require an interactive terminal and explicit Yes before allowing Worker deletion.
+//
 export async function confirmDestroy(message, input = process.stdin, output = process.stdout) {
   if (!input.isTTY || !output.isTTY) {
     throw new Error("destroy requires an interactive terminal; no Worker was deleted");
@@ -425,7 +481,15 @@ export async function confirmDestroy(message, input = process.stdin, output = pr
   }
 }
 
-export async function main(argv = process.argv.slice(2), projectRoot = process.cwd(), wrangler = runWrangler, confirm = confirmDestroy) {
+// Dispatch authentication, initialization, deletion and build/deploy commands.
+// Injectable Wrangler and confirmation functions let tests exercise commands without deployment.
+//
+export async function main(
+  argv = process.argv.slice(2),
+  projectRoot = process.cwd(),
+  wrangler = runWrangler,
+  confirm = confirmDestroy,
+) {
   // Canonicalize once so package-manager symlinks and macOS' /var -> /private/var
   // alias cannot make a resolved extension appear to escape the project root.
   const root = await realpath(resolve(projectRoot));
@@ -460,22 +524,21 @@ export async function main(argv = process.argv.slice(2), projectRoot = process.c
 
   const config = await generatedWranglerConfig(root, project, options, built.outputDirectory);
   const configArguments = ["--config", config, ...assets.arguments];
-  if (options.command === "check") {
-    await wrangler([
-      "deploy", "--dry-run", "--outdir", resolve(built.outputDirectory, "dist"),
-      ...configArguments, ...options.wranglerArguments,
-    ], root);
-  } else if (options.command === "dev") {
-    await wrangler(["dev", ...configArguments, ...options.wranglerArguments], root);
-  } else if (options.command === "deploy") {
-    await wrangler([
-      "deploy", "--dry-run", "--outdir", resolve(built.outputDirectory, "dist"),
-      ...configArguments, ...options.wranglerArguments,
-    ], root);
-    await wrangler(["deploy", ...configArguments, ...options.wranglerArguments], root);
+  const wranglerArguments = [...configArguments, ...options.wranglerArguments];
+  if (options.command === "dev") {
+    await wrangler(["dev", ...wranglerArguments], root);
+    return;
   }
+
+  // Both check and deploy validate the bundle; only deploy then uploads it.
+  await wrangler([
+    "deploy", "--dry-run", "--outdir", resolve(built.outputDirectory, "dist"),
+    ...wranglerArguments,
+  ], root);
+  if (options.command === "deploy") await wrangler(["deploy", ...wranglerArguments], root);
 }
 
+// Run only when invoked as the CLI, including through an npm executable symlink.
 const invokedPath = process.argv[1] ? await realpath(resolve(process.argv[1])).catch(() => undefined) : undefined;
 const modulePath = await realpath(fileURLToPath(import.meta.url));
 if (invokedPath === modulePath) {

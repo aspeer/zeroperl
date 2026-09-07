@@ -113,7 +113,7 @@ Artifact evidence:
 See RELEASE-REVIEW.md for the exact coverage and remaining publication actions.
 `npm run test:cloudflare-package` now covers library override deduplication,
 Perl-safe bootstrap configuration and failed Fetch response construction.
-`make -C tests/sfs` runs native C and generator tests; the generator harness
+`make -C t/sfs` runs native C and generator tests; the generator harness
 supports the root ESM package scope. Build tools require a native lz4 addon
 compiled for the Node architecture in use.
 
@@ -145,7 +145,7 @@ ESM, CJS and strict NodeNext checks.
 
 ## CPAN snapshot checks
 
-`tests/cpan/xs-runtime.t` runs the shared `Core::XSCompatibility` checks under
+`t/cpan/xs-runtime.t` runs the shared `Core::XSCompatibility` checks under
 native Perl during the container build. The WASM smoke harness runs the same
 checks twice in one interpreter: actual XS entry points, subroutine names,
 parameter validation, hash/array accessors, CSV quoting/Unicode/binary/error
@@ -155,11 +155,11 @@ handling, and Variable::Magic attach/detach/scope cleanup.
 from Variable::Magic set/free callbacks over three interpreter turns. It runs
 in release qualification alongside the existing lifecycle tests.
 
-`tests/cpan/lock.t` runs in the container build with the selected native Perl
+`t/cpan/lock.t` runs in the container build with the selected native Perl
 and Carton. It checks input binding, archive integrity, locked recipe lookup,
 and rejection of unsupported installed XS modules. Run it independently with
 `container run --rm -v "$PWD:/review:ro" zeroperl-cpan-tools:5.44.0
-/build/native/prefix/bin/prove /review/tests/cpan/lock.t` (one shell line).
+/build/native/prefix/bin/prove /review/t/cpan/lock.t` (one shell line).
 
 Snapshot generation and full WASM builds must pass for each supported Perl.
 Repeat `make cpanfile.snapshot` without input changes and check that the snapshot
@@ -205,7 +205,7 @@ so the cleanup did not require another WASM build or repeated runtime matrix.
 
 ### Request error isolation
 
-`prove tests/runtime/webdyne-error-isolation.t` exercises a recovered API
+`prove t/runtime/webdyne-error-isolation.t` exercises a recovered API
 exception followed by an ordinary PSP request three times, plus an uncaught
 current-request failure and recovery. The regression failed before the adapter
 fix and passes all 12 assertions afterward. Local Wrangler acceptance also
@@ -214,7 +214,7 @@ checks D1 batch rollback/recovery immediately followed by KV and R2 operations.
 The mixed stream acceptance sequence currently fails on the final 5.44.0
 local Worker: SSE emits ready/done successfully, then WebSocket startup traps
 with a WASM memory access error. This reproduces before and after the diagnostic
-isolation fix. See `tests/runtime/smoke-stream-sequence.mjs`; publication remains
+isolation fix. See `t/runtime/smoke-stream-sequence.mjs`; publication remains
 blocked pending resolution. Standalone text/binary WebSocket echo passes.
 
 ## Asyncify re-entry qualification (2026-09-05)
@@ -234,8 +234,8 @@ release gate; these bridge checks do not certify provider request lifetimes.
 ## Cloudflare completion retention
 
 The implemented provider correction passes 1,000 rounds (6,000 requests) using
-`ROUNDS=1000 node tests/runtime/smoke-stream-overlap.mjs BASE_URL`. Install the
-existing `tests/runtime/stream-sequence` fixtures in the acceptance app first.
+`ROUNDS=1000 node t/runtime/smoke-stream-overlap.mjs BASE_URL`. Install the
+existing `t/runtime/stream-sequence` fixtures in the acceptance app first.
 D1/KV/R2 checks during overlap and a WebSocket echo after 45 seconds also pass.
 All 17 runtime JavaScript tests pass. Forced socket termination leaves service
 responsive but produces a separate hung-request warning; see
@@ -243,7 +243,7 @@ CLOUDFLARE-CONTEXT-INVESTIGATION.md for evidence and remaining qualification.
 
 ## Hung-request diagnostic isolation
 
-`tests/runtime/hung-request/README.md` documents the standalone reproduction
+`t/runtime/hung-request/README.md` documents the standalone reproduction
 and observed toolchain versions. The Node TCP client passes follow-up HTTP
 checks against both the standalone Worker and Perl 5.44; both log the diagnostic.
 Temporary tracing confirms WebDyne session removal and extension release.
@@ -289,7 +289,7 @@ rejection, symlink boundaries, and authentication without an application.
 Validation on `development`:
 
 - `npm run test:cloudflare-package`: all 36 JavaScript tests pass.
-- `prove tests/runtime/webdyne-error-isolation.t`: all 12 native Perl checks pass.
+- `prove t/runtime/webdyne-error-isolation.t`: all 12 native Perl checks pass.
 - ESLint recommended rules with Node globals pass for the changed JavaScript;
   this repository has no configured root lint command. No TypeScript changed.
 - Prepared the real 5.44.0/1.0.3 candidate from existing verified WASM artifacts
@@ -334,3 +334,66 @@ The updated development tarball passes the 6 MB inventory gate (4,839,408
 bytes). Installed it over the previous local package in the independent test
 app, reran init, and verified the destroy script was added. A real subprocess
 with piped Yes exits with the interactive-terminal error before Wrangler runs.
+
+
+## Test directory layout
+
+The main suite lives under `t/`: `cpan/`, `runtime/`, `smoke/` and `sfs/`,
+plus the Python notice tests. JavaScript package/release tests remain in
+`t.js/`. Run the native Perl test subset with `prove -r t` in the prepared
+build environment; it needs the pinned CPAN/XS dependencies.
+
+
+## Basic lifespan startup (2026-09-07)
+
+- `prove t/runtime/lifespan.t t/runtime/webdyne-error-isolation.t`: 18 native
+  assertions pass, including actual WebDyne startup acknowledgement, a pending
+  lifespan Future and session removal on retirement.
+- `npm run test:cloudflare-package`: all 47 JavaScript tests pass. The new
+  `t.js/lifespan.test.mjs` covers acknowledgement, pending receive, invalid
+  messages, startup failure and host-wait cleanup.
+- `node t/runtime/smoke-lifespan.mjs
+  output/5.44.0/zeroperl-webdyne-5.44.0-1.0.4.wasm` (one command): passes actual
+  WebDyne startup, concurrent cold and warm requests, explicit startup failure,
+  replacement-generation startup, early application return, asynchronous timer
+  resumption and missing-acknowledgement timeout. The test imports current
+  source through a Node text loader and requires an existing qualified artifact.
+- Local Wrangler 4.127.1 with that artifact and current source passes concurrent
+  cold HTTP, SSE, WebSocket echo and warm HTTP. The temporary fixture used the
+  existing 2026-08-27 compatibility date: the installed workerd supports dates
+  only through 2026-09-04 and rejects today's 2026-09-07 date. No dependencies
+  or production configuration were changed to work around that limitation.
+
+No TypeScript changed; no root lint configuration exists. Older Perl WASM
+versions and remote deployment were not run for this increment.
+
+## PAGI runner JSON codec
+
+`t/runtime/runner-json.t` checks Unicode and binary wire values, booleans,
+input preservation and recovery after malformed JSON. Run with `prove`, or use
+`t/runtime/test-runner-json.mjs <artifact.wasm>` for the same assertions in WASM.
+The reproducible native/WASM benchmark commands, measurements and limitations
+are recorded in `t/runtime/bench-runner.pl.md`.
+
+
+## Named lifespan callback integration (2026-09-07)
+
+- `npm run test:cloudflare-package`: all 50 JavaScript tests pass. New tests
+  cover callback names, generated bindings, invalid settings before building,
+  and preservation of explicit Wrangler configuration.
+- `prove -I/path/to/pm-WebDyne/lib t/runtime/lifespan-callbacks.t
+  t/runtime/lifespan.t t/runtime/webdyne-error-isolation.t` (one command):
+  35 native assertions pass against the merged core.
+- `node t/runtime/smoke-lifespan-callbacks.mjs
+  output/5.44.0/zeroperl-webdyne-5.44.0-1.0.4.wasm /path/to/pm-WebDyne/lib`
+  (one command): passes old-core rejection, configured async startup once
+  before concurrent/warm requests, missing modules/functions and callback errors.
+  The new core module is explicitly overlaid into the test VFS.
+- Local Wrangler 4.127.1 with generated callback bindings, the existing 1.0.4
+  Perl 5.44 artifact, and the merged core overlay passes concurrent cold HTTP,
+  SSE, WebSocket echo and warm HTTP; PSP observes startup-count=1.
+
+Shutdown invocation is covered by native bootstrap and the core's native/WASM
+callback tests. The Worker does not yet send shutdown. No TypeScript changed,
+no root lint configuration exists, and no new binary or remote deployment was
+produced.

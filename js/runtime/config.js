@@ -1,5 +1,14 @@
 const PERL_LIBRARY_DIR = "/perl5/lib";
 
+/** Callback settings are qualified Perl function names, never Perl expressions. */
+export function lifespanCallbackName(value, description) {
+  if (typeof value !== "string" || value !== value.trim()
+    || !/^[A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)+$/.test(value)) {
+    throw new TypeError(`${description} must be a qualified Perl function name, such as My::App::startup (without parentheses)`);
+  }
+  return value;
+}
+
 /** Select text bindings that are safe to expose through Perl's WASI environment. */
 function webdynePerlEnvironment(bindings = {}) {
   const environment = Object.fromEntries(
@@ -16,6 +25,11 @@ function webdynePerlEnvironment(bindings = {}) {
 
 /** Parse provider bindings into one interpreter's fixed WebDyne configuration. */
 export function webdyneRuntimeConfig(bindings = {}) {
+  const callbacks = {};
+  for (const phase of ["startup", "shutdown"]) {
+    const name = `WEBDYNE_${phase.toUpperCase()}`;
+    if (bindings[name] !== undefined) callbacks[phase] = lifespanCallbackName(bindings[name], name);
+  }
   const flag = (value, fallback = 0) => {
     if (value === undefined) return fallback;
     return /^(?:1|true|yes|on)$/i.test(String(value)) ? 1 : 0;
@@ -32,6 +46,7 @@ export function webdyneRuntimeConfig(bindings = {}) {
     index,
     static: flag(bindings.WEBDYNE_STATIC, 1),
     conf: flag(bindings.WEBDYNE_CONF),
+    ...callbacks,
     perlEnv: webdynePerlEnvironment(bindings),
   };
 }
