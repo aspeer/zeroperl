@@ -326,3 +326,12 @@ records current tooling provenance separately; the embedded binary retains its
 original version/provenance and stable release attribution links. Packages are
 private, packed with npm, and checked against the existing 6 MB inventory gate.
 No release version, build counter, tag or publishing path changes.
+
+## Confirmed Worker teardown (2026-09-07)
+
+`destroy` reuses deployment configuration but skips app/CPAN/VFS processing.
+Wrangler 4.127.1 defaults its confirmation to yes in noninteractive contexts,
+so the wrapper requires a terminal and a full Yes (default No) before invoking
+it. Keep Wrangler's own named-target and dependency confirmations: its --force
+also bypasses dependent-Worker protection, so it must not be used merely to
+avoid a second prompt. No real Worker is deleted during regression testing.

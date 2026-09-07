@@ -264,10 +264,16 @@ its tested Wrangler version. Installation has no deployment side effects.
 
 
 The explicit \`init\` command adds npm scripts for \`build\`, \`check\`, \`dev\`,
-\`deploy\`, \`login\`, \`logout\`, and \`whoami\`, retaining existing scripts.
+\`deploy\`, \`destroy\`, \`login\`, \`logout\`, and \`whoami\`, retaining existing scripts.
 It sets \`webdyne.static: false\` and creates a root \`.assetsignore\` containing
 \`*.psp\`, \`*.pm\`, \`*.pl\`, and \`*.conf\` unless the file already exists.
 Use \`npm run login\`, \`npm run whoami\`, then \`npm run deploy\` to publish.
+Use \`npm run destroy\` to delete the configured Worker. Type the full \`Yes\`
+at the local confirmation (blank means No), then confirm Wrangler's named target.
+Destroy requires an interactive terminal, rejects confirmation-bypass flags,
+and uses deployment configuration without building the application. Rerun
+\`npx webdyne-cloudflare init\` after upgrading to add the new npm script.
+
 
 When the application root contains \`.assetsignore\`, the CLI automatically
 passes \`--assets\` with that directory to Wrangler. Public assets are omitted

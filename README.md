@@ -185,3 +185,13 @@ Development currently builds the server archive once before starting Wrangler.
 After changing PSP/Perl files or ignore rules, run `npm run build` in another
 terminal or restart `npm run dev`. For explicit forwarded asset roots, pass the
 same `-- --assets DIR` to the rebuild. Wrangler handles public asset changes.
+
+To remove the deployed Worker, run `npm run destroy`. Type the full `Yes` at
+`Are you sure [Yes/No] (default No)?`, then confirm Wrangler's own named-target
+prompt. Blank, No, other answers, or cancellation do not invoke deletion.
+Piped/unattended input and confirmation-bypass flags are refused. The command
+uses the same Wrangler configuration as deployment but does not build or need
+an `app/` directory. Wrangler retains its checks for dependent Workers.
+For configured environments, use `npm run destroy -- -- --env staging`.
+After upgrading an existing app, rerun `npx webdyne-cloudflare init` to add
+`"destroy": "webdyne-cloudflare destroy"` while preserving other scripts.

@@ -321,3 +321,16 @@ responses succeed. The test server was stopped after acceptance.
   runtime provenance, Scratch ignore defaults, PSP in VFS and CSS omitted.
 - This repackages the previously tested WASM; no native/TypeScript/runtime code
   changes or compiler rebuild are involved. Nothing published or deployed.
+
+## Confirmed Worker teardown (2026-09-07)
+
+All 42 JavaScript tests pass, including five teardown cases: full-Yes versus
+blank/No/other input, noninteractive refusal, cancellation without Wrangler,
+accepted command/config/environment forwarding without an app build, and
+force-bypass rejection plus initializer upgrade. Deletion is stubbed in tests;
+no real Worker was removed. ESLint and diff whitespace checks pass.
+
+The updated development tarball passes the 6 MB inventory gate (4,839,408
+bytes). Installed it over the previous local package in the independent test
+app, reran init, and verified the destroy script was added. A real subprocess
+with piped Yes exits with the interactive-terminal error before Wrangler runs.

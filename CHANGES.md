@@ -89,3 +89,9 @@
 - Add `npm run pack:dev` to validate existing runtime artifacts and package current
   tooling as a private, uniquely versioned development .tgz without a release.
 - Record tooling revision/dirty state separately from original WASM provenance.
+
+## Unreleased — Worker teardown
+
+- Add `npm run destroy` through initialization; use deployment configuration
+  without an app build, require interactive full-Yes confirmation, and retain
+  Wrangler's target/dependency confirmation without using force deletion.

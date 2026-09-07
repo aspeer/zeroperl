@@ -2,6 +2,7 @@
 
 import { access, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
+import { createInterface } from "node:readline/promises";
 import { spawn } from "node:child_process";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,6 +33,7 @@ function usage(error) {
   if (error) console.error(error);
   console.error(`Usage:
   webdyne-cloudflare init [options]
+  webdyne-cloudflare destroy [options] [-- wrangler-options]
   webdyne-cloudflare login|logout|whoami [-- wrangler-options]
   webdyne-cloudflare build [options]
   webdyne-cloudflare check [options] [-- wrangler-options]
@@ -73,7 +75,7 @@ function safeProjectPath(projectRoot, requested, description) {
 function parseArguments(argv, defaults) {
   const command = argv.shift();
   if (!command || command === "--help" || command === "-h") usage();
-  if (!["init", "build", "check", "dev", "deploy"].includes(command)) usage(`Unknown command: ${command}`);
+  if (!["init", "build", "check", "dev", "deploy", "destroy"].includes(command)) usage(`Unknown command: ${command}`);
 
   const options = {
     command,
@@ -160,7 +162,7 @@ async function initialize(projectRoot, project, options) {
   await readAssetsPolicy(appRoot);
   const packageJson = project.packageJson;
   const scripts = assertObject(packageJson.scripts, "package.json scripts");
-  for (const command of ["build", "check", "dev", "deploy", "login", "logout", "whoami"]) {
+  for (const command of ["build", "check", "dev", "deploy", "destroy", "login", "logout", "whoami"]) {
     const value = `webdyne-cloudflare ${command}`;
     if (scripts[command] !== undefined && scripts[command] !== value) {
       console.log(`Preserved existing npm script: ${command}`);
@@ -411,7 +413,19 @@ function runWrangler(arguments_, projectRoot) {
   });
 }
 
-export async function main(argv = process.argv.slice(2), projectRoot = process.cwd(), wrangler = runWrangler) {
+export async function confirmDestroy(message, input = process.stdin, output = process.stdout) {
+  if (!input.isTTY || !output.isTTY) {
+    throw new Error("destroy requires an interactive terminal; no Worker was deleted");
+  }
+  const prompt = createInterface({ input, output });
+  try {
+    return (await prompt.question(`${message}\nAre you sure [Yes/No] (default No)? `)).trim().toLowerCase() === "yes";
+  } finally {
+    prompt.close();
+  }
+}
+
+export async function main(argv = process.argv.slice(2), projectRoot = process.cwd(), wrangler = runWrangler, confirm = confirmDestroy) {
   // Canonicalize once so package-manager symlinks and macOS' /var -> /private/var
   // alias cannot make a resolved extension appear to escape the project root.
   const root = await realpath(resolve(projectRoot));
@@ -424,6 +438,22 @@ export async function main(argv = process.argv.slice(2), projectRoot = process.c
   const project = await readProject(root);
   const options = parseArguments([...argv], project.defaults);
   if (options.command === "init") return initialize(root, project, options);
+  if (options.command === "destroy") {
+    // Never use --force to suppress Wrangler's prompt: it also bypasses checks
+    // for other Workers depending on this one.
+    if (options.wranglerArguments.some((arg) => /^--(force|yes)(=|$)|^-y$/.test(arg))) {
+      throw new Error("destroy does not allow confirmation bypass flags");
+    }
+    const output = safeProjectPath(root, options.output, "WebDyne output directory");
+    await mkdir(output, { recursive: true });
+    const config = await generatedWranglerConfig(root, project, options, output);
+    const args = ["delete", "--config", config, ...options.wranglerArguments];
+    if (!await confirm(`Delete the Cloudflare Worker selected by:\nwrangler ${args.map((arg) => JSON.stringify(arg)).join(" ")}`)) {
+      console.log("Cancelled; no Worker was deleted.");
+      return;
+    }
+    return wrangler(args, root);
+  }
   const assets = await applicationAssets(root, options);
   const built = await build(root, project, options, assets.policy);
   if (options.command === "build") return;

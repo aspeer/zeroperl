@@ -197,3 +197,9 @@ No push, release, deployment, or merge is part of this change.
 - [x] Add a repeatable private development tarball command using verified WASM.
 - [x] Verify version provenance and install/init/build from the actual tarball.
 - [x] Deliver the artifact and document local installation versus npm init.
+
+## Confirmed Worker teardown (2026-09-07)
+
+- [x] Add destroy, explicit confirmation, and no-build configuration reuse.
+- [x] Test cancellation, acceptance, noninteractive rejection and force rejection.
+- [x] Build and verify the updated local development tarball.
