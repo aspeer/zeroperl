@@ -34,3 +34,8 @@
 
 Plain `.pagi` applications, WebDyne lifespan callbacks and per-request diagnostic
 clearing are implemented. They are no longer development tasks.
+
+## Licence review follow-up
+
+- Preserve diagnostic build evidence before npm packaging so a stale-policy
+  failure does not discard the archive needed by `make licence-review`.

@@ -117,6 +117,8 @@ await mkdir(destination, { recursive: true });
 const runtimeNotices = resolve(destination, "THIRD-PARTY-LICENSES.txt");
 const embeddedInventoryPath = resolve(destination, "embedded-files.json");
 await writeFile(embeddedInventoryPath, `${JSON.stringify(embeddedFiles, null, 2)}\n`);
+// Review tooling needs the same verified payload inventory as normal packaging.
+if (options["inventory-only"] === "true") process.exit(0);
 execFileSync("python3", ["-B", fileURLToPath(new URL("./runtime-notices.py", import.meta.url)), noticesPath, noticePolicy, sourceManifestPath, runtimeNotices, embeddedInventoryPath], {stdio: "inherit"});
 execFileSync("python3", ["-B", fileURLToPath(new URL("./release-licenses.py", import.meta.url)), noticesPath, licenseArchive, sourceManifestPath, runtimeNotices, noticePolicy], {stdio: "inherit"});
 const releaseUrl = `https://github.com/aspeer/zeroperl/releases/tag/aspeer-zeroperl_${packageVersion}`;

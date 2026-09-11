@@ -40,6 +40,11 @@ test("npm packaging rejects a changed prefix even when file counts and sizes mat
     }));
     const args = ["tools/prepare-npm-package.mjs", "--source", root, "--destination", join(root, "package"),
       "--manifest", "manifest.json", "--wasm", "runtime.wasm", "--reactor", "reactor.wasm", "--notice-policy", join(root, "policy.json")];
+    execFileSync(process.execPath, [...args, "--inventory-only", "true"], {stdio: "pipe"});
+    assert.deepEqual(await readdir(join(root, "package")), ["embedded-files.json"]);
+    assert.deepEqual(JSON.parse(await readFile(join(root, "package/embedded-files.json"), "utf8")), {
+      "Example.pm": createHash("sha256").update("original").digest("hex"),
+    });
     execFileSync(process.execPath, args, {stdio: "pipe"});
     const metadata = JSON.parse(await readFile(join(root, "package/package.json"), "utf8"));
     assert.equal(metadata.license, "MIT");
@@ -73,6 +78,10 @@ test("npm packaging rejects a changed prefix even when file counts and sizes mat
     });
     await writeFile(join(root, "notices.tar.gz"), noticeBytes);
     await writeFile(module, "modified");
+    assert.throws(() => execFileSync(process.execPath, [...args, "--inventory-only", "true"], {stdio: "pipe"}), error => {
+      assert.match(error.stderr.toString(), /Prefix sha256 does not match/);
+      return true;
+    });
     assert.throws(() => execFileSync(process.execPath, args, {stdio: "pipe"}), error => {
       assert.match(error.stderr.toString(), /Prefix sha256 does not match/);
       return true;

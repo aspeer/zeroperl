@@ -75,6 +75,7 @@ jobs:
           node --test t.js/*.test.mjs
           python3 -B t/test_compact_notices.py
           python3 -B t/test_runtime_notices.py
+          python3 -B t/test_licence_review.py
       - name: Build once from the tagged source
         env:
           BUILD_EXIFTOOL: 'false'

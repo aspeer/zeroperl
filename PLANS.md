@@ -20,3 +20,18 @@ native runtime assertions and the lifespan, plain PAGI and callback WASM checks.
 Further implementation work is tracked in [BACKLOG.md](BACKLOG.md).
 Release preparation and staging are described in [RELEASING.md](RELEASING.md).
 A documentation merge does not publish a package.
+
+## Licence review target
+
+Implemented `make licence-review` to propose updated paths, excerpts and hashes
+from verified build evidence while retaining the committed policy. Its WebDyne
+3.029 / Perl 5.44.0 run preserved all reviewed notice text, passed the notice and
+53 package tests, and produced a 4.84 MB npm archive. The full evidence diff shows
+version metadata and code changes only. The candidate and report are under
+`output/licence-review/5.44.0-1.0.8/`; adoption of the candidate remains separate.
+
+`make licence-adopt` now validates and installs the verified proposal atomically;
+`make licence-commit` also commits the scoped release changes on the current branch.
+Tests cover altered candidates/manifests/policies, repeat adoption, and preservation
+of unrelated staged and unstaged Git changes. Release merging and pushing remain
+separate from these local commands.

@@ -132,3 +132,18 @@ failure, invalid responses, timeout and interpreter failures remain fatal to
 startup. No configuration switch is needed; WebDyne's callback handling stays
 unchanged. The application completion callback owns this decision so host or
 interpreter failures cannot be mistaken for an unsupported protocol.
+
+## Automated licence inventory proposals
+
+`make licence-review` reuses unchanged reviewed excerpt bytes from a checksum-bound
+baseline archive and writes a separate candidate inventory. It exposes all evidence
+changes for review, blocks unmatched notice coverage and build-input changes, and
+runs package verification without publishing. The committed policy remains the CI
+approval record; mechanical excerpt matching cannot establish absence of newly
+added obligations elsewhere in a source file.
+
+Adoption is explicit through `make licence-adopt` or `make licence-commit`. The
+successful report binds the proposal, manifest and original policy hashes; current
+package verification precedes atomic replacement. The commit target uses an explicit
+file scope and refuses pre-existing staged changes, keeping branch merges and remote
+publication outside the local licence workflow.

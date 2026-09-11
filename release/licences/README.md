@@ -6,7 +6,8 @@ never decides a new component's licence using a keyword scan. The broader
 collection and this inventory remain available in the GitHub licence archive.
 
 The current reviewed profile is Perl 5.44.0 with the default embedded WebDyne
-build, shrink off, WebDyne 3.028 and the pinned CPAN snapshot. Other Perl
+build, shrink off, with WebDyne and dependency versions recorded in `5.44.0.json`.
+Other Perl
 versions require their own inventory before npm packaging. This is an artifact
 qualification restriction, not removal of their build support.
 
@@ -76,3 +77,78 @@ from `embedded-files.json`. The package preparer supports `--notice-policy` for
 an explicitly reviewed alternate inventory; normal releases use this directory.
 The notice text has a 500 KB raw budget and npm retains a 6 MB compressed budget.
 No full source bodies or nested evidence archives should be added to npm.
+
+## Automated proposal and verification
+
+After building the current release with `./build.sh run off`, run:
+
+```sh
+make licence-review
+```
+
+The target selects `PERL_VERSION` and the version in `release/versions.json`.
+It verifies the build artifacts and attribution archive, locates the original
+archive matching the committed policy's `evidenceSha256` under `output/`, and
+carries forward byte-identical notice excerpts into a proposed inventory.
+Versioned CPAN paths and moved excerpt offsets are updated automatically.
+It uses the package preparer's verified embedded inventory rather than a
+separate implementation of library precedence.
+
+Output is written to `output/licence-review/<perl>-<release>/`:
+
+- `report.json`: changes, blockers and verification status.
+- `evidence.diff`: all attribution source changes, including text outside the
+  previously selected excerpts. Inspect this for additional notices.
+- `candidate.json`: a complete proposed policy when matching succeeds.
+- `incomplete.json`: a proposal requiring manual completion when matching fails.
+- `package/` and `tarball/`: locally prepared and size-checked npm artifacts.
+
+Successful matching runs notice tests, package tests, actual package preparation,
+`npm pack --ignore-scripts` and the npm content/size gate. Nothing is published,
+committed, or copied over the reviewed policy. A successful exit means a verified
+proposal, not a legal determination: unchanged selected text does not establish
+that no additional obligations were introduced. Inspect the evidence diff before
+adopting the candidate as `release/licences/<perl>.json`.
+
+Changed/missing or ambiguous excerpts, new/removed evidence files or distributions,
+and changes to build inputs other than the dependency snapshot stop the refresh.
+Repository notice changes also require review. The snapshot's distributions must
+match the evidence and explicitly excluded bootstrap tools. No licence text is
+inferred from package metadata or silently replaced.
+
+Override the artifact manifest or baseline archive explicitly when necessary:
+
+```sh
+make licence-review PERL_VERSION=5.44.0 \
+  LICENCE_MANIFEST=/absolute/path/manifest-5.44.0-1.0.8.json \
+  LICENCE_BASELINE=/absolute/path/third-party-notices-5.44.0-1.0.5.tar.gz
+```
+
+The baseline override must still match the committed review's evidence checksum.
+Keep that archive available after adopting a new policy: the next refresh needs
+its original notice bytes. Failed verification returns nonzero; inspect the report
+and terminal output. CI continues to verify the committed inventory normally.
+
+## Adopt and commit in one command
+
+After inspecting a successful review's evidence diff, run:
+
+```sh
+make licence-commit
+```
+
+This checks that Git has no pre-existing staged changes, adopts the verified
+candidate, checks whitespace, and commits the explicitly listed licence tooling,
+policy, dependency snapshot and supporting documentation files. Other working-tree
+files are left alone. It works on the current branch and does not merge, create
+release tags or push. Repeating it with no changes creates no extra commit.
+
+Use `make licence-adopt` to update the policy without committing. Adoption checks
+the candidate and manifest hashes saved by the successful review, rejects a policy
+edited since review, and reruns actual package preparation against current artifacts
+and build inputs before replacing the policy atomically. Old reports without these
+hashes require a fresh `make licence-review`. Both targets accept the same Perl and
+manifest overrides as the review target.
+
+Once these changes are on clean `main`, `make release` remains the command to bump
+the release version and create paired tags; run its printed push command to start CI.
