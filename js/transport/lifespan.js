@@ -2,6 +2,7 @@
 export function createLifespanTransport() {
   let delivered = false;
   let acknowledged = false;
+  let responded = false;
   let closed = false;
   let resolveStartup;
   let rejectStartup;
@@ -27,6 +28,11 @@ export function createLifespanTransport() {
     scope: { type: "lifespan", pagi: { version: "0.4", spec_version: "0.3" } },
     startup,
     close,
+    decline() {
+      if (closed || responded) return false;
+      resolveStartup(false);
+      return true;
+    },
     connection: {
       status: () => ({ connected: !closed, reason: closed ? "runtime_retired" : null }),
       waitForDisconnect: () => disconnected,
@@ -40,6 +46,7 @@ export function createLifespanTransport() {
     },
     sink: {
       send(event) {
+        responded = true;
         if (closed || !delivered || acknowledged) throw new Error("Unexpected PAGI lifespan event");
         if (event.type === "lifespan.startup.failed") {
           throw new Error(`PAGI lifespan startup failed: ${event.message ?? "no message"}`);
@@ -48,7 +55,7 @@ export function createLifespanTransport() {
           throw new Error(`Unexpected PAGI lifespan event: ${event.type}`);
         }
         acknowledged = true;
-        resolveStartup();
+        resolveStartup(true);
       },
       fail: close,
     },

@@ -37,3 +37,32 @@ test("lifespan rejects invalid messages and preserves startup failure diagnostic
   transport.sink.fail(failure);
   await rejected;
 });
+
+test("unsupported lifespan resolves startup and releases pending receives on retirement", async () => {
+  const transport = createLifespanTransport();
+  await transport.receiveSource.next();
+  const pending = transport.receiveSource.next();
+  assert.equal(transport.decline(), true);
+  transport.close(new Error("retired"));
+  assert.equal(await transport.startup, false);
+  assert.equal(await pending, undefined);
+  assert.equal(transport.decline(), false);
+});
+
+test("lifespan responses cannot subsequently be declined", async () => {
+  for (const type of ["lifespan.startup.complete", "lifespan.startup.failed", "http.response.start"]) {
+    const transport = createLifespanTransport();
+    await transport.receiveSource.next();
+    if (type === "lifespan.startup.complete") {
+      transport.sink.send({ type });
+      assert.equal(await transport.startup, true);
+    } else {
+      const rejected = assert.rejects(transport.startup, /retired/);
+      assert.throws(() => transport.sink.send({ type }));
+      transport.close(new Error("retired"));
+      await rejected;
+    }
+    assert.equal(transport.decline(), false);
+    transport.close(new Error("retired"));
+  }
+});

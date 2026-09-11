@@ -123,3 +123,12 @@ README preserves the fork introduction, credits and upstream instructions.
 WEBDYNE is the application guide; service APIs/configuration belong in the
 WebDyne::Cloudflare README. Build, test and release guides describe repeatable
 procedures. PLANS and BACKLOG hold current work, not completed release diaries.
+
+## Optional PAGI lifespan (2026-09-11)
+
+The shared WASM host treats application return or exception before any lifespan
+response as unsupported lifespan and continues on the same interpreter. Explicit
+failure, invalid responses, timeout and interpreter failures remain fatal to
+startup. No configuration switch is needed; WebDyne's callback handling stays
+unchanged. The application completion callback owns this decision so host or
+interpreter failures cannot be mistaken for an unsupported protocol.

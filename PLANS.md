@@ -13,6 +13,10 @@ Completed for the announcement documentation:
 - Checked examples, links and current configuration against source; native,
   JavaScript and focused WASM tests passed.
 
+Optional PAGI lifespan is implemented: applications can decline startup support
+without preventing HTTP requests. Verification covers 53 JavaScript tests, 62
+native runtime assertions and the lifespan, plain PAGI and callback WASM checks.
+
 Further implementation work is tracked in [BACKLOG.md](BACKLOG.md).
 Release preparation and staging are described in [RELEASING.md](RELEASING.md).
 A documentation merge does not publish a package.

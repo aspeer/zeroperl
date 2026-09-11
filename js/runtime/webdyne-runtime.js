@@ -237,6 +237,13 @@ export function createWebDyneRuntime({
       const session = pagiSessions.get(sessionId.toInt());
       if (!session || session.finished) return perl.createUndef();
       const status = JSON.parse(statusJson.toString());
+      if (session.lifespan?.decline()) {
+        session.finished = true;
+        stopPagiSession(session);
+        session.resolve();
+        console.info("PAGI lifespan unsupported; continuing startup");
+        return perl.createUndef();
+      }
       if (status.error) {
         const failure = describePagiFailure(
           session,
@@ -425,9 +432,10 @@ export function createWebDyneRuntime({
     }, 10000);
     try {
       await invokeApplication(session);
-      await ready;
+      const supported = await ready;
       // Finish the acknowledgement's Perl turn before publishing the runtime.
       await persistentPerlQueue;
+      if (!supported) return;
       if (session.finished) throw new Error("PAGI lifespan application failed during startup");
     } finally {
       clearTimeout(timeout);

@@ -95,9 +95,26 @@ try {
   assert.equal(failed.generations(), 2, "a replacement interpreter runs startup again");
   console.log("PASS: failed startup blocks requests and a replacement reruns startup");
 
-  const early = createRuntime("return;");
-  assert.equal((await request(early.runtime)).status, 500);
-  console.log("PASS: lifespan returning before acknowledgement blocks requests");
+  for (const fixture of ["return;", 'die "lifespan unsupported\\n";', "await $receive_cr->(); return;"]) {
+    const unsupported = createRuntime(fixture);
+    const results = await Promise.all(Array.from({ length: 3 }, () => request(unsupported.runtime)));
+    for (const result of results) {
+      assert.equal(result.status, 200);
+      assert.match(result.body, /lifespan page/);
+    }
+    assert.equal((await request(unsupported.runtime)).status, 200);
+    assert.equal(unsupported.startups(), 1);
+    assert.equal(unsupported.generations(), 1, "unsupported lifespan does not retire the interpreter");
+  }
+  console.log("PASS: unsupported lifespan permits concurrent and warm HTTP requests");
+
+  const invalid = createRuntime(`
+    await $receive_cr->();
+    await $send_cr->({type => 'http.response.start'});
+  `);
+  assert.equal((await request(invalid.runtime)).status, 500);
+  assert.match(JSON.stringify(errors), /Unexpected PAGI lifespan event/);
+  console.log("PASS: invalid lifespan response blocks requests");
 
   const delayed = createRuntime("await Future::IO->sleep(0.02);");
   assert.equal((await request(delayed.runtime)).status, 200);

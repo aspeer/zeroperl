@@ -270,7 +270,8 @@ interpreter instance; use a storage service for persistent application data.
 ## Application startup and lifespan callbacks
 
 The runtime sends `lifespan.startup` when it lazily creates a Perl interpreter.
-Requests wait for acknowledgement; concurrent first requests share one startup,
+Requests wait for acknowledgement or for the app to decline lifespan support;
+concurrent first requests share one startup,
 and warm requests reuse that interpreter. Startup runs again if a failed
 interpreter is replaced.
 
@@ -293,7 +294,7 @@ Futures produce a lifespan failure. Missing modules/functions fail bootstrap.
 Omit a callback to disable it; empty strings, nulls and Perl expressions are
 not accepted. These callbacks are included in the runtime with WebDyne 3.028.
 
-Startup failure or a missing acknowledgement after 10 seconds fails waiting
+Explicit startup failure or a pending acknowledgement after 10 seconds fails waiting
 requests. The timeout cannot interrupt CPU-bound Perl which does not yield.
 Callback configuration stays fixed for that interpreter generation.
 
@@ -315,10 +316,16 @@ a PAGI application coderef accepting `(scope, receive, send)`. It receives all
 paths and scope types directly, including HTTP, SSE, WebSocket and lifespan,
 without loading WebDyne or using its PSP routing/static middleware.
 
-The application must receive `lifespan.startup` and send
-`lifespan.startup.complete` before requests can run. Unsupported or unacknowledged
-startup fails; it is not silently skipped. The WebDyne startup/shutdown function
-settings do not apply in this mode. Keep `.pagi` source in `.assetsignore`.
+Lifespan support is optional. An application that returns or throws before sending
+any lifespan response is treated as unsupported, and HTTP requests proceed using
+the same interpreter. This is logged once per interpreter at informational level;
+there is no configuration switch or required lifespan boilerplate.
+
+Applications that implement lifespan must receive `lifespan.startup` and send
+`lifespan.startup.complete`. An explicit `lifespan.startup.failed`, an invalid
+response, or a pending startup that exceeds 10 seconds still fails startup.
+Interpreter failures are not treated as unsupported lifespan. The WebDyne
+startup/shutdown function settings do not apply in this mode. Keep `.pagi` source in `.assetsignore`.
 For a custom Wrangler file set `WEBDYNE_INDEX` to the entry path relative to
 `WEBDYNE_ROOT` as well as keeping the build entry in package.json.
 
