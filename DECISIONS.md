@@ -1,396 +1,125 @@
 # ZeroPerl WebDyne decisions
 
-## D001: Supported Perl release lines
-
-Qualified standard artifacts target Perl 5.18.4, 5.36.3, and 5.44.0. Perl
-5.24.4 is excluded because real WebDyne Chain/Template execution traps in
-`_asyncjmp_longjmp` with both 32 KiB and 64 KiB capture buffers, despite
-passing the low-level async probes.
-
-## D002: WebDyne compatibility takes precedence
-
-The canonical runtime embeds WebDyne 3.023, WebDyne::PAGI, PAGI::Tools
-0.002002, their runtime dependencies, and the XS modules they require. Generic
-PAGI compatibility is useful but is not a release gate.
-
-## D003: Bridge ownership and distribution
-
-JavaScript/Perl marshalling and Asyncify-aware resource disposal belong in
-`zeroperl-ts`; Perl runtime and static-XS behaviour belong in this repository.
-The versioned WebDyne npm distribution nevertheless carries the compiled
-bridge, provider-neutral PAGI runtime, default Cloudflare adapter, and Perl
-launchers so one package is sufficient to execute a PSP application. The
-canonical editable bridge source remains `zeroperl-ts`; `js/zeroperl.js` is its
-generated distribution artifact.
-
-Cloudflare-service integrations such as D1 remain separate from the core host.
-
-## D004: Mini artifact gate
-
-A mini artifact will only be retained if its compressed WASM is at least 30%
-smaller than the equivalent standard artifact while retaining required WebDyne
-modules. The Perl 5.44.0 safe experiment retained the standard module and XS
-surface and used compressed SFS embedding. It was 16.1% smaller raw but 7.3%
-larger after gzip, so Milestone 1 does not publish a mini artifact. Repairing
-the older trace-based XS-pruning path is out of scope because the product
-requirement is to retain required WebDyne XS and nearly all core XS modules.
-
-## D005: POSIX compatibility surface
-
-The WASM runtime supplies the `POSIX::strftime` surface used by WebDyne without
-claiming support for the complete core `POSIX` XS module.
-
-## D006: Legacy XS ABI compatibility
-
-Perl 5.18, 5.24, and 5.36 retain the core mathoms compatibility layer because
-current WebDyne XS dependencies use legacy Perl ABI symbols on those releases.
-Newer releases continue to build with `NO_MATHOMS`.
-
-## D007: ExifTool is opt-in
-
-ExifTool is not part of the WebDyne runtime deliverable and is excluded from
-all standard artifacts. `BUILD_EXIFTOOL=true` remains available solely for
-special-purpose builds and is not a release gate.
-
-## D008: Asyncify capture headroom
-
-The setjmp/Asyncify capture buffer is 64 KiB. It is separate from the 8 MiB
-WebAssembly execution stack. Although the increase did not repair Perl 5.24.4,
-it passed all retained versions and provides headroom for deeper WebDyne page
-call stacks.
-
-## D009: Embedded files have a stable nonzero modification time
-
-Embedded SFS entries are immutable and report `st_mtime = 1`. A zero value is
-ambiguous to callers that use a truthy modification time to distinguish a
-successful `stat`; WebDyne does this when compiling its built-in index page.
-The fixed epoch sentinel preserves deterministic artifacts without inventing a
-build-time timestamp.
-
-## D010: Version artifacts by Perl release and WebDyne build
-
-Each supported Perl release line has an independently incremented positive
-WebDyne build number. Local outputs retain the exact Perl version and build
-number in every public filename. A release tag uses
-`v<perl-version>-webdyne.<build-number>` and cannot be overwritten with
-different bytes.
-
-The npm package name contains the Perl version, for example
-`@webdyne/webdyne-zeroperl-5.44.0`. Its SemVer major is the WebDyne build
-number, so build 1 publishes as `1.0.0` and may be selected as `@1`. npm
-packaging consumes qualified release bytes and does not rebuild the runtime.
-
-GitHub attestations and SHA-256 manifests provide binary provenance and
-integrity. Platform-specific executable signing is not applicable to a WASM
-module. npm Trusted Publishing remains disabled until the package namespace
-and OIDC publisher are configured.
-
-## D011: Portable core with Cloudflare as the default provider
-
-The npm runtime separates interpreter/VFS ownership, Fetch-to-PAGI transport,
-and provider integration. Cloudflare is the only qualified provider and remains
-the zero-configuration default. Its non-standard `WebSocketPair` and
-`ExecutionContext.waitUntil()` behavior is confined to the Cloudflare adapter;
-future providers must supply equivalent lifecycle and WebSocket capabilities
-without changing the WebDyne runtime core.
-
-Application repositories place their complete served tree in `app/` by
-default. The source directory is configurable, but it always mounts at VFS
-`/app`. Runtime helpers and optional Pure-Perl dependencies use `/perl5/bin`
-and `/perl5/lib`; `/tmp` is writable and exposed as `TMPDIR`. The package may
-generate Wrangler configuration during an explicit build/dev/check/deploy
-command, but installation itself has no deployment side effects.
-
-## D012: Resolve provider extensions explicitly from npm
-
-The runtime package does not embed optional Cloudflare services. Applications
-name extensions under `webdyne.extensions` and must also declare them as direct
-production dependencies. A versioned manifest identifies the package's Perl
-library and static provider export; dependency scanning and npm install hooks
-are deliberately avoided.
-
-The provider-neutral lifecycle registers host functions for every interpreter
-generation and attaches request capabilities with guaranteed cleanup. The
-Cloudflare deployment helper may translate provider-owned configuration such
-as `d1Databases` into Wrangler fields without moving that behavior into the
-portable runtime. `kvNamespaces` and `r2Buckets` follow the same boundary: the
-helper maps application-owned identifiers and local/remote flags to Wrangler,
-while the separately installed extension owns the Perl and JavaScript service
-behavior.
-
-
-## D013: First public release uses the consolidated implementations
-
-The user confirmed preparing candidates from the latest implementation branches
-for eventual main merges. Review fixes remain on `codex/first-release-review`.
-The npm runtime and standalone bridge are separate distributions with separate
-versions; both need matching runtime qualification. No publication or merge is
-implied by preparing a public package manifest.
-
-Bootstrap JSON is encoded as UTF-8 hexadecimal data in a Perl pack expression,
-so configuration is never interpreted as interpolated Perl source. Library
-files matching the embedded prefix are omitted only when no configured library
-supplies differing bytes for that module path.
-
-## D010: Callback ownership and asynchronous replacement
-
-Callback arguments are borrowed until the host callback settles. The C
-callback captures a returned argument's SV before freeing argument handles;
-an independent returned wrapper transfers its owned reference without an
-extra increment. The bridge invalidates returned owned wrappers and expired
-borrowed wrappers and rejects cross-interpreter returns.
-
-Array/hash/scalar replacements use the same asyncjmp boundary as release.
-The bridge retains temporary values and names through completion and preserves
-the synchronous path when no destructor suspends. Direct value APIs do not
-promise support for tied/overloaded magic; evaluate those operations in Perl.
-
-Generated npm metadata follows the existing MIT runtime source license. The
-Apache bridge license and notice are included separately, and embedded
-interpreter/dependency attribution must accompany the qualified artifacts.
-
-## D011: Preserve live C frames through Asyncify rewind
-
-The corrected bridge uses three stack-pointer phases: preserve the suspended
-C stack while awaiting the host promise; restore the root before re-entering
-the exported C wrapper; restore the suspended pointer at the rewound import
-before resuming its C continuation. Finally restore the root on export exit.
-
-Keeping the suspended pointer through export re-entry made the untransformed
-C wrapper read a different result context from the one its callback wrote.
-Restoring only the root repaired results but broke rejected-callback recovery
-on older Perl versions. Both restores are required. The correction passes
-scalar/list results, repeated yields, host allocations and rejection recovery
-on Perl 5.18.4, 5.36.3 and 5.44.0 without rebuilding the WASM binaries.
-
-Scalar replacement also drains its own Perl temporary scope. Perl 5.18 may
-mortalize the old reference, so omitting this scope postpones DESTROY beyond
-the setter's completion.
-
-## D012: Resolve CPAN versions once per target Perl
-
-`make cpanfile.snapshot` reconciles dependencies under the selected native Perl;
-`make cpanfile.snapshot-update` starts a fresh resolution. The default comes
-from `release/defaults.mk`. Versioned Carton snapshots are the sole selection
-of CPAN distribution versions. Companion metadata binds inputs and archives
-by checksum. Normal builds install in deployment mode and XS recipes consume
-the same archives; recipes only describe target compilation and patches.
-Snapshots differ by Perl version because core modules and compatible dependency
-versions differ. Full toolchain/byte-for-byte reproducibility is outside this
-change. Publication remains a separate user decision.
-
-## D014: Include a small base set of application XS modules
-
-The approved base additions are Sub::Name 0.28, Params::Util 1.102,
-Class::XSAccessor 1.19 (including Array), Text::CSV_XS 1.64 and
-Variable::Magic 0.65. The snapshots retain existing selections; only Perl
-5.18 additionally needs the Pure Perl XSLoader 0.24 distribution. Variable::Magic
-has no external C library or non-core runtime dependencies.
-
-Retain Variable::Magic: removing its archive, bootstrap and embedded companions
-from the otherwise identical Perl 5.44 build reduces raw WASM by 27,791 bytes
-and gzip-9 by 194 bytes. Compressed deltas depend on whole-program optimization
-and compression and are not additive module sizes. The all-five measurement
-binary is byte-identical to qualified build 8. Removing the complete batch
-reduces it by 210,258 raw bytes and 58,048 gzip-9 bytes.
-
-Params::Util's native dynamic-loading probes are bypassed only for WASI;
-target compilation and execution qualify the static implementation. Normalize
-module source permissions before executable stripping, since the upstream
-Params::Util.pm has its executable bit set. This also restores four existing
-runtime module files that were previously stripped. The locked XSLoader update
-may replace Perl 5.18's older Pure Perl loader without changing core XS objects.
-
-Build 8 is qualified on 5.18.4, 5.36.3 and 5.44.0, including asynchronous
-Variable::Magic set/free callbacks and the existing lifecycle checks. See
-TESTS.md for artifact sizes and evidence. Publication and consumer package
-refreshes remain separate from these local runtime candidates.
-
-## D013: Release source references across the runtime and bridge
-
-The runtime pins the tested bridge implementation commit. The bridge can then
-record the clean runtime release manifest in a subsequent artifact-only commit.
-Repointing the runtime gitlink for every bundled-runtime refresh would create
-a circular provenance dependency. Validate that bridge source and the generated
-runtime bridge remain identical across that artifact-only refresh.
-
-## D014: Clear WebDyne diagnostics at application request entry
-
-Final local Worker acceptance reproduced a caught D1 batch constraint error
-appearing in the next unrelated KV request. WebDyne 3.023 retains that message
-in its process-wide diagnostic stack even when the API handler recovers.
-The WebDyne-specific adapter calls the public `WebDyne::Util::errclr()` API
-before invoking each new application request. This prevents cross-request
-error leakage while preserving errors raised by the current request. The
-provider-neutral PAGI runner and generic TypeScript bridge remain unchanged.
-The core framework's treatment of caught exceptions within one request remains
-an upstream follow-up; this compatibility fix establishes a clean request entry.
-
-## Retain Cloudflare completion for every session
-
-Register HTTP, SSE and WebSocket session completion with `context.waitUntil`.
-A connection closing can precede queued Perl work and extension cleanup. The
-provider must retain the originating request context through that completion
-to avoid canceled cross-request continuations. Response delivery and the single
-persistent interpreter remain unchanged. The normal Cloudflare post-request
-execution limit still applies; no compatibility flag is disabled.
-
-## WebDyne 3.026 and the locked Carp upgrade
-
-All supported snapshots select WebDyne exactly 3.026. Its Carp 1.50 minimum
-requires the locked Pure Perl Carp files to supersede Perl 5.18's older core
-copy. Prefix assembly permits that targeted override while continuing to
-protect native/target XS companion alignment. Delivered-WASM qualification
-checks WebDyne and WebDyne::PAGI against the snapshot and requires Carp >= 1.50.
-
-## Require Cloudflare incoming-request cancellation signals
-
-Generated Wrangler configurations explicitly enable `enable_request_signal`.
-Without it, the existing request abort listener cannot mark a canceled SSE
-connection disconnected; a later write can suspend the shared interpreter
-indefinitely. This flag supplies the missing provider event without changing
-Perl, Asyncify or the persistent interpreter architecture. Custom configurations
-must include it too. Long-SSE acceptance checks post-cancellation service.
-
-
-## Project releases through paired tags and npm staging
-
-The project version identifies a source release; Perl versions identify its
-build variants. A prefixed annotated tag triggers the release workflow and a
-matching annotated v tag is an alias. Both must match the version at the same
-main commit. A local helper increments the patch version and creates the tag
-pair; CI does not mutate source, allocate versions, or approve npm publication.
-The inspected tarball is submitted using npm stage publish with stage-only
-OIDC permission. The maintainer approves in npm. This supersedes independent
-Perl build numbering and the previous two-workflow/manual artifact transfer.
-
-
-## Separate npm runtime payload from diagnostic build evidence
-
-Starting with 1.0.3, npm ships only the Asyncify-enabled runtime, application
-helpers and a version-specific reference to third-party licences. At the
-maintainer's request, legal texts and SDK/bridge notices are delivered in a
-separate deterministic GitHub Release archive. Its link and checksum are
-recorded in npm. The workflow verifies the public licence asset before npm
-staging and refuses to overwrite differing existing assets. Full source
-evidence and the raw reactor remain diagnostic artifacts. The compressed npm
-budget is 6 MB. This supersedes the initial in-package compact-notice layout;
-it does not change component licence obligations or runtime behavior.
-
-
-## Propagate reviewed notices inside the lean npm package
-
-The link-only 1.0.3 candidate is superseded. npm includes a small reviewed
-collection of actual runtime licence/copyright notices, deduplicating shared
-terms and retaining vendor exceptions. The broad archive remains on GitHub.
-Perl's Artistic option is selected where available; component-specific terms
-remain intact. A pinned source-range inventory fails closed on unreviewed
-payload/dependency/linking/licence changes while allowing identified generated
-host metadata differences. This avoids both the earlier 11.9 MB broad text
-and relying on a URL alone for licence propagation.
-
-## Explicit project initialization and asset ownership (2026-09-07)
-
-The distribution CLI owns initialization; npm installation never edits the
-consumer's scripts. `init` preserves existing scripts and ignore contents,
-sets WebDyne static serving off, and creates Scratch's default ignore patterns.
-The tested Wrangler remains a regular distribution dependency; authentication
-commands invoke its resolved entry point without requiring an app build.
-
-Asset ownership comes from the effective assets root's `.assetsignore` on each
-build. Ignored files remain in VFS; public files are served by Cloudflare.
-Without that marker, retain legacy full-VFS behavior. Explicit forwarded assets
-flags win over the source root. Automatic flags intentionally override custom
-config asset-directory settings; custom configurations remain otherwise intact.
-
-Use node-ignore 5.3.2 (the same library/major as Wrangler 4.127.1) for gitignore
-semantics and Wrangler's three default metadata patterns. Read only the root
-file, as Cloudflare does. Reject nested/misspelled ignore files instead of
-inventing cascading semantics that could expose server files. Reject a public
-entry page and generated output within an active assets root. Keep legacy VFS
-exclusions and Pure-Perl library handling unchanged. The default four patterns
-are deliberately identical to Scratch; application-specific private files need
-explicit ignore patterns.
-
-Initialization leaves compatibility-date selection with the existing generator
-and user configuration. Setting today's date broke the pinned Wrangler runtime
-in acceptance testing; updating the supported default belongs with Wrangler
-qualification, not each invocation of `init`.
-
-## Development package versions (2026-09-07)
-
-Local CLI-only builds reuse a qualified runtime and delegate to the existing
-packager's checksum, inventory and notice checks. Only the generated package's
-version gains a next-patch `-dev.<timestamp>.g<revision>` suffix. Its manifest
-records current tooling provenance separately; the embedded binary retains its
-original version/provenance and stable release attribution links. Packages are
-private, packed with npm, and checked against the existing 6 MB inventory gate.
-No release version, build counter, tag or publishing path changes.
-
-## Confirmed Worker teardown (2026-09-07)
-
-`destroy` reuses deployment configuration but skips app/CPAN/VFS processing.
-Wrangler 4.127.1 defaults its confirmation to yes in noninteractive contexts,
-so the wrapper requires a terminal and a full Yes (default No) before invoking
-it. Keep Wrangler's own named-target and dependency confirmations: its --force
-also bypasses dependent-Worker protection, so it must not be used merely to
-avoid a second prompt. No real Worker is deleted during regression testing.
-
-
-## Latest-Perl npm alias and WebDyne 3.027 (2026-09-07)
-
-The maintainer authorized work on development, verification, merging to main,
-pushing to GitHub for a tagged build/staging run, and removal of merged branches
-locally and from github/origin. npm approval remains manual.
-
-The versioned npm name retains its Perl suffix; the unsuffixed name duplicates
-only the greatest supported Perl version. Both use the same project semver and
-runtime bytes. Each package has independent npm trusted-publisher configuration
-and staging/approval. Refresh CPAN locks and review the 3.027 notice inventory
-before qualification. Download any first-name seed candidate locally.
-
-
-## Basic PAGI lifespan startup (2026-09-07)
-
-The provider-neutral JavaScript runtime starts a dedicated `lifespan` session
-through `Pagi::ZeroPerl::Runner::start_session` and the same
-`Pagi::WebDyne::application` entry point used for requests. WebDyne dispatches
-to its existing `handler_lifespan`; the host does not call framework methods
-directly. Startup acknowledgement gates the shared runtime promise, while
-the application Future stays pending. A missing acknowledgement times out after
-10 seconds of schedulable host time; this is not a CPU-interruption mechanism.
-Startup errors retire the generation and fail waiting requests; a later request
-may construct a replacement and repeat startup.
-
-This increment implements startup only. Retirement drops the session and its
-host waiters, with no fabricated shutdown event. No `state` field is advertised,
-and no Cloudflare request extensions are attached to lifespan. State propagation,
-custom callbacks and persistent service capabilities are separate follow-ups.
-The retained lifespan Future is not attached to `waitUntil`: request completion
-already waits for startup, and the stub thereafter waits without active I/O.
-
-
-## Named WebDyne lifespan callbacks (2026-09-07)
-
-The portable WebDyne constructor owns callback execution and event replies.
-The scaffold carries qualified function names in WEBDYNE_STARTUP/SHUTDOWN;
-Perl loads the module by a validated filename and resolves its symbol without
-evaluating configuration as source. The runtime validates names before attaching
-request extensions so malformed configuration cannot leak capabilities.
-
-Callback settings are opt-in. Bootstrap checks the public lifespan_callback
-method as a capability marker because the unreleased core change does not yet
-have a distinct release version. Existing binaries remain usable without
-callbacks; configured callbacks require a new core or explicit library overlay.
-Both callbacks are passed through, while the host continues to dispatch startup
-only. This preserves the established incremental lifecycle scope.
-
-
-## Direct PAGI entry applications (2026-09-08)
-
-A case-sensitive `.pagi` suffix in the configured index selects a single
-application coderef loaded once from the runtime filesystem. All paths and
-scope types pass through unchanged. This branch does not load WebDyne or its
-callback modules; the PAGI app owns lifespan acknowledgement. The existing
-PSP path keeps WebDyne routing and now relies on 3.028 for error isolation.
-New asset ignore files exclude `.pagi`; customized existing files are preserved.
+These are the decisions which still describe the runtime. Superseded release
+experiments and implementation diaries are retained in Git history.
+
+## Compatibility and supported Perls
+
+Preserve existing WebDyne behaviour and keep provider APIs outside the core.
+Supported build lines are 5.18.4, 5.36.3 and 5.44.0. Perl 5.24.4 failed real
+Chain/Template async execution even with a larger capture buffer, so it is
+excluded. ExifTool is opt-in. The experimental mini build did not meet its
+compressed-size gate and is not a release target.
+
+Older Perls retain the ABI compatibility needed by the selected XS modules.
+The Asyncify capture buffer is 64 KiB, separate from the 8 MiB WASM stack.
+Embedded immutable files have nonzero mtime 1 so WebDyne can distinguish a
+successful stat. Application VFS entries use the same epoch-second convention.
+The lightweight POSIX facade supplies strftime without the complete POSIX XS.
+
+## Runtime, bridge and provider ownership
+
+The canonical bridge source is the aspeer zeroperl-ts repository, pinned as a
+submodule. Generated `js/zeroperl.js` is refreshed from it. Keep marshalling
+there, PAGI transport in the portable runtime, and Cloudflare execution-context
+and WebSocket APIs in the provider adapter.
+
+A bridge artifact refresh may reference a runtime release without repointing
+the runtime gitlink for artifact-only bridge commits; otherwise provenance
+would be circular. Verify bridge source equality when doing this.
+
+Borrowed callback values remain valid until the host callback settles. Owned
+returns transfer ownership, and destructive value operations retain temporary
+state across async suspension. Asyncify reentry preserves the suspended C stack,
+restores the root before export reentry, then restores the suspended pointer at
+the rewound import. Both restores are needed across supported Perl versions.
+
+## Application files and extensions
+
+Host application directories are configurable but always mount at `/app`.
+Launchers use `/perl5/bin`, optional Pure-Perl modules use `/perl5/lib`, and
+`/tmp` is writable with TMPDIR preserved. Configuration is encoded as data,
+not interpolated Perl source.
+
+Extensions must be declared direct npm dependencies and enabled explicitly.
+Their manifests supply Perl modules and static provider imports. Register once
+per interpreter generation, attach capabilities per request, and clean up once
+in reverse order. The separate WebDyne::Cloudflare package owns D1/KV/R2 APIs;
+the CLI only translates resource configuration for generated Wrangler files.
+
+`init` is explicit and preserves existing scripts and ignore files. It disables
+WebDyne static serving and creates source ignore patterns, including `.pagi`.
+The effective assets root's `.assetsignore` decides which files remain in VFS
+and which Cloudflare serves. No ignore file means legacy full-VFS packaging.
+Explicit assets arguments win. Nested/misspelled ignore files and a public
+entry are rejected. Custom Wrangler files remain untouched.
+
+`destroy` requires interactive full-Yes confirmation and retains Wrangler's
+target/dependency checks. It skips builds and refuses bypass flags.
+
+## CPAN and XS
+
+Resolve CPAN dependencies once per target Perl into checked, versioned Carton
+snapshots. Normal builds consume those archives in deployment mode. Static XS
+recipes use the same sources and their matching Perl companions; they do not
+select independent versions. Host native extensions cannot be application
+library overlays.
+
+The small application XS set includes Sub::Name, Params::Util,
+Class::XSAccessor (including Array), Text::CSV_XS and Variable::Magic.
+Variable::Magic's measured compressed cost was small and its asynchronous
+callbacks passed qualification. Legacy target-specific fixes remain in the
+build layer. See [BUILD.md](BUILD.md) for the current recipe and lock process.
+
+## Persistent requests and lifespan
+
+Retain each Cloudflare session's completion with `context.waitUntil`, including
+stream cleanup after the connection closes. Enable `enable_request_signal` so
+disconnected SSE cannot leave a later write blocking the interpreter.
+The platform's ordinary request lifetime limits still apply.
+
+WebDyne 3.028 clears its own request diagnostics. The bootstrap no longer calls
+errclr at each request; this supersedes the earlier adapter workaround.
+
+Startup goes through PAGI lifespan and gates the shared interpreter promise.
+Concurrent first requests share startup. Failure retires the generation; a
+later request can create another. The acknowledgement timeout is 10 seconds
+of schedulable host time, not CPU interruption.
+
+Named callbacks are supported by embedded WebDyne 3.028. Validated qualified
+function names are loaded through modules, never evaluated as expressions.
+The core owns callback execution and Future acknowledgement. The Worker sends
+startup only; shutdown dispatch, state propagation and interpreter-lifetime
+service capabilities remain future work.
+
+A case-sensitive `.pagi` entry loads an application coderef once, receives all
+paths/scopes and owns lifespan acknowledgement. It bypasses WebDyne loading,
+PSP routing and WebDyne callback configuration.
+
+## Releases and attribution
+
+Project semver identifies a release; Perl versions select variants. Paired
+annotated project-prefixed and v tags identify the same main commit. Only the
+project-prefixed tag triggers the build/package/staging workflow. This replaces
+earlier per-Perl build numbering and separate candidate workflows.
+
+The unsuffixed npm package duplicates the newest supported Perl distribution.
+Both names need independent Trusted Publishing setup and maintainer approval.
+Staging is not public publication. See [RELEASING.md](RELEASING.md).
+
+npm includes the Asyncify runtime and reviewed component notices, plus a link
+to broader release evidence. The reactor and broad source-evidence archive stay
+outside npm. This supersedes the temporary link-only licence experiment.
+Packaging checks a reviewed inventory, the 500 KB notice budget and the 6 MB
+compressed package budget. Additional Perl variants need their own inventories.
+
+Local development tarballs reuse qualified runtime bytes, add a unique private
+development version and record tooling provenance separately. They do not
+change the binary's release identity or create tags.
+
+## Documentation ownership
+
+README preserves the fork introduction, credits and upstream instructions.
+WEBDYNE is the application guide; service APIs/configuration belong in the
+WebDyne::Cloudflare README. Build, test and release guides describe repeatable
+procedures. PLANS and BACKLOG hold current work, not completed release diaries.

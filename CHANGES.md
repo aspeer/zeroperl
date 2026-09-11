@@ -1,5 +1,23 @@
 # Changes
 
+## 1.0.5–1.0.6
+
+- Embedded WebDyne 3.028 with named lifespan callbacks and request diagnostic clearing.
+- Added direct `.pagi` application loading, including lifespan acknowledgement.
+- Added `.pagi` to newly generated asset ignore files.
+- Corrected the release inventory for lifespan transport and bootstrap documentation.
+- Consolidated public usage/configuration guides and removed obsolete review diaries.
+
+## 1.0.3–1.0.4
+
+- Adopted project semver and paired tags with a single build/package/staging workflow.
+- Added the unsuffixed newest-Perl npm package.
+- Kept reviewed notices in the lean npm package and broad evidence in release assets.
+
+Earlier entries below record the implementation sequence; release mechanics
+which they introduced may have been superseded above. See RELEASING.md for
+the current process.
+
 ## CPAN manifest cleanup
 
 - Removed all optional recommendations/suggestions from the WASM cpanfile.
@@ -76,7 +94,7 @@
 - Rejected the 5.44 mini candidate after its compressed size increased by
   7.3%, despite a 16.1% raw-size reduction.
 
-## Unreleased — application setup and Cloudflare assets
+## Application tooling — application setup and Cloudflare assets
 
 - Add repeatable `webdyne-cloudflare init` and bundled login/logout/whoami.
 - Initialize Scratch-compatible assets rules and disable WebDyne static serving.
@@ -84,13 +102,13 @@
   with root gitignore semantics, custom roots and explicit asset-flag support.
 - Reject misplaced ignore files and accidental public entry pages.
 
-## Unreleased — local development tarballs
+## Application tooling — local development tarballs
 
 - Add `npm run pack:dev` to validate existing runtime artifacts and package current
   tooling as a private, uniquely versioned development .tgz without a release.
 - Record tooling revision/dirty state separately from original WASM provenance.
 
-## Unreleased — Worker teardown
+## Application tooling — Worker teardown
 
 - Add `npm run destroy` through initialization; use deployment configuration
   without an app build, require interactive full-Yes confirmation, and retain

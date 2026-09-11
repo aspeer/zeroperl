@@ -199,21 +199,22 @@ provider factory. `scripts/extensions.mjs` resolves metadata without executing
 package code, adds the Perl tree to `/perl5/lib`, and emits a static import for
 Wrangler. At runtime `js/runtime/extensions.js` registers each extension once
 per interpreter generation, attaches it to a request scope, and runs cleanup
-exactly once in reverse order. The first implementation is the separately
-versioned `@webdyne/webdyne-cloudflare` D1 extension.
+exactly once in reverse order. The separately versioned `@webdyne/webdyne-cloudflare` extension supplies
+D1, KV and R2 services.
 
 The application repository owns its PSP files and bindings. Its `app/` tree is
 mounted at VFS `/app`; a `package.json` override may select another source
 directory without changing that stable virtual path. The generated entrypoint
 statically imports the qualified WASM from the installed package and supplies
 the application and library archives to `createCloudflareWorker()`. Application
-archive construction is recursive: PSP pages, static assets, templates, and
-nested support files are all retained below `/app`.
+archive construction is recursive. With `.assetsignore`, ignored server files
+remain below `/app` while Cloudflare serves public assets separately. Without
+an ignore file the builder retains the complete application tree.
 
 The virtual filesystem has four application roots alongside `/dev`:
 
 - `/zeroperl` is the immutable library prefix embedded in the WASM module;
-- `/app` is the complete application tree and WebDyne document root;
+- `/app` contains the packaged application files and is the default document root;
 - `/perl5/bin` contains the PAGI and WebDyne launchers;
 - `/perl5/lib` contains the compatibility module and optional Pure-Perl
   application dependencies; and
@@ -403,7 +404,7 @@ Smoke testing:
 - [pipeline/](pipeline): build orchestration scripts.
 - [stubs/](stubs): runtime wrapper C sources, assembly helpers, headers, and cross-compilation stubs (`Errno.pm`).
 - [tools/](tools): shrink generation, smoke tooling, size reporting, utility scripts.
-- [gen/](gen): generated and tracked shrink artifacts plus generated embedding inputs.
+- `gen/`: generated and tracked shrink artifacts plus generated embedding inputs.
 - [patches/](patches): source patches applied during WASI Perl build (`patch_glob.pl` for all versions, `patch_mg.pl` when `OLD_PERL`, `patch_sv_locale.pl` for 5.28.x).
 - [t/smoke/](t/smoke): sample corpus for smoke coverage.
 - [t/sfs/](t/sfs): native C unit tests for the SFS runtime and compression layer.

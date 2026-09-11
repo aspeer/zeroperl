@@ -1,7 +1,5 @@
 # ZeroPerl — WebDyne integration fork
 
-For maintainers: [release tagging and npm staging](RELEASING.md).
-
 This is a fork of the original [6over3/zeroperl](https://github.com/6over3/zeroperl)
 project. It supports a WASM implementation of WebDyne, primarily on Cloudflare
 Workers at this time, with the potential to support other WASM providers later.
@@ -47,6 +45,7 @@ Read the full blog [here](https://andrews.substack.com/p/zeroperl-sandboxed-perl
 Requires Docker or Apple Container (macOS).
 
 **Docker:**
+
 ```bash
 docker build -t zeroperl .
 mkdir -p output
@@ -121,77 +120,3 @@ See the [zeroperl-ts README](https://github.com/6over3/zeroperl-ts) for details.
 
 > **Note:** The first argument passed to Perl **must** be `zeroperl`.
 > Depending on your runtime, you may need to map `/dev/null` as a preopen.
-
-## Initialize a Cloudflare application
-
-In an application repository with PSP pages and supporting files in `app/`:
-
-```sh
-npm init
-npm install @webdyne/webdyne-zeroperl-5.44.0
-npx webdyne-cloudflare init
-npm run dev
-```
-
-The initializer is included in the next package release built from this source.
-It preserves existing npm scripts, adds `build`, `check`, `dev`, `deploy`,
-`login`, `logout`, and `whoami` where absent, and updates `.gitignore` for
-installed dependencies and generated output. Existing `.assetsignore` contents
-are preserved. It sets `webdyne.static` to `false` and otherwise creates exactly:
-
-```gitignore
-*.psp
-*.pm
-*.pl
-*.conf
-```
-
-Run `npm run login`, `npm run whoami`, then `npm run deploy` to publish.
-Authentication uses the package's Wrangler without building the application.
-`npm run` lists commands. Wrangler is already a distribution dependency;
-installation does not log in or deploy.
-
-The source root is `--app-directory DIR` (or `--document-root DIR`), then
-`package.json.webdyne.appDirectory`, then `app`. Initialization saves explicit
-source, entry, output, library and Wrangler-config options for subsequent runs.
-There is no separate host `DIR_ROOT` variable; the application still mounts at
-VFS `/app`. Generated output must be outside the assets directory.
-
-A root `.assetsignore` enables automatic `--assets DIR` for check, development,
-and both deployment stages. Files ignored by Cloudflare stay in the VFS; public
-assets are omitted. **Add patterns for templates or data Perl reads directly.**
-Removing the ignore file restores complete application packaging. Every build
-rereads the file. The entry page must be ignored or the build refuses to proceed.
-
-Cloudflare reads one [root `.assetsignore`](https://developers.cloudflare.com/workers/static-assets/binding/#ignoring-assets)
-using gitignore patterns, including comments, negation and directory patterns.
-Root patterns apply throughout the tree; nested `.assetsignore` files are not
-loaded. The CLI rejects nested files and misspelled `.assetignore` files with
-instructions to move their rules. `/_headers`, `/_redirects`, and `/.assetsignore`
-follow Wrangler's default ignore rules. The small `ignore` dependency implements
-these rules rather than maintaining a separate glob implementation.
-
-Explicit forwarded `--assets DIR` or `--assets=DIR` takes precedence and is not
-duplicated. Its root ignore file controls VFS selection for files inside that
-assets tree; application files outside it remain in the VFS. This permits an
-explicit `app/public` assets root. Paths are relative to the project, including
-when generated Wrangler config lives in `.webdyne`. Without an ignore file,
-explicit assets flags still reach Wrangler but VFS pruning is disabled.
-Automatic assets arguments override any assets directory in a custom Wrangler
-config; choose another root using explicit `--assets`. Custom configs remain
-untouched and must set `vars.WEBDYNE_STATIC` to `"0"` themselves.
-
-Development currently builds the server archive once before starting Wrangler.
-After changing PSP/Perl files or ignore rules, run `npm run build` in another
-terminal or restart `npm run dev`. For explicit forwarded asset roots, pass the
-same `-- --assets DIR` to the rebuild. Wrangler handles public asset changes.
-
-To remove the deployed Worker, run `npm run destroy`. Type the full `Yes` at
-`Are you sure [Yes/No] (default No)?`, then confirm Wrangler's own named-target
-prompt. Blank, No, other answers, or cancellation do not invoke deletion.
-Piped/unattended input and confirmation-bypass flags are refused. The command
-uses the same Wrangler configuration as deployment but does not build or need
-an `app/` directory. Wrangler retains its checks for dependent Workers.
-For configured environments, use `npm run destroy -- -- --env staging`.
-After upgrading an existing app, rerun `npx webdyne-cloudflare init` to add
-`"destroy": "webdyne-cloudflare destroy"` while preserving other scripts.

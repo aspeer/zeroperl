@@ -2,7 +2,8 @@
 
 Release versions belong to the project. Perl versions select build variants.
 The next release increments the version recorded in release/versions.json.
-Earlier local 1.0.0 candidates remain historical test artifacts.
+Use the version and command printed by the release helper; version numbers
+in the examples below are illustrative.
 
 On a clean main checkout containing the changes to release:
 
@@ -27,7 +28,7 @@ GitHub repository before pushing a runtime release, so CI can check it out.
 ## Version and Perl configuration
 
 `release/versions.json` contains one `version`, the `perlVersions` to release,
-and `supportedPerlVersions` for local builds. Only 5.44.0 is selected initially.
+and `supportedPerlVersions` for local builds. Currently only 5.44.0 is selected.
 Add qualified variants to perlVersions before preparing the next release.
 All selected variants receive the same npm version. Build 2 is version 1.0.2,
 not 2.0.0. The patch component is retained as buildNumber in manifests for
