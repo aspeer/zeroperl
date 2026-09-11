@@ -20,10 +20,9 @@ npx webdyne-cloudflare init
 Create `app/app.psp` with a small page:
 
 ```html
-<html>
-<head><title>Hello from WebDyne</title></head>
-<body><h1>Hello from WebDyne</h1></body>
-</html>
+<start_html title="Server Time" h1 hr>
+Server time is: <perl>localtime()</perl>
+<end_html>
 ```
 
 Then start the local Worker and open the address Wrangler prints:
