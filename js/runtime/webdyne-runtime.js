@@ -36,6 +36,7 @@ export function createWebDyneRuntime({
   perlLibraryVfsArchive,
   webSocketAdapter,
   extensions = [],
+  extensionCleanupTimeoutMs = 10_000,
 }) {
   if (!(zeroperlModule instanceof WebAssembly.Module)) {
     throw new TypeError("zeroperlModule must be an imported WebAssembly.Module");
@@ -48,7 +49,7 @@ export function createWebDyneRuntime({
   }
 
   const assets = { appVfsArchive, perlLibraryVfsArchive };
-  const extensionManager = createExtensionManager(extensions);
+  const extensionManager = createExtensionManager(extensions, { cleanupTimeoutMs: extensionCleanupTimeoutMs });
   let perlFileSystemPromise;
   let persistentRuntimePromise;
   let persistentPerl;
@@ -445,30 +446,36 @@ export function createWebDyneRuntime({
   function dispatch(request, bindings = {}) {
     const runtimeConfig = webdyneRuntimeConfig(bindings);
     const scope = buildPagiScope(request);
-    const releaseExtensions = extensionManager.attachScope({ scope, bindings, request });
-    let transport;
-    try {
-      transport = createFetchPagiTransport(scope, request, { webSocketAdapter });
-    } catch (error) {
-      releaseExtensions();
-      throw error;
-    }
-    const completion = startPersistentSession(
-      scope,
-      request,
-      transport,
-      runtimeConfig,
-    ).catch((error) => {
-      if (!error?.pagiErrorId) console.error("PAGI application failed:", error);
-    }).finally(() => {
+    // Construct the transport before allocating extension resources. Dispatch
+    // remains synchronous; setup, application work and cleanup share completion.
+    const transport = createFetchPagiTransport(scope, request, { webSocketAdapter });
+    const completion = (async () => {
+      let releaseExtensions;
+      let applicationError;
       try {
-        releaseExtensions();
+        releaseExtensions = await extensionManager.attachScope({ scope, bindings, request });
+        await startPersistentSession(scope, request, transport, runtimeConfig);
       } catch (error) {
-        // Streaming callers may intentionally ignore completion. Keep a faulty
-        // extension cleanup observable without creating an unhandled rejection.
-        console.error("WebDyne extension cleanup failed", error);
+        applicationError = error;
+        if (!error?.pagiErrorId) console.error("PAGI application failed:", error);
+        await transport.sink.fail(error);
+        throw error;
+      } finally {
+        if (releaseExtensions) {
+          try {
+            await releaseExtensions();
+          } catch (error) {
+            console.error("WebDyne extension cleanup failed", error);
+            throw applicationError
+              ? new AggregateError([applicationError, error], "PAGI application and extension cleanup failed", { cause: applicationError })
+              : error;
+          }
+        }
       }
-    });
+    })();
+    // Providers still receive the rejecting Promise; observing it here avoids
+    // unhandled rejections for portable callers that only consume the response.
+    void completion.catch(() => undefined);
     return { response: transport.response, completion, type: scope.type };
   }
 

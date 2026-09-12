@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promi
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { prepareDevelopmentFromNpm } from "./prepare-dev-from-npm.mjs";
 
 export function developmentVersion(runtimeVersion, revision, date = new Date()) {
   const parts = runtimeVersion.split(".");
@@ -20,6 +21,7 @@ export async function main(args = process.argv.slice(2)) {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
   const release = JSON.parse(await readFile(join(root, "release/versions.json"), "utf8"));
   const { values } = parseArgs({ args, options: {
+    "from-npm": { type: "boolean", default: false },
     "perl-version": { type: "string", default: "5.44.0" },
     "runtime-version": { type: "string", default: release.version },
   } });
@@ -31,16 +33,22 @@ export async function main(args = process.argv.slice(2)) {
   const dirty = Boolean(execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).trim());
   const source = join(root, "output", perl);
   const manifestName = `manifest-${perl}-${runtime}.json`;
-  const original = JSON.parse(await readFile(join(source, manifestName), "utf8"));
+
   const destination = join(root, "dist/dev");
   await mkdir(destination, { recursive: true });
   const work = await mkdtemp(join(destination, "work-"));
   const prepared = join(work, "package");
   try {
-    execFileSync(process.execPath, ["tools/prepare-npm-package.mjs",
-      "--source", source, "--destination", prepared, "--manifest", manifestName,
-      "--wasm", original.artifacts.wasm.filename, "--reactor", original.artifacts.reactor.filename,
-    ], { cwd: root, stdio: "inherit" });
+    let publishedPackage;
+    if (values["from-npm"]) {
+      publishedPackage = await prepareDevelopmentFromNpm({ root, work, prepared, runtime, perl });
+    } else {
+      const original = JSON.parse(await readFile(join(source, manifestName), "utf8"));
+      execFileSync(process.execPath, ["tools/prepare-npm-package.mjs",
+        "--source", source, "--destination", prepared, "--manifest", manifestName,
+        "--wasm", original.artifacts.wasm.filename, "--reactor", original.artifacts.reactor.filename,
+      ], { cwd: root, stdio: "inherit" });
+    }
     const packagePath = join(prepared, "package.json");
     const pkg = JSON.parse(await readFile(packagePath, "utf8"));
     pkg.version = version;
@@ -49,7 +57,7 @@ export async function main(args = process.argv.slice(2)) {
     const manifestPath = join(prepared, "manifest.json");
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
     manifest.npmPackage.version = version;
-    manifest.npmPackage.development = { revision, dirty, runtimeVersion: runtime };
+    manifest.npmPackage.development = { revision, dirty, runtimeVersion: runtime, ...(publishedPackage ? { publishedPackage, overlay: ["bin", "lib", "scripts", "js/runtime", "js/provider", "js/transport", "js/worker.js"] } : {}) };
     await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
     const readmePath = join(prepared, "README.md");
     const readme = await readFile(readmePath, "utf8");

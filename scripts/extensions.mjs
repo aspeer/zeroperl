@@ -67,7 +67,23 @@ export async function resolveWebDyneExtensions(projectRoot, packageJson, configu
     if (typeof manifest.perlLibrary !== "string" || manifest.perlLibrary.length === 0) {
       throw new Error(`${packageName} extension manifest must declare perlLibrary`);
     }
-    const cloudflare = manifest.providers?.cloudflare;
+    const provider = manifest.providers?.cloudflare;
+    const variants = provider?.variants ?? [];
+    if (!Array.isArray(variants)) throw new Error(`${packageName} provider variants must be an array`);
+    const selected = [];
+    for (const variant of variants) {
+      if (!isObject(variant) || !exportNamePattern.test(variant.whenOption ?? "")
+        || typeof variant.module !== "string" || !/^\.\/[A-Za-z0-9._/-]+$/.test(variant.module)
+        || variant.module.split("/").includes("..") || !exportNamePattern.test(variant.factory ?? "")
+        || !Array.isArray(variant.compatibilityFlags ?? [])
+        || (variant.compatibilityFlags ?? []).some(flag => typeof flag !== "string" || !/^[a-z][a-z0-9_]*$/.test(flag))) {
+        throw new Error(`${packageName} has an invalid Cloudflare provider variant`);
+      }
+      const value = Object.hasOwn(options, variant.whenOption) ? options[variant.whenOption] : undefined;
+      if ((Array.isArray(value) && value.length > 0) || (typeof value === "string" && value.trim().length > 0)) selected.push(variant);
+    }
+    if (selected.length > 1) throw new Error(`${packageName} has multiple active Cloudflare provider variants`);
+    const cloudflare = selected[0] ?? provider;
     if (!isObject(cloudflare)
       || typeof cloudflare.module !== "string"
       || !/^\.\/[A-Za-z0-9._/-]+$/.test(cloudflare.module)
@@ -88,6 +104,7 @@ export async function resolveWebDyneExtensions(projectRoot, packageJson, configu
       perlLibrary,
       importSpecifier: `${packageName}/${cloudflare.module.slice(2)}`,
       factory: cloudflare.factory,
+      compatibilityFlags: selected[0]?.compatibilityFlags ?? [],
     });
   }
   return resolved;

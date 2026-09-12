@@ -399,10 +399,27 @@ function cloudflareR2Buckets(value) {
   });
 }
 
+// Hyperdrive credentials belong in bindings or private development environment.
+function cloudflareHyperdrive(value) {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new TypeError("package.json webdyne.cloudflare.hyperdrive must be an array");
+  const seen = new Set();
+  return value.map((entry, index) => {
+    const item = assertObject(entry, `webdyne.cloudflare.hyperdrive[${index}]`);
+    if (typeof item.binding !== "string" || !/^[A-Z_][A-Z0-9_]*$/.test(item.binding) || seen.has(item.binding)) {
+      throw new TypeError(`Invalid or duplicate Hyperdrive binding at index ${index}`);
+    }
+    if (typeof item.id !== "string" || !/^[a-f0-9]{32}$/i.test(item.id)) throw new TypeError(`Hyperdrive ${item.binding} requires a 32-character configuration id`);
+    if (Object.keys(item).some(key => !["binding", "id"].includes(key))) throw new TypeError("Hyperdrive accepts binding and id only; put local credentials in WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_<BINDING>");
+    seen.add(item.binding);
+    return { binding: item.binding, id: item.id };
+  });
+}
+
 // Use an explicit or project-root Wrangler config, otherwise write the generated defaults.
 // Binding translation applies only to generated configuration; supplied files are left intact.
 //
-export async function generatedWranglerConfig(projectRoot, project, options, outputDirectory) {
+export async function generatedWranglerConfig(projectRoot, project, options, outputDirectory, extensions = []) {
   if (options.wranglerConfig) {
     const explicit = safeProjectPath(projectRoot, options.wranglerConfig, "Wrangler configuration");
     if (!(await exists(explicit))) throw new Error(`Wrangler configuration does not exist: ${options.wranglerConfig}`);
@@ -417,8 +434,10 @@ export async function generatedWranglerConfig(projectRoot, project, options, out
     name: project.cloudflare.name ?? workerName(project.packageJson),
     main: "worker.js",
     compatibility_date: project.cloudflare.compatibilityDate ?? "2026-08-27",
-    compatibility_flags: ["enable_request_signal"],
+    compatibility_flags: [...new Set(["enable_request_signal", ...extensions.flatMap(extension => extension.compatibilityFlags ?? []),
+      ...(project.cloudflare.hyperdrive?.length ? ["nodejs_compat"] : [])])],
     workers_dev: project.cloudflare.workersDev ?? true,
+    observability: { enabled: true, traces: { enabled: true } },
     vars: {
       WEBDYNE_ROOT: "/app",
       WEBDYNE_INDEX: options.entry,
@@ -429,6 +448,7 @@ export async function generatedWranglerConfig(projectRoot, project, options, out
       { type: "Text", globs: ["**/*.pl", "**/*.pm"], fallthrough: false },
       { type: "Data", globs: ["**/*.tar.gz"], fallthrough: false },
     ],
+    ...(project.cloudflare.hyperdrive === undefined ? {} : { hyperdrive: cloudflareHyperdrive(project.cloudflare.hyperdrive) }),
     ...(project.cloudflare.d1Databases === undefined
       ? {}
       : { d1_databases: cloudflareD1Databases(project.cloudflare.d1Databases) }),
@@ -522,7 +542,7 @@ export async function main(
   const built = await build(root, project, options, assets.policy);
   if (options.command === "build") return;
 
-  const config = await generatedWranglerConfig(root, project, options, built.outputDirectory);
+  const config = await generatedWranglerConfig(root, project, options, built.outputDirectory, built.extensions);
   const configArguments = ["--config", config, ...assets.arguments];
   const wranglerArguments = [...configArguments, ...options.wranglerArguments];
   if (options.command === "dev") {

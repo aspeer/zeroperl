@@ -49,7 +49,7 @@ test("the portable runtime uses the new VFS roots and temporary directory", () =
   });
 });
 
-test("runtime extensions register per interpreter and clean up request scopes in reverse order", () => {
+test("runtime extensions register per interpreter and clean up request scopes in reverse order", async () => {
   const events = [];
   const manager = createExtensionManager([
     {
@@ -72,10 +72,10 @@ test("runtime extensions register per interpreter and clean up request scopes in
   ]);
   manager.register({ id: 7 });
   const scope = { extensions: {} };
-  const release = manager.attachScope({ scope, bindings: {}, request: {} });
+  const release = await manager.attachScope({ scope, bindings: {}, request: {} });
   assert.equal(scope.extensions.first, true);
-  release();
-  release();
+  await release();
+  await release();
   assert.deepEqual(events, [
     "register:first:7",
     "register:second:7",

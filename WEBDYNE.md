@@ -335,3 +335,82 @@ For a custom Wrangler file set `WEBDYNE_INDEX` to the entry path relative to
 - [TESTS.md](TESTS.md): verification commands and known limitations.
 - [RELEASING.md](RELEASING.md): preparing and staging a release.
 - [ARCHITECTURE.md](ARCHITECTURE.md): runtime layout and build internals.
+
+
+## Extension resource cleanup
+
+Extensions can return a cleanup function or `{ release(context) }` from their
+synchronous `attachScope()` hook. Cleanup may return a Promise. Revoke request
+capabilities synchronously when cleanup starts, then return the Promise for
+closing resources. All hooks are invoked once, in reverse registration order,
+before the manager waits for their asynchronous completions.
+
+Cleanup receives `{ signal }`. The runtime option `extensionCleanupTimeoutMs`
+defaults to 10000 ms. At that deadline the signal aborts and request completion
+rejects. Extensions must implement their own forced-close behavior on abort:
+a deadline does not itself cancel network operations. Late cleanup rejections
+remain observed. Do not put awaited network work in a Perl destructor.
+
+The portable runtime includes cleanup in `dispatch.completion`; the Cloudflare
+provider passes this Promise to `waitUntil()`. Partial attachment failure also
+awaits cleanup. Already-sent HTTP responses cannot be replaced by cleanup errors;
+completion rejects and diagnostics record the failure. A platform termination
+can still prevent cleanup from finishing, so database code must not interpret
+connection loss during commit as proof of rollback or automatically retry writes.
+
+Synchronous extension hooks continue to work. Direct consumers of the exported
+extension manager must now await `manager.attachScope(context)` to obtain the
+release function and await `release()` for completion. The generated Worker
+handles this internally. Resource creation during attachment should remain
+synchronous; open connections lazily in request operations.
+
+
+For JavaScript/portable-source development when raw build artifacts are absent,
+run `npm run pack:dev -- --from-npm`. This downloads the exact versioned official
+Perl-specific npm package from registry.npmjs.org, verifies its published SHA-512
+integrity and manifest hashes for WASM and notices, then overlays `bin`, `lib`,
+`scripts`, the runtime/provider/transport JavaScript directories, and `js/worker.js`.
+The private development tarball records the published input and source revision.
+It retains the released JS bridge, WASM, embedded inventory, licences, exports,
+and dependency metadata. Use the original raw-artifact mode for XS/ABI/bridge or
+package dependency/export changes; the published-input mode does not rebuild or
+validate those changes. Neither mode publishes a package.
+
+
+## PostgreSQL through Hyperdrive (runtime 1.0.10)
+
+Install `@webdyne/webdyne-cloudflare` 1.3.0 or later, then configure an explicit
+request binding allow-list and the existing Hyperdrive resource ID:
+
+```json
+{
+  "webdyne": {
+    "extensions": {
+      "@webdyne/webdyne-cloudflare": { "hyperdriveBindings": ["DB"] }
+    },
+    "cloudflare": {
+      "hyperdrive": [{ "binding": "DB", "id": "YOUR_32_HEX_HYPERDRIVE_ID" }]
+    }
+  }
+}
+```
+
+`webdyne-cloudflare check`/`deploy` generates the Hyperdrive binding and selects
+its pg-enabled provider export. D1/KV/R2-only applications retain their original
+provider. Generated configurations include the selected provider's compatibility
+flags and logs/traces. User-owned Wrangler files are never rewritten: add the
+Hyperdrive binding and `nodejs_compat` there yourself. Use caching-disabled
+Hyperdrive for the initial CRUD/read-after-write use case.
+
+Local database credentials belong in the private environment variable
+`WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB`, never in package.json. The
+resource array accepts only binding and id. The Perl API and examples are
+maintained in the Cloudflare extension package. No DBI/XS additions are required.
+
+Extension manifests may declare Cloudflare `variants`: each contains a
+`whenOption` naming an explicit nonempty array/string option, an exported module,
+a factory name, and optional `compatibilityFlags`. At most one variant may be
+active. This is declarative static import selection, not executable build code.
+An empty/absent option selects the original provider. Runtime 1.0.10 also passes
+`lifecycle.asyncCleanup: true` to attachment hooks; async-cleanup extensions must
+reject older runtimes rather than silently discarding cleanup Promises.

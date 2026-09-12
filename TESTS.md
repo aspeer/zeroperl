@@ -97,3 +97,22 @@ packaging selects 5.44.0. Superseded build diaries remain in Git history.
   despite passing isolated async probes.
 - The experimental mini build failed its compressed-size improvement target;
   it is not a qualified release alternative.
+
+
+## Asynchronous extension cleanup development checks
+
+The `codex/hyperdrive-support` change adds five lifecycle tests for immediate
+revocation and shared completion, mixed cleanup failures, partial attachment
+failure, deadline abort and late rejection, and dispatch completion on setup
+failure. The complete JavaScript suite passes 58 tests. These checks use JavaScript
+resources and a dispatch failure before WASM starts; real Worker/database socket
+closure, request abort, and interpreter recycling still need phase-1 integration
+coverage. No new Perl or XS binary was built for this change.
+
+
+Hyperdrive generator/lifecycle qualification (2026-09-12): extension variant
+selection is opt-in, malformed or ambiguous variants fail, Hyperdrive IDs and
+binding uniqueness are checked, and user-owned Wrangler files remain unchanged.
+The Cloudflare extension repository owns the live PostgreSQL qualification harness.
+Run `npm run test:cloudflare-package` and the three Python notice/licence test
+files before preparing the 1.0.10 release.
