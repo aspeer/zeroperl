@@ -33,17 +33,18 @@ try {
       extensions: [{register(perl) { interpreters.push(perl); }}],
     });
   }
-  async function request(app, env = bindings) {
+  async function request(app, env = bindings, failure) {
     const result = app.dispatch(new Request("http://localhost/app.psp"), env);
     const response = await result.response;
     const body = await response.text();
-    await result.completion;
+    if (failure) await assert.rejects(result.completion, failure);
+    else await result.completion;
     return {status: response.status, body};
   }
   // An old artifact must not silently accept callback settings it cannot execute.
   if (process.argv[3]) {
     const old = await runtime(false);
-    assert.equal((await request(old)).status, 500);
+    assert.equal((await request(old, bindings, /require updated WebDyne/)).status, 500);
     assert.match(JSON.stringify(errors), /require updated WebDyne/);
     console.log("PASS: old embedded core reports unsupported callbacks");
   }
@@ -59,11 +60,11 @@ try {
   console.log("PASS: configured async startup completes once before cold and warm PSP requests");
   for (const [startup, diagnostic] of [["My::App::missing", /not defined/], ["Missing::LifespanFixture::startup", /Unable to load lifespan callback/]]) {
     const invalid = await runtime(true);
-    assert.equal((await request(invalid, {...bindings, WEBDYNE_STARTUP: startup})).status, 500);
+    assert.equal((await request(invalid, {...bindings, WEBDYNE_STARTUP: startup}, diagnostic)).status, 500);
     assert.match(JSON.stringify(errors), diagnostic);
   }
   const failed = await runtime(true);
-  assert.equal((await request(failed, {...bindings, WEBDYNE_TEST_STARTUP_FAIL: "1"})).status, 500);
+  assert.equal((await request(failed, {...bindings, WEBDYNE_TEST_STARTUP_FAIL: "1"}, /callback fixture failed/)).status, 500);
   assert.match(JSON.stringify(errors), /callback fixture failed/);
   console.log("PASS: missing modules/functions and callback errors block requests");
 } catch (error) {
