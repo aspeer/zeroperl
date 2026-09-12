@@ -61,11 +61,12 @@ try {
     return { runtime, startups: () => startups, generations: () => generations };
   }
 
-  async function request(runtime) {
+  async function request(runtime, failure) {
     const result = runtime.dispatch(new Request("http://localhost/app.psp"));
     const response = await result.response;
     const body = await response.text();
-    await result.completion;
+    if (failure) await assert.rejects(result.completion, failure);
+    else await result.completion;
     return { status: response.status, body };
   }
 
@@ -84,14 +85,14 @@ try {
     await $send_cr->({type => 'lifespan.startup.failed', message => 'fixture startup failure'});
     return;
   `);
-  const failures = await Promise.all([request(failed.runtime), request(failed.runtime)]);
+  const failures = await Promise.all([request(failed.runtime, /fixture startup failure/), request(failed.runtime, /fixture startup failure/)]);
   for (const result of failures) {
     assert.equal(result.status, 500);
 
   }
   assert.match(JSON.stringify(errors), /fixture startup failure/);
   assert.equal(failed.startups(), 1);
-  assert.equal((await request(failed.runtime)).status, 500);
+  assert.equal((await request(failed.runtime, /fixture startup failure/)).status, 500);
   assert.equal(failed.generations(), 2, "a replacement interpreter runs startup again");
   console.log("PASS: failed startup blocks requests and a replacement reruns startup");
 
@@ -112,7 +113,7 @@ try {
     await $receive_cr->();
     await $send_cr->({type => 'http.response.start'});
   `);
-  assert.equal((await request(invalid.runtime)).status, 500);
+  assert.equal((await request(invalid.runtime, /Unexpected PAGI lifespan event/)).status, 500);
   assert.match(JSON.stringify(errors), /Unexpected PAGI lifespan event/);
   console.log("PASS: invalid lifespan response blocks requests");
 
@@ -121,7 +122,7 @@ try {
   console.log("PASS: asynchronous startup can resume through the session timer bridge");
 
   const stalled = createRuntime("await $receive_cr->(); await $receive_cr->();");
-  const timeout = await request(stalled.runtime);
+  const timeout = await request(stalled.runtime, /startup timed out/);
   assert.equal(timeout.status, 500);
   assert.match(JSON.stringify(errors), /startup timed out/);
   console.log("PASS: missing startup acknowledgement times out");
