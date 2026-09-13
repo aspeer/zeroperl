@@ -54,7 +54,7 @@ check before uploading. Installing the package never logs in or deploys.
 | --- | --- |
 | `@webdyne/webdyne-zeroperl@1` | The complete WebDyne/PAGI runtime using the newest supported Perl. |
 | `@webdyne/webdyne-zeroperl-5.44.0@1` | The same runtime, staying on Perl 5.44.0. |
-| `@aspeer/zeroperl-ts` | Embedding Perl directly in JavaScript/TypeScript. WebDyne applications don't need to install this separately. |
+| `@webdyne/webdyne-zeroperl-ts` | Embedding Perl directly in JavaScript/TypeScript. WebDyne applications don't need to install this separately. |
 
 The two WebDyne packages use the same project version. The unsuffixed package
 follows the newest supported Perl; the suffix selects a Perl version, not an

@@ -53,7 +53,7 @@ test('alias pointing at another commit fails release validation',()=>fixture((re
 
 test('TypeScript releases update package and lock versions together',()=>fixture((repo,git)=>{
  rmSync(join(repo,'release'),{recursive:true});
- writeFileSync(join(repo,'package.json'),JSON.stringify({name:'@aspeer/zeroperl-ts',version:'1.1.0'}));
+ writeFileSync(join(repo,'package.json'),JSON.stringify({name:'@webdyne/webdyne-zeroperl-ts',version:'1.1.0'}));
  writeFileSync(join(repo,'package-lock.json'),JSON.stringify({version:'1.1.0',packages:{'':{version:'1.1.0'}}}));
  git('add','-A');git('commit','-m','TypeScript fixture');
  prepareRelease(repo);

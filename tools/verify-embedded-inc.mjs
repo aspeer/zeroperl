@@ -5,7 +5,7 @@ import { constants as fsConstants } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { MemoryFileSystem, ZeroPerl } from "@aspeer/zeroperl-ts";
+import { MemoryFileSystem, ZeroPerl } from "@webdyne/webdyne-zeroperl-ts";
 
 const decoder = new TextDecoder();
 const __filename = fileURLToPath(import.meta.url);

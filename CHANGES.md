@@ -1,5 +1,12 @@
 # Changes
 
+## 1.0.15
+
+- Updated the bridge submodule and verifier to
+  `@webdyne/webdyne-zeroperl-ts` 1.1.4; updated imports and package guidance.
+- Removed obsolete development plans, benchmark reports and the disabled
+  release workflow while retaining active tests and maintained documentation.
+
 ## 1.0.5–1.0.6
 
 - Embedded WebDyne 3.028 with named lifespan callbacks and request diagnostic clearing.

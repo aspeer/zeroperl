@@ -3,7 +3,7 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { MemoryFileSystem, ZeroPerl } from "@aspeer/zeroperl-ts";
+import { MemoryFileSystem, ZeroPerl } from "@webdyne/webdyne-zeroperl-ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

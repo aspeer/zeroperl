@@ -52,8 +52,7 @@ it does not create a release or bypass tag validation.
 `.github/workflows/zeroperl-webdyne-release.yml` is the single build, package
 and staging workflow. It validates the tag pair, builds each selected Perl once,
 runs runtime and package qualification, archives the results, and stages each
-variant through its npm trusted publisher. The previous separate npm workflow
-has been removed. Configure npm to trust **zeroperl-webdyne-release.yml** in
+variant through its npm trusted publisher. Configure npm to trust **zeroperl-webdyne-release.yml** in
 **aspeer/zeroperl**. No GitHub environment is specified by this workflow.
 
 The Perl-specific package is `@webdyne/webdyne-zeroperl-5.44.0@<semver>`.
@@ -102,7 +101,7 @@ before their retention expires (npm candidate: 30 days for runtime, 90 days
 for TypeScript; runtime binary bundle: 90 days).
 
 
-## Lean runtime package (1.0.3 onward)
+## Runtime package contents
 
 npm contains one production WASM, application tooling and the reviewed
 `THIRD-PARTY-LICENSES.txt`. Shared terms are deduplicated; component-specific
@@ -211,3 +210,19 @@ Future tagged releases build, attest and stage both candidates automatically;
 approval in npm remains manual. Do not rerun the seeded version expecting it to
 stage again: use the next release. A successful sibling staging operation remains
 pending even when the other name needs seeding; review it separately in npm.
+
+
+## Release maintenance checks
+
+Verify the compiled bridge against the canonical submodule source before release;
+this comparison is not yet an automated release gate. Qualify changes to the pinned
+Wrangler toolchain and review current dependency audit results rather than relying
+on a previous audit report. Confirm registry and staging state independently for
+both package names before announcing publication.
+
+Preserve diagnostic build evidence before npm packaging: an inventory-policy
+failure must not discard the archive needed by `make licence-review`. Keep the
+checksum-matched attribution baseline required by the committed inventory, as
+explained in [UPDATE.md](UPDATE.md) and [the licence review guide](release/licences/README.md).
+Mechanical reuse of unchanged excerpts does not establish that changed source
+contains no additional obligations; inspect the evidence diff before adoption.

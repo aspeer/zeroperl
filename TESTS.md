@@ -12,8 +12,8 @@ npm run test:cloudflare-package
 prove -I/absolute/path/to/pm-WebDyne/lib t/runtime/*.t
 ```
 
-Use WebDyne 3.028 and its dependencies for the native tests. The `.pagi`
-bootstrap test deliberately runs without loading WebDyne. CPAN lock and XS
+Use the WebDyne version pinned in `cpanfile` and its dependencies for native
+tests. The `.pagi` bootstrap test deliberately runs without loading WebDyne. CPAN lock and XS
 checks in `t/cpan/` need the prepared build environment and selected snapshot;
 `prove -r t` is appropriate there, not an assertion that every host Perl has
 all build dependencies installed.
@@ -64,25 +64,6 @@ contents, package size, attribution inventory and provenance before staging.
 Keep the inspected package and manifest together; an old passing binary does
 not qualify a changed embedded library. See [RELEASING.md](RELEASING.md).
 
-The last recorded GitHub run, `34138265604`, built and qualified 1.0.6 with
-WebDyne 3.028 and passed package/alias checks. It staged the Perl-specific npm
-candidate; the unsuffixed alias returned E401. This is historical build evidence,
-not a claim that both packages are currently published. Confirm registry state
-before an announcement. The 1.0.5 build had passed runtime checks but failed
-an expected-file inventory check, corrected for 1.0.6.
-
-Older qualification covered Perl 5.18.4, 5.36.3 and 5.44.0, including static XS,
-asynchronous disposal and persistent WebDyne rendering. Current release
-packaging selects 5.44.0. Superseded build diaries remain in Git history.
-
-## Documentation review checks (2026-09-11)
-
-- 51 JavaScript contract tests and 62 native runtime assertions passed.
-- Plain PAGI and named lifespan callback smoke tests passed using the local
-  1.0.5 WebDyne 3.028 WASM artifact, without a library overlay.
-- Relative documentation links and whitespace checks passed. No new binary,
-  hosted deployment or publication was produced by this documentation review.
-
 ## Known limits
 
 - Startup is dispatched; Worker shutdown and lifespan-state propagation are not.
@@ -97,22 +78,27 @@ packaging selects 5.44.0. Superseded build diaries remain in Git history.
   despite passing isolated async probes.
 - The experimental mini build failed its compressed-size improvement target;
   it is not a qualified release alternative.
+- Development tooling does not watch server-side application/library files or
+  `.assetsignore`; rebuild or restart Wrangler after those changes.
+- Opcode and CGI::Simple::Cookie startup warnings need investigation if they
+  affect the selected application.
 
+## Extension and release tooling checks
 
-## Asynchronous extension cleanup development checks
+JavaScript regression tests cover immediate capability revocation, shared cleanup
+completion, multiple cleanup failures, partial attachment failures, deadline abort,
+late rejection and dispatch completion after setup failure. Generator tests cover
+extension variants, binding validation and preservation of user-owned configuration.
+The Cloudflare extension repository owns live PostgreSQL qualification; these local
+contracts alone do not prove Worker/database socket cancellation or recycling.
 
-The `codex/hyperdrive-support` change adds five lifecycle tests for immediate
-revocation and shared completion, mixed cleanup failures, partial attachment
-failure, deadline abort and late rejection, and dispatch completion on setup
-failure. The complete JavaScript suite passes 58 tests. These checks use JavaScript
-resources and a dispatch failure before WASM starts; real Worker/database socket
-closure, request abort, and interpreter recycling still need phase-1 integration
-coverage. No new Perl or XS binary was built for this change.
+Run the notice and licence suites alongside the JavaScript package tests:
 
+```sh
+python3 -B t/test_compact_notices.py
+python3 -B t/test_runtime_notices.py
+python3 -B t/test_licence_review.py
+```
 
-Hyperdrive generator/lifecycle qualification (2026-09-12): extension variant
-selection is opt-in, malformed or ambiguous variants fail, Hyperdrive IDs and
-binding uniqueness are checked, and user-owned Wrangler files remain unchanged.
-The Cloudflare extension repository owns the live PostgreSQL qualification harness.
-Run `npm run test:cloudflare-package` and the three Python notice/licence test
-files before preparing the 1.0.10 release.
+For runner JSON performance, use the [benchmark harness](t/runtime/bench-runner.pl.md).
+Its local measurements exclude rendering, bridge crossings and network overhead.

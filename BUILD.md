@@ -24,10 +24,11 @@ Carton installation on the host is not required. Work on the TypeScript bridge
 itself additionally uses Bun and its own build instructions.
 
 [release/defaults.mk](release/defaults.mk) supplies the default `PERL_VERSION`
-for Make and `build.sh`, currently **5.44.0**. The supported release targets are
-**5.18.4, 5.36.3, and 5.44.0**. The release profile locks WebDyne
-**3.027**, including its Carp 1.50 minimum. This default is a repository setting, not a lookup
-of the latest upstream Perl release. Direct Dockerfile builds have their own
+for Make and `build.sh`, currently **5.44.0**. The supported build targets are
+**5.18.4, 5.36.3, and 5.44.0** for local builds; `release/versions.json`
+selects the variants packaged for release. `cpanfile` and the matching snapshots
+lock WebDyne and its dependencies. These are repository settings, not lookups
+of the latest upstream releases. Direct Dockerfile builds have their own
 `ARG` defaults; pass `--build-arg PERL_VERSION=...` explicitly when using them.
 
 Both wrappers prefer Apple Container when its `container` command is present,
@@ -476,8 +477,9 @@ container build --target final -t zeroperl .
 This repo vendors the canonical development `zeroperl-ts` source as a git
 submodule at `./zeroperl-ts`. Initialize it before running the root package or
 editing and testing the bridge in place. Release-build verifier tooling instead
-uses a public bridge commit pinned in `tools/package-lock.json`, so clean CI
-builders use that pinned verifier independently of the development submodule.
+uses `@webdyne/webdyne-zeroperl-ts` pinned to an exact npm version in
+`tools/package.json` and `tools/package-lock.json`. Clean CI builders use that
+verifier independently of the development submodule.
 
 Clone with submodules:
 

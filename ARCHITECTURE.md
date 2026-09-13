@@ -404,7 +404,7 @@ Smoke testing:
 - [pipeline/](pipeline): build orchestration scripts.
 - [stubs/](stubs): runtime wrapper C sources, assembly helpers, headers, and cross-compilation stubs (`Errno.pm`).
 - [tools/](tools): shrink generation, smoke tooling, size reporting, utility scripts.
-- `gen/`: generated and tracked shrink artifacts plus generated embedding inputs.
+- `gen/`: generated shrink artifacts and embedding inputs, excluded from Git.
 - [patches/](patches): source patches applied during WASI Perl build (`patch_glob.pl` for all versions, `patch_mg.pl` when `OLD_PERL`, `patch_sv_locale.pl` for 5.28.x).
 - [t/smoke/](t/smoke): sample corpus for smoke coverage.
 - [t/sfs/](t/sfs): native C unit tests for the SFS runtime and compression layer.
@@ -417,3 +417,61 @@ When changing architecture-sensitive paths:
 - Keep `prepare-prefix` before final link so embedded prefix data reflects current shrink mode.
 - Preserve `off` as safe fallback mode for debugging and bisecting.
 - If adding new generated shrink artifacts, wire them into CI artifact extraction and determinism checks.
+
+
+## Bridge and application ownership
+
+The canonical bridge source is pinned in the `zeroperl-ts` submodule;
+`js/zeroperl.js` is generated from it. Marshalling belongs in the bridge, PAGI
+transport in the portable runtime, and Cloudflare execution-context and WebSocket
+APIs in the provider adapter. An artifact-only bridge refresh need not change the
+runtime gitlink if the bridge source is identical; this avoids circular provenance.
+
+Borrowed callback values live until the host callback settles. Owned returns
+transfer ownership, and destructive operations retain temporary state across
+asynchronous suspension. Asyncify restores the root stack before export re-entry
+and the suspended pointer at the rewound import. Both restores are required.
+
+Application directories mount at `/app`; launchers use `/perl5/bin`, optional
+Pure-Perl modules use `/perl5/lib`, and `/tmp` is writable with TMPDIR preserved.
+Configuration crosses the boundary as data rather than interpolated Perl source.
+Embedded immutable files use nonzero mtime 1; application VFS timestamps also use
+epoch seconds. The lightweight POSIX facade supplies `strftime` without full POSIX XS.
+
+Extensions are direct npm dependencies enabled explicitly. Register them once per
+interpreter generation and attach capabilities per request. Cleanup invokes hooks
+in reverse order, revokes capabilities immediately and awaits their completion
+with a deadline. Dispatch completion includes cleanup failures. Service APIs belong
+in the separate WebDyne::Cloudflare package.
+
+`init` preserves existing scripts and ignore files. The effective assets root's
+`.assetsignore` controls VFS/public-file placement; absent ignore files retain
+full-VFS packaging. Explicit asset arguments take precedence. Nested or misspelled
+ignore files and publicly exposed entries are rejected; custom Wrangler files
+remain user-owned. `destroy` requires full-Yes confirmation and target checks,
+skips builds and refuses bypass flags.
+
+## Persistent requests and lifespan
+
+Cloudflare retains session completion with `context.waitUntil`, including stream
+cleanup. `enable_request_signal` lets disconnected SSE release its session;
+ordinary platform request-lifetime limits still apply. WebDyne owns request
+error-state clearing rather than relying on a bootstrap workaround.
+
+PAGI startup gates the shared interpreter promise. Concurrent initial requests
+share startup; failure retires the generation so a later request can create another.
+The acknowledgement timeout is 10 seconds of schedulable host time and cannot
+interrupt CPU-bound Perl. Named callback functions are validated and loaded through
+modules, never evaluated as expressions. The core owns their Future acknowledgement.
+
+A case-sensitive `.pagi` entry loads a coderef once, receives all paths/scopes and
+owns lifespan acknowledgement, bypassing WebDyne PSP routing. Application return
+or exception before any lifespan response means unsupported lifespan and permits
+startup on the same interpreter. Explicit failure, invalid responses, timeout and
+interpreter failures remain fatal; the application completion callback distinguishes
+unsupported lifespan from host failure.
+
+Worker shutdown dispatch, lifespan-state propagation and interpreter-lifetime
+service capabilities are not implemented. Current service handles belong to one
+request; asynchronous startup work needs qualification under provider ownership.
+See [TESTS.md](TESTS.md) for acceptance checks and limitations.
