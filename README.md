@@ -11,6 +11,9 @@ in that usage guide. The source license is in [LICENSE](LICENSE);
 bundled-component attribution is described in
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
+See [examples/README.md](examples/README.md) for standalone WebDyne, native PAGI
+and optional Cloudflare KV applications.
+
 ## Credits
 
 - [6over3/zeroperl](https://github.com/6over3/zeroperl) and

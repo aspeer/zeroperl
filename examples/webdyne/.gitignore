@@ -1,0 +1,5 @@
+node_modules/
+.webdyne/
+.wrangler/
+.dev.vars*
+.env*

@@ -23,3 +23,6 @@ tmp/
 
 # Generated npm candidates
 dist/
+
+# Independent example application manifests
+!/examples/*/package.json

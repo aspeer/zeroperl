@@ -1,0 +1,35 @@
+{
+  "name": "zeroperl-example-cloudflare-kv",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "webdyne-cloudflare build",
+    "check": "webdyne-cloudflare check",
+    "dev": "webdyne-cloudflare dev"
+  },
+  "dependencies": {
+    "@webdyne/webdyne-zeroperl": "^1.0.9",
+    "@webdyne/webdyne-cloudflare": "^1.2.0"
+  },
+  "webdyne": {
+    "appDirectory": "app",
+    "entry": "app.psp",
+    "static": false,
+    "cloudflare": {
+      "name": "zeroperl-example-cloudflare-kv",
+      "kvNamespaces": [
+        {
+          "binding": "CACHE"
+        }
+      ]
+    },
+    "extensions": {
+      "@webdyne/webdyne-cloudflare": {
+        "kvBindings": [
+          "CACHE"
+        ]
+      }
+    }
+  }
+}

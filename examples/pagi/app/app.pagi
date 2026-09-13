@@ -1,0 +1,49 @@
+use strict;
+use warnings;
+use Future::AsyncAwait;
+use JSON::PP qw(encode_json);
+
+async sub {
+    my ($scope_hr, $receive_cr, $send_cr)=@_;
+
+    #  Lifespan is optional. Returning without acknowledgement declines it.
+    #
+    return unless $scope_hr->{'type'} eq 'http';
+
+    #  Drain request events without retaining the body before sending a response.
+    #
+    while (1) {
+        my $event_hr=await $receive_cr->();
+        return if $event_hr->{'type'} eq 'http.disconnect';
+        last unless $event_hr->{'more_body'};
+    }
+
+    my $method=$scope_hr->{'method'};
+    my $path=$scope_hr->{'path'};
+    my $status=200;
+    my $content_type='text/plain; charset=utf-8';
+    my $body="Hello from native PAGI on ZeroPerl!\nTry /info for JSON.\n";
+    my @headers;
+
+    if (($method ne 'GET')&&($method ne 'HEAD')) {
+        $status=405;
+        $body="Method not allowed\n";
+        push(@headers, ['allow', 'GET, HEAD']);
+    }
+    elsif ($path eq '/info') {
+        $content_type='application/json';
+        $body=encode_json({application => 'native-pagi', method => $method, path => $path});
+    }
+    elsif ($path ne '/') {
+        $status=404;
+        $body="Not found\n";
+    }
+
+    push(@headers, ['content-type', $content_type]);
+    await $send_cr->({type => 'http.response.start', status => $status, headers => \@headers});
+    await $send_cr->({
+        type      => 'http.response.body',
+        body      => $method eq 'HEAD' ? '' : $body,
+        more_body => 0,
+    });
+};

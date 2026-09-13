@@ -2,6 +2,9 @@
 
 ## 1.0.15
 
+- Added standalone WebDyne, native PAGI and optional Cloudflare KV examples
+  with installation instructions and expected responses.
+
 - Updated the bridge submodule and verifier to
   `@webdyne/webdyne-zeroperl-ts` 1.1.4; updated imports and package guidance.
 - Removed obsolete development plans, benchmark reports and the disabled

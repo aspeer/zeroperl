@@ -6,6 +6,9 @@ Workers today. Plain `.pagi` applications are supported too. The sister package
 connects Perl applications to D1, Workers KV and R2. Other WASM providers may be
 supported later; the PAGI runtime is kept separate from the Cloudflare adapter.
 
+See [examples/README.md](examples/README.md) for standalone WebDyne, native PAGI
+and optional Cloudflare KV applications.
+
 ## Quick start
 
 Use a recent Node.js installation (22 or later) and npm. In a new application

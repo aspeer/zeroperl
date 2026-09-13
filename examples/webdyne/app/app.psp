@@ -1,0 +1,24 @@
+<start_html title="WebDyne on ZeroPerl" style="/style.css" h1>
+<p>This page runs Perl in WebAssembly. The stylesheet is a public static asset.</p>
+<form method="get">
+  <label for="name">Your name</label>
+  <input id="name" name="name" maxlength="80">
+  <button type="submit">Say hello</button>
+</form>
+<perl handler="greeting"><p>${message}</p></perl>
+<end_html>
+
+__PERL__
+
+use strict;
+use warnings;
+
+sub greeting {
+    my ($self)=@_;
+    my $name=$self->CGI()->param('name');
+    $name='visitor' unless defined($name)&&length($name);
+    $name=substr($name, 0, 80);
+    return $self->render(
+        message => $self->html_tiny()->entity_encode("Hello, $name!"),
+    );
+}
