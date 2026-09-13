@@ -184,7 +184,7 @@ test('CLI defaults to auto and honours explicit minification modes', () => fixtu
   const original = 'package Example;\nsub answer {\n    return 42;\n}\n1;\n';
   await put('Example.pm', original);
   for (const minify of [undefined, 'auto', true, false]) {
-    await writeFile(join(root, 'package.json'), JSON.stringify({name: 'stage-cli', webdyne: {perlLibrary: 'lib', perlMinify: minify}}));
+    await writeFile(join(root, 'package.json'), JSON.stringify({name: 'stage-cli', webdyne: {perlLibrary: 'lib', perlLibraryOptimize: true, perlMinify: minify}}));
     await cloudflareMain(['build'], root);
     const result = {perlLibraryVfsArchive: join(root, '.webdyne/perl-lib-vfs.tar.gz')};
     const actual = (await payload(result))['perl5/lib/Example.pm'];
@@ -234,7 +234,7 @@ for (const dependency of ['missing', 'wrong-version']) {
       `import {main} from ${JSON.stringify(new URL('../scripts/webdyne-cloudflare.mjs', import.meta.url).href)}; await main(['build'], ${JSON.stringify(root)});`],
       {encoding: 'utf8', env: {...process.env, PERL5OPT: `-I${root} -MStageDependency`}});
     for (const mode of [undefined, 'auto', true, false]) {
-      await writeFile(join(root, 'package.json'), JSON.stringify({name: 'fallback', webdyne: {perlLibrary: 'lib', perlMinify: mode}}));
+      await writeFile(join(root, 'package.json'), JSON.stringify({name: 'fallback', webdyne: {perlLibrary: 'lib', perlLibraryOptimize: true, perlMinify: mode}}));
       const result = run();
       if (mode === true) {
         assert.notEqual(result.status, 0);
@@ -256,9 +256,108 @@ for (const dependency of ['missing', 'wrong-version']) {
       }
     }
     await put('auto/Unknown/Unknown.so', 'unsupported native code');
-    await writeFile(join(root, 'package.json'), JSON.stringify({webdyne: {perlLibrary: 'lib'}}));
+    await writeFile(join(root, 'package.json'), JSON.stringify({webdyne: {perlLibrary: 'lib', perlLibraryOptimize: true}}));
     const rejected = run();
     assert.notEqual(rejected.status, 0);
     assert.match(rejected.stderr, /Native Perl artifacts/);
   }));
 }
+
+for (const viaCli of [false, true]) {
+  test(`explicit libraries stay verbatim without host Perl (${viaCli ? 'CLI flag' : 'package.json'})`, () => fixture(async ({root, put}) => {
+    const originals = {
+      'Example.pm': 'package Example;\n\n# Keep formatting\n1;\n',
+      'Bad.pm': 'package Bad; sub { {{{',
+      'WebDyne/Install.pm': 'installer retained',
+      'WebDyne/Install/Apache.pm': 'installer companion',
+      'Example.pod': '=head1 docs\n',
+      '.packlist': 'metadata',
+      'foreign/.meta/Example/install.json': '{}',
+      'foreign/Architecture.pm': 'original architecture path',
+      'auto/Example/Example.bs': '',
+    };
+    for (const [path, source] of Object.entries(originals)) await put(path, source);
+    await mkdir(join(root, 'lib/empty'));
+    await writeFile(join(root, 'package.json'), JSON.stringify({webdyne: {
+      ...(viaCli ? {} : {perlLibrary: 'lib'}), perlMinify: true,
+    }}));
+    const args = viaCli ? ['build', '--library', 'lib'] : ['build'];
+    const script = `import {main} from ${JSON.stringify(new URL('../scripts/webdyne-cloudflare.mjs', import.meta.url).href)}; await main(${JSON.stringify(args)}, ${JSON.stringify(root)});`;
+    const run = () => spawnSync(process.execPath, ['--input-type=module', '-e', script], {encoding: 'utf8', env: {...process.env, PATH: ''}});
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    const archive = join(root, '.webdyne/perl-lib-vfs.tar.gz');
+    assert.deepEqual(await payload({perlLibraryVfsArchive: archive}), Object.fromEntries(Object.entries(originals).map(([path, value]) => [`perl5/lib/${path}`, value])));
+    const entries = await unpackTar(gunzipSync(await readFile(archive)), {strict: true});
+    assert.ok(entries.some(({header}) => header.name.replace(/\/$/, '') === 'perl5/lib/empty'));
+    const report = JSON.parse(await readFile(join(root, '.webdyne/perl-library-report.json')));
+    assert.equal(report.saved_bytes, 0);
+    assert.ok(report.files.every(file => file.reason === 'explicit library retained verbatim'));
+    const first = await readFile(archive);
+    assert.equal(run().status, 0);
+    assert.deepEqual(await readFile(archive), first);
+    await writeFile(join(root, 'package.json'), JSON.stringify({webdyne: {perlLibrary: 'lib', perlLibraryOptimize: true}}));
+    assert.match(run().stderr, /requires host Perl/);
+    assert.ok(!(await readdir(join(root, '.webdyne'))).some(name => /stage-/.test(name)));
+  }));
+}
+
+test('explicit libraries override managed files and are never deduplicated', () => fixture(async ({root, put, build}) => {
+  await put('Example.pm', 'managed copy');
+  await put('Duplicate.pm', 'embedded');
+  await put('WebDyne/Install.pm', 'managed installer');
+  await mkdir(join(root, 'explicit'));
+  await mkdir(join(root, 'later'));
+  await writeFile(join(root, 'explicit/Example.pm'), 'first explicit');
+  await writeFile(join(root, 'later/Example.pm'), 'last explicit');
+  await writeFile(join(root, 'explicit/Duplicate.pm'), 'embedded');
+  const result = await build({verbatimLibraryDirectories: ['explicit', 'later'], embeddedFiles: {'Duplicate.pm': hash('embedded')}});
+  assert.deepEqual(await payload(result), {'perl5/lib/Example.pm': 'last explicit', 'perl5/lib/Duplicate.pm': 'embedded'});
+  assert.deepEqual(result.omittedEmbeddedFiles, []);
+  assert.equal(result.libraryReport.output_bytes, Buffer.byteLength('last explicitembedded'));
+  assert.ok(result.libraryReport.files.some(file => file.reason === 'superseded by later explicit library'));
+  assert.ok(result.libraryReport.files.some(file => file.reason === 'WebDyne installer'));
+}));
+
+test('explicit native files, symlinks and overlapping output are rejected without transformations', () => fixture(async ({root, put, build}) => {
+  const options = {libraryDirectories: [], verbatimLibraryDirectories: ['lib']};
+  await put('Example.so', 'native');
+  await assert.rejects(build(options), /Native Perl artifacts/);
+  await rm(join(root, 'lib/Example.so'));
+  await put('Example.pm', '1;');
+  await symlink(join(root, 'lib/Example.pm'), join(root, 'lib/link'));
+  await assert.rejects(build(options), /symlinks are not portable/);
+  await rm(join(root, 'lib/link'));
+  await assert.rejects(build({...options, outputDirectory: join(root, 'lib/out')}), /outside Perl libraries/);
+}));
+
+test('explicit modified companions cannot justify managed XS removal', () => fixture(async ({root, put, build}) => {
+  await put('host/.meta/Example/install.json', JSON.stringify({dist: 'Example-1', provides: {Example: {file: 'Example.pm'}}}));
+  await put('host/Example.pm', 'embedded');
+  await put('host/auto/Example/Example.so', 'native');
+  await mkdir(join(root, 'explicit'));
+  await writeFile(join(root, 'explicit/Example.pm'), 'modified');
+  await assert.rejects(build({verbatimLibraryDirectories: ['explicit'], embeddedFiles: {'Example.pm': hash('embedded')},
+    sourceInventory: {nativeModules: {'Example.pm': {distribution: 'Example-1'}}}}), /Native Perl artifacts/);
+}));
+
+test('explicit optimisation option validates booleans', () => fixture(async ({root}) => {
+  await writeFile(join(root, 'package.json'), JSON.stringify({webdyne: {perlLibraryOptimize: 'true'}}));
+  await assert.rejects(cloudflareMain(['build'], root), /perlLibraryOptimize must be a boolean/);
+}));
+
+test('verbatim binary data survives and file/directory conflicts preserve sources and prior archives', () => fixture(async ({root, put, build}) => {
+  const bytes = Buffer.from([0, 255, 128, 13, 10, 42]);
+  await put('data.bin', bytes);
+  const options = {libraryDirectories: [], verbatimLibraryDirectories: ['lib']};
+  const result = await build(options);
+  const archive = await readFile(result.perlLibraryVfsArchive);
+  const entries = await unpackTar(gunzipSync(archive), {strict: true});
+  assert.deepEqual(Buffer.from(entries.find(({header}) => header.name === 'perl5/lib/data.bin').data), bytes);
+  await mkdir(join(root, 'other/data.bin'), {recursive: true});
+  await assert.rejects(build({...options, verbatimLibraryDirectories: ['lib', 'other']}), /EISDIR|EEXIST/);
+  assert.deepEqual(await readFile(join(root, 'lib/data.bin')), bytes);
+  assert.deepEqual(await readFile(result.perlLibraryVfsArchive), archive);
+  assert.ok(!(await readdir(join(root, 'out'))).some(name => /stage-/.test(name)));
+}));

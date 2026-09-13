@@ -1,4 +1,4 @@
-// Run: node t/runtime/smoke-perl-staging.mjs /path/to/new-runtime.wasm
+// Run: node t/runtime/smoke-perl-staging.mjs /path/to/new-runtime.wasm [--verbatim]
 // Exercise staged/minified modules through the real persistent PAGI runtime,
 // including data, Unicode, async Futures and repeated concurrent requests.
 import assert from 'node:assert/strict';
@@ -11,6 +11,7 @@ register('./perl-source-loader.mjs', import.meta.url);
 const {createWebDyneRuntime} = await import('../../js/runtime/webdyne-runtime.js');
 const root = await mkdtemp(join(tmpdir(), 'wasm-perl-staging-'));
 const interpreters = [];
+const verbatim = process.argv.includes('--verbatim');
 try {
   await mkdir(join(root, 'app')); await mkdir(join(root, 'lib'));
   await writeFile(join(root, 'lib/Compact.pm'), `package Compact;
@@ -44,9 +45,14 @@ async sub {
     await $send_cr->({type => 'http.response.body', body => $body, more_body => 0});
 };
 `);
-  const files = await buildApplicationArchives({projectRoot: root, appDirectory: 'app', libraryDirectories: ['lib'], outputDirectory: join(root, 'out'), minify: true});
-  assert.equal(files.libraryReport.files.find(x => x.path === 'Compact.pm').minification, 'compacted');
-  assert.match(files.libraryReport.files.find(x => x.path === 'RuntimeData.pm').minification, /skipped/);
+  const files = await buildApplicationArchives({projectRoot: root, appDirectory: 'app', libraryDirectories: verbatim ? [] : ['lib'], verbatimLibraryDirectories: verbatim ? ['lib'] : [], outputDirectory: join(root, 'out'), minify: true});
+  if (verbatim) {
+    assert.ok(files.libraryReport.files.every(x => x.reason === 'explicit library retained verbatim'));
+    assert.equal(files.libraryReport.saved_bytes, 0);
+  } else {
+    assert.equal(files.libraryReport.files.find(x => x.path === 'Compact.pm').minification, 'compacted');
+    assert.match(files.libraryReport.files.find(x => x.path === 'RuntimeData.pm').minification, /skipped/);
+  }
   const runtime = createWebDyneRuntime({
     zeroperlModule: await WebAssembly.compile(await readFile(process.argv[2])),
     appVfsArchive: new Uint8Array(await readFile(files.appVfsArchive)).buffer,
@@ -68,7 +74,7 @@ async sub {
     1;
   `);
   assert.equal(check.success, true, check.error);
-  console.log('PASS: minified async/UTF-8 modules, preserved DATA, 21 requests in one interpreter; installer and build inventory absent from WASM');
+  console.log('PASS: ' + (verbatim ? 'verbatim' : 'minified') + ' async/UTF-8 modules, preserved DATA, 21 requests in one interpreter; installer and build inventory absent from WASM');
 } finally {
   for (const perl of interpreters) await perl.dispose();
   await rm(root, {recursive: true, force: true});

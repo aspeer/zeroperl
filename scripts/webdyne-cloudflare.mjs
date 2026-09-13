@@ -113,6 +113,7 @@ function parseArguments(argv, defaults) {
     entry: defaults.entry,
     libraries: [...defaults.libraries],
     minify: defaults.minify,
+    optimizeLibraries: defaults.optimizeLibraries,
     output: defaults.output,
     wranglerConfig: defaults.wranglerConfig,
     wranglerArguments: [],
@@ -169,6 +170,9 @@ async function readProject(projectRoot) {
   if (webdyne.perlMinify !== undefined && webdyne.perlMinify !== "auto" && typeof webdyne.perlMinify !== "boolean") {
     throw new Error('package.json webdyne.perlMinify must be a boolean or "auto"');
   }
+  if (webdyne.perlLibraryOptimize !== undefined && typeof webdyne.perlLibraryOptimize !== "boolean") {
+    throw new Error("package.json webdyne.perlLibraryOptimize must be a boolean");
+  }
   const libraries = webdyne.perlLibrary === undefined
     ? []
     : Array.isArray(webdyne.perlLibrary) ? webdyne.perlLibrary : [webdyne.perlLibrary];
@@ -185,6 +189,7 @@ async function readProject(projectRoot) {
       entry: webdyne.entry ?? "app.psp",
       libraries,
       minify: webdyne.perlMinify ?? "auto",
+      optimizeLibraries: webdyne.perlLibraryOptimize ?? false,
       output: webdyne.outputDirectory ?? ".webdyne",
       wranglerConfig: cloudflare.wranglerConfig,
     },
@@ -281,7 +286,9 @@ async function build(projectRoot, project, options, assets) {
     throw new Error(`The entry ${options.entry} would be public: add it to ${resolve(assets.directory, ".assetsignore")}`);
   }
 
-  const libraries = [...options.libraries];
+  // Explicit trees are packaged verbatim unless the application opts in.
+  // Automatically installed extension/CPAN trees retain managed staging.
+  const libraries = options.optimizeLibraries ? [...options.libraries] : [];
   const extensions = await resolveWebDyneExtensions(projectRoot, project.packageJson, project.extensions);
   const objects = durableObjects(project.cloudflare.durableObjects);
   configureDurableExtensions(objects, extensions);
@@ -293,6 +300,7 @@ async function build(projectRoot, project, options, assets) {
     projectRoot,
     appDirectory,
     libraryDirectories: libraries,
+    verbatimLibraryDirectories: options.optimizeLibraries ? [] : options.libraries,
     outputDirectory,
     embeddedFiles: await readEmbeddedFiles(),
     sourceInventory: await readSourceInventory(packageRoot),

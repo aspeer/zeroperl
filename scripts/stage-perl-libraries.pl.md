@@ -54,6 +54,22 @@ packages without source inventories retain final-byte deduplication and cannot
 silently discard host native dependencies. Core XS not explicitly evidenced
 by the CPAN recipe inventory is conservatively rejected.
 
+## Explicit application libraries
+
+The npm CLI bypasses this helper for `webdyne.perlLibrary` and `--library`
+trees by default. Node preserves their file bytes, paths, metadata files and
+empty directories; archive metadata is normalised. It rejects native binaries,
+symlinks and special entries. Set `webdyne.perlLibraryOptimize: true` to send
+these trees through this helper. `perlMinify` alone does not opt them in.
+Npm extension and CPAN libraries continue to use the helper automatically.
+
+The JavaScript archive API accepts `verbatimLibraryDirectories` for this bypass;
+`libraryDirectories` retains its managed staging contract. Explicit trees overlay
+managed output, with later explicit roots winning. File/directory collisions
+fail. Their files are never deduplicated against the runtime. Modified explicit
+companions also prevent managed XS removal based on an embedded source match.
+Reports include verbatim files and their bytes alongside managed decisions.
+
 ## Minification and compatibility
 
 Host Perl 5.18 or later is supported. Minification requires exactly
@@ -62,8 +78,8 @@ by the helper. The npm CLI defaults `webdyne.perlMinify` to `"auto"`: use the
 approved formatter when available, otherwise warn and stage without minification.
 A load failure or different version triggers this fallback; all other staging
 optimisations and checks still run. `true` requires the approved version and
-fails with installation guidance if unavailable; `false` disables minification. Host Perl is still required for library
-staging, but applications with no extra libraries retain their Node-only build.
+fails with installation guidance if unavailable; `false` disables minification. Host Perl is still required for managed
+staging; applications with only verbatim libraries retain their Node-only build.
 The lower-level `buildApplicationArchives` API defaults `minify` to false;
 callers select the transformation explicitly.
 

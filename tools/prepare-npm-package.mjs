@@ -315,14 +315,21 @@ Custom Wrangler configurations must include the \`enable_request_signal\`
 compatibility flag so disconnected SSE sessions stop promptly. Generated
 configurations include it automatically.
 
-Additional Perl libraries, including npm extension libraries, are staged by
+Explicit \`webdyne.perlLibrary\` / \`--library\` trees are packaged unchanged by
+Node, without requiring host Perl. Set \`webdyne.perlLibraryOptimize: true\` to
+opt them into staging optimisations. Explicit trees override managed libraries;
+later explicit roots win. Symlinks, special entries and native binaries are
+rejected; file contents and relative paths are preserved, with normalised tar
+metadata. File/directory collisions fail instead of deleting a tree.
+
+Npm extension and CPAN libraries always use managed staging, requiring
 host Perl 5.18 or newer. Default \`webdyne.perlMinify: "auto"\` uses
 Perl::Tidy 20260826 if available; otherwise it warns, records the skipped
 minification, and continues the other staging optimisations. Install the optional
 formatter with \`cpanm Perl::Tidy@20260826\`. Set \`webdyne.perlMinify: true\`
 to require that version, or \`false\` to retain source formatting. Errors during
-formatting still fail the build. No-library apps
-still build with Node alone. The helper excludes installers and host artifacts,
+formatting still fail the build. The minification setting alone does not opt
+explicit libraries into staging. Apps without managed libraries build with Node alone. The helper excludes installers and host artifacts,
 preserves application overrides, and reports per-file decisions in
 \`.webdyne/perl-library-report.json\`. Removed POD remains in the archive's
 \`/perl5/PERL-LIBRARY-DOCUMENTATION.txt\`; net size figures include it.

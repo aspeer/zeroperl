@@ -87,7 +87,8 @@ settings understood by the CLI:
 | `static` | `true`; `init` sets `false` | Let WebDyne serve static files from its VFS. Leave false when Cloudflare serves your assets. |
 | `outputDirectory` | `".webdyne"` | Generated Worker, archives and default Wrangler configuration. Keep outside the application/assets tree. |
 | `perlLibrary` | None | A project-relative directory, or array of directories, containing additional Perl libraries for staging. |
-| `perlMinify` | `"auto"` | Compact staged `.pm`/`.pl` libraries when host Perl::Tidy 20260826 is available; otherwise warn and retain formatting. `true` requires that version; `false` disables minification. |
+| `perlLibraryOptimize` | `false` | Opt explicitly supplied `perlLibrary` / `--library` trees into managed staging optimisations. |
+| `perlMinify` | `"auto"` | Compact managed `.pm`/`.pl` libraries when host Perl::Tidy 20260826 is available; otherwise warn and retain formatting. `true` requires that version; `false` disables minification. |
 | `extensions` | None | An object mapping direct npm dependency names to their options, or an array of package names with no options. |
 | `lifespan.startup` | None | Qualified Perl startup function, such as `My::App::startup`. |
 | `lifespan.shutdown` | None | Qualified shutdown function. Accepted by WebDyne, but the Worker does not yet dispatch shutdown. |
@@ -260,17 +261,32 @@ and cached below the output directory's `cpan/` until `cpanfile` or
 `cpanfile.snapshot` changes. Commit the snapshot for reproducible dependency
 selection.
 
-Additional libraries (including npm extension libraries) are prepared by a
-host Perl helper, then archived by the Node builder. Install Perl 5.18 or newer
-and optionally `cpanm Perl::Tidy@20260826` for minification. The default
-`"perlMinify": "auto"` warns and records a skipped minification in the report
-when Perl::Tidy cannot be loaded or its version differs. Other staging
-optimisations still run. Set `true` to require the approved formatter, or
-`false` to disable minification. Actual formatter errors always fail the build;
-Perl remains required for staging libraries. Applications with no additional
-libraries retain the Node-only build path.
+Explicit libraries supplied through `webdyne.perlLibrary` or `--library` are
+packaged by Node with file contents and relative paths unchanged. There is no
+minification, deduplication, metadata/installer removal or architecture flattening.
+These libraries alone do not require host Perl. Symlinks, special filesystem
+entries and native binaries (including nonempty `.bs` files) are rejected;
+empty `.bs` files are retained. Tar metadata is normalised for reproducibility.
+Explicit libraries override managed libraries at the same path; later explicit
+roots win. File/directory collisions fail instead of deleting a tree.
 
-Staging excludes installation metadata, standalone POD and WebDyne installer
+Set `"perlLibraryOptimize": true` under `webdyne` to opt explicit libraries into
+the managed staging pipeline. For example:
+
+```json
+{"webdyne": {"perlLibrary": "lib", "perlLibraryOptimize": true, "perlMinify": "auto"}}
+```
+
+Automatically supplied npm extension and CPAN libraries continue to use managed
+staging. Managed staging requires host Perl 5.18 or newer and optionally
+`cpanm Perl::Tidy@20260826` for minification. The default `"perlMinify": "auto"`
+warns and records skipped minification when Perl::Tidy cannot be loaded or its
+version differs. Other staging optimisations still run. Set `true` to require
+the approved formatter, or `false` to disable minification. This setting does
+not itself opt explicit libraries into staging. Actual formatter errors fail
+the build. Apps without managed libraries retain the Node-only build path.
+
+Managed staging excludes installation metadata, standalone POD and WebDyne installer
 components. It flattens portable Perl files from recognised host architecture
 directories. Host binaries are never uploaded: a redundant CPAN XS installation
 is omitted only when the packaged runtime inventory proves a matching target
