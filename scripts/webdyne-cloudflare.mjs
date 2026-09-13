@@ -3,6 +3,7 @@
 // Application CLI: package WebDyne sources and drive the bundled Wrangler.
 // Runtime service bridges are supplied by WebDyne extension packages.
 
+import { durableObjects, durableWranglerConfig, configureDurableExtensions, durableWorkerSource } from "./durable-objects.mjs";
 import { access, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { createInterface } from "node:readline/promises";
@@ -276,6 +277,8 @@ async function build(projectRoot, project, options, assets) {
 
   const libraries = [...options.libraries];
   const extensions = await resolveWebDyneExtensions(projectRoot, project.packageJson, project.extensions);
+  const objects = durableObjects(project.cloudflare.durableObjects);
+  configureDurableExtensions(objects, extensions);
   libraries.push(...extensions.map(({ perlLibrary }) => relative(projectRoot, perlLibrary)));
   const installedCpanLibrary = await installCpanDependencies({ projectRoot, outputDirectory });
   if (installedCpanLibrary) libraries.push(relative(projectRoot, installedCpanLibrary));
@@ -296,6 +299,7 @@ import appVfsArchive from "./app-vfs.tar.gz";
 import perlLibraryVfsArchive from "./perl-lib-vfs.tar.gz";
 ${extensionSource.imports}
 ${extensionSource.declaration}
+${durableWorkerSource(objects, distributionName, extensionSource.declaration)}
 
 export default createCloudflareWorker({
   zeroperlModule,
@@ -451,9 +455,10 @@ export async function generatedWranglerConfig(projectRoot, project, options, out
   const generatedConfig = resolve(outputDirectory, "wrangler.jsonc");
   const config = {
     $schema: "../node_modules/wrangler/config-schema.json",
+    ...durableWranglerConfig(durableObjects(project.cloudflare.durableObjects)),
     name: project.cloudflare.name ?? workerName(project.packageJson),
     main: "worker.js",
-    compatibility_date: project.cloudflare.compatibilityDate ?? "2026-08-27",
+    compatibility_date: project.cloudflare.compatibilityDate ?? (project.cloudflare.durableObjects?.length ? "2026-09-13" : "2026-08-27"),
     compatibility_flags: [...new Set(["enable_request_signal", ...extensions.flatMap(extension => extension.compatibilityFlags ?? []),
       ...(project.cloudflare.hyperdrive?.length ? ["nodejs_compat"] : [])])],
     workers_dev: project.cloudflare.workersDev ?? true,

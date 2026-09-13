@@ -513,6 +513,14 @@ sub start_session {
     my ($session_id, $scope_json, $entrypoint)=@_;
     die "Duplicate PAGI session $session_id\n" if $SESSION{$session_id};
     no strict 'refs';
+    die "Invalid application entry point\n"
+        unless ($entrypoint=~/\A[A-Za-z_]\w*(?:::[A-Za-z_]\w*)+\z/);
+    unless (*{$entrypoint}{'CODE'}) {
+        my $module_fn=$entrypoint;
+        $module_fn=~s/::[^:]+$//;
+        $module_fn=~s{::}{/}g;
+        require "$module_fn.pm";
+    }
     my $app_cr=*{$entrypoint}{'CODE'} or die "PAGI application entry point $entrypoint is not defined\n";
     my $scope_hr=$json_or->decode($scope_json);
     die "PAGI scope must decode to a hash\n" unless ref($scope_hr) eq 'HASH';

@@ -113,3 +113,13 @@ the current process.
 - Add `npm run destroy` through initialization; use deployment configuration
   without an app build, require interactive full-Yes confirmation, and retain
   Wrangler's target/dependency confirmation without using force deletion.
+
+## Unreleased: finite invocations for Durable Objects
+
+- Add an opt-in finite result transport and `mode: "invocation"` runtime, reusing
+  interpreter scheduling, session timers and awaited capability cleanup.
+- Lazily load qualified Perl adapter entrypoints; expose explicit runtime disposal.
+- Generate Perl Durable Object classes and SQLite namespace declarations from
+  `webdyne.cloudflare.durableObjects`; preserve custom Wrangler configuration.
+- Target Wrangler 4.131.1 in generated runtime packages. Cloudflare object policy
+  remains in WebDyne::Cloudflare. The existing WASM ABI is unchanged.

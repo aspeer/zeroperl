@@ -2,6 +2,7 @@ import { ZeroPerl } from "../zeroperl.js";
 import { createPerlFileSystem } from "./perl-filesystem.js";
 import { perlJsonExpression, webdyneRuntimeConfig } from "./config.js";
 import { createExtensionManager } from "./extensions.js";
+import { createInvocationTransport } from "../transport/invocation.js";
 import { createLifespanTransport } from "../transport/lifespan.js";
 import {
   buildPagiScope,
@@ -36,6 +37,7 @@ export function createWebDyneRuntime({
   perlLibraryVfsArchive,
   webSocketAdapter,
   extensions = [],
+  mode = "pagi",
   extensionCleanupTimeoutMs = 10_000,
 }) {
   if (!(zeroperlModule instanceof WebAssembly.Module)) {
@@ -47,6 +49,8 @@ export function createWebDyneRuntime({
   if (!(perlLibraryVfsArchive instanceof ArrayBuffer)) {
     throw new TypeError("perlLibraryVfsArchive must be an imported ArrayBuffer");
   }
+
+  if (!["pagi", "invocation"].includes(mode)) throw new TypeError("Invalid WebDyne runtime mode");
 
   const assets = { appVfsArchive, perlLibraryVfsArchive };
   const extensionManager = createExtensionManager(extensions, { cleanupTimeoutMs: extensionCleanupTimeoutMs });
@@ -288,11 +292,15 @@ export function createWebDyneRuntime({
          $Pagi::WebDyne::CONFIG = $bootstrap->{applicationConfig};`,
       );
       if (!configure.success) throw new Error(configure.error);
-      for (const file of [PAGI_RUNNER, WEBDYNE_APPLICATION]) {
+      for (const file of (mode === "pagi" ? [PAGI_RUNNER, WEBDYNE_APPLICATION] : [PAGI_RUNNER])) {
         const load = await perl.runFile(file);
         if (!load.success) throw new Error(load.error);
       }
-      await startLifespan(generation);
+      if (mode === "invocation") {
+        const timers = await perl.eval("require Future::IO; require Future::IO::Impl::ZeroPerl; Future::IO->override_impl('Future::IO::Impl::ZeroPerl');");
+        if (!timers.success) throw new Error(timers.error);
+      }
+      if (mode === "pagi") await startLifespan(generation);
       return { perl, generation };
     } catch (error) {
       if (persistentPerl === perl) await resetPersistentRuntime(error);
@@ -383,8 +391,9 @@ export function createWebDyneRuntime({
     });
   }
 
-  async function startPersistentSession(scope, request, transport, runtimeConfig) {
+  async function startPersistentSession(scope, request, transport, runtimeConfig, entrypoint) {
     const session = createPagiSession(scope, request, transport);
+    session.entrypoint = entrypoint;
     // Bootstrap can fail before this function reaches session.completion.
     void session.completion.catch(() => undefined);
     pagiSessions.set(session.id, session);
@@ -405,7 +414,7 @@ export function createWebDyneRuntime({
       // The scope crosses the ABI as an owned JSON value. WebDyne can safely
       // decorate the decoded Perl graph without retaining JS-owned values.
       const scopeValue = perl.createString(serializePagiScope(session.scope));
-      const entrypointValue = perl.createString("Pagi::WebDyne::application");
+      const entrypointValue = perl.createString(session.entrypoint ?? "Pagi::WebDyne::application");
       return {
         args: [sessionValue, scopeValue, entrypointValue],
         dispose: () => {
@@ -444,6 +453,7 @@ export function createWebDyneRuntime({
   }
 
   function dispatch(request, bindings = {}) {
+    if (mode !== "pagi") throw new Error("Invocation runtimes cannot dispatch HTTP requests");
     const runtimeConfig = webdyneRuntimeConfig(bindings);
     const scope = buildPagiScope(request);
     // Construct the transport before allocating extension resources. Dispatch
@@ -479,5 +489,36 @@ export function createWebDyneRuntime({
     return { response: transport.response, completion, type: scope.type };
   }
 
-  return { dispatch };
+  /** Finite non-HTTP events reuse session scheduling, timers and awaited cleanup. */
+  async function invoke({ scope, bindings = {}, entrypoint, invocation }) {
+    if (mode !== "invocation") throw new Error("invoke requires an invocation runtime");
+    if (!/^[A-Za-z_]\w*(?:::[A-Za-z_]\w*)+$/.test(entrypoint ?? "")) {
+      throw new TypeError("Invocation entrypoint must be a qualified Perl function name");
+    }
+    const transport = createInvocationTransport();
+    let release;
+    let failure;
+    try {
+      release = await extensionManager.attachScope({ scope, bindings, invocation });
+      await startPersistentSession(scope, null, transport, webdyneRuntimeConfig(bindings), entrypoint);
+      return transport.result();
+    } catch (error) {
+      failure = error;
+      throw error;
+    } finally {
+      try {
+        if (release) await release();
+      } catch (error) {
+        throw failure ? new AggregateError([failure, error], "Invocation and cleanup failed") : error;
+      } finally {
+        transport.close();
+      }
+    }
+  }
+
+  async function dispose() {
+    await resetPersistentRuntime(new Error("WebDyne runtime disposed"));
+  }
+
+  return { dispatch, invoke, dispose };
 }

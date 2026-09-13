@@ -209,7 +209,7 @@ const packageJson = {
     fflate: "0.8.3",
     ignore: "5.3.2",
     "modern-tar": "0.8.4",
-    wrangler: "4.127.1",
+    wrangler: "4.131.1",
   },
   sideEffects: false,
   keywords: ["perl", "webdyne", "pagi", "wasm", "webassembly", "wasi"],

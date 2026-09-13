@@ -140,3 +140,23 @@ test("extension context advertises awaited cleanup without mutating caller conte
   assert.equal(context.lifecycle, undefined);
   await release();
 });
+
+test("finite invocation waits for partial attachment cleanup before rejecting", async () => {
+  const close = deferred();
+  const failure = new Error("finite attach failed");
+  const module = await WebAssembly.compile(new Uint8Array([0,97,115,109,1,0,0,0]));
+  const runtime = createWebDyneRuntime({ mode: "invocation", zeroperlModule: module,
+    appVfsArchive: new ArrayBuffer(0), perlLibraryVfsArchive: new ArrayBuffer(0),
+    extensions: [
+      { attachScope: () => () => close.promise },
+      { attachScope: () => { throw failure; } },
+    ],
+  });
+  let settled = false;
+  const completion = runtime.invoke({scope: {}, entrypoint: "Test::Adapter::application"});
+  const rejected = assert.rejects(completion, /finite attach failed/).then(() => { settled = true; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(settled, false);
+  close.resolve();
+  await rejected;
+});
