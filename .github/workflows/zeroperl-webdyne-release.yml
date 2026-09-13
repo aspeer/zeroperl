@@ -190,6 +190,7 @@ jobs:
             echo package/THIRD-PARTY-LICENSES.txt
             echo package/README.md
             echo package/bin/pagi-runner.pl
+            echo package/bin/pagi-runner.pl.md
             echo package/bin/webdyne-app.pl
             echo package/bin/webdyne-app.pl.md
             echo package/embedded-files.json
@@ -199,7 +200,9 @@ jobs:
             echo package/js/runtime/extensions.js
             echo package/js/runtime/perl-filesystem.js
             echo package/js/runtime/webdyne-runtime.js
+            echo package/js/runtime/webdyne-runtime.js.md
             echo package/js/transport/fetch-pagi.js
+            echo package/js/transport/invocation.js
             echo package/js/transport/lifespan.js
             echo package/js/worker.js
             echo package/js/zeroperl.js
@@ -208,6 +211,7 @@ jobs:
             echo package/package.json
             echo package/scripts/assets.mjs
             echo package/scripts/build-vfs.mjs
+            echo package/scripts/durable-objects.mjs
             echo package/scripts/extensions.mjs
             echo package/scripts/install-cpan.mjs
             echo package/scripts/webdyne-cloudflare.mjs

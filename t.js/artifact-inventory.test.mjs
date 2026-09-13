@@ -46,6 +46,20 @@ test("npm packaging rejects a changed prefix even when file counts and sizes mat
       "Example.pm": createHash("sha256").update("original").digest("hex"),
     });
     execFileSync(process.execPath, args, {stdio: "pipe"});
+    // Compare the assembled source payload with CI's strict package allowlist
+    // before a compiler build is needed to discover an omitted new file.
+    const workflow = await readFile(".github/workflows/zeroperl-webdyne-release.yml", "utf8");
+    const declared = [...workflow.matchAll(/^\s*echo package\/((?:bin|js|lib|scripts)\/\S+)$/gm)].map(match => match[1]).sort();
+    const actual = [];
+    async function sourceFiles(directory) {
+      for (const entry of await readdir(join(root, "package", directory), { withFileTypes: true })) {
+        const path = `${directory}/${entry.name}`;
+        if (entry.isDirectory()) await sourceFiles(path);
+        else actual.push(path);
+      }
+    }
+    for (const directory of ["bin", "js", "lib", "scripts"]) await sourceFiles(directory);
+    assert.deepEqual(actual.sort(), declared, "CI inventory covers the assembled runtime source payload");
     const metadata = JSON.parse(await readFile(join(root, "package/package.json"), "utf8"));
     assert.equal(metadata.license, "MIT");
     assert.equal(metadata.exports["./zeroperl-reactor.wasm"], undefined);
