@@ -87,7 +87,7 @@ settings understood by the CLI:
 | `static` | `true`; `init` sets `false` | Let WebDyne serve static files from its VFS. Leave false when Cloudflare serves your assets. |
 | `outputDirectory` | `".webdyne"` | Generated Worker, archives and default Wrangler configuration. Keep outside the application/assets tree. |
 | `perlLibrary` | None | A project-relative directory, or array of directories, containing additional Perl libraries for staging. |
-| `perlMinify` | `true` | Compact staged `.pm`/`.pl` libraries using host Perl::Tidy 20260826; set `false` to retain source formatting. |
+| `perlMinify` | `"auto"` | Compact staged `.pm`/`.pl` libraries when host Perl::Tidy 20260826 is available; otherwise warn and retain formatting. `true` requires that version; `false` disables minification. |
 | `extensions` | None | An object mapping direct npm dependency names to their options, or an array of package names with no options. |
 | `lifespan.startup` | None | Qualified Perl startup function, such as `My::App::startup`. |
 | `lifespan.shutdown` | None | Qualified shutdown function. Accepted by WebDyne, but the Worker does not yet dispatch shutdown. |
@@ -262,8 +262,11 @@ selection.
 
 Additional libraries (including npm extension libraries) are prepared by a
 host Perl helper, then archived by the Node builder. Install Perl 5.18 or newer
-and, for default minification, `cpanm Perl::Tidy@20260826`. Set
-`"perlMinify": false` in the `webdyne` configuration to disable minification;
+and optionally `cpanm Perl::Tidy@20260826` for minification. The default
+`"perlMinify": "auto"` warns and records a skipped minification in the report
+when Perl::Tidy cannot be loaded or its version differs. Other staging
+optimisations still run. Set `true` to require the approved formatter, or
+`false` to disable minification. Actual formatter errors always fail the build;
 Perl remains required for staging libraries. Applications with no additional
 libraries retain the Node-only build path.
 

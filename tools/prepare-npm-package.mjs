@@ -316,9 +316,12 @@ compatibility flag so disconnected SSE sessions stop promptly. Generated
 configurations include it automatically.
 
 Additional Perl libraries, including npm extension libraries, are staged by
-host Perl 5.18 or newer. Default minification requires Perl::Tidy 20260826:
-install it with \`cpanm Perl::Tidy@20260826\`, or set
-\`webdyne.perlMinify: false\` to retain source formatting. No-library apps
+host Perl 5.18 or newer. Default \`webdyne.perlMinify: "auto"\` uses
+Perl::Tidy 20260826 if available; otherwise it warns, records the skipped
+minification, and continues the other staging optimisations. Install the optional
+formatter with \`cpanm Perl::Tidy@20260826\`. Set \`webdyne.perlMinify: true\`
+to require that version, or \`false\` to retain source formatting. Errors during
+formatting still fail the build. No-library apps
 still build with Node alone. The helper excludes installers and host artifacts,
 preserves application overrides, and reports per-file decisions in
 \`.webdyne/perl-library-report.json\`. Removed POD remains in the archive's

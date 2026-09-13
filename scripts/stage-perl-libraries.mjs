@@ -26,9 +26,11 @@ export async function stagePerlLibraries({ libraries, outputDirectory, embeddedF
   try {
     const request = join(temporary, "request.json");
     await writeFile(request, JSON.stringify({ libraries, destination, embeddedFiles, sourceInventory, minify, runtime }));
-    const { stdout } = await execute("perl", [fileURLToPath(new URL("./stage-perl-libraries.pl", import.meta.url)), request], {
+    const { stdout, stderr } = await execute("perl", [fileURLToPath(new URL("./stage-perl-libraries.pl", import.meta.url)), request], {
       maxBuffer: 64 * 1024 * 1024,
     });
+    // Successful auto fallback writes a warning; do not lose subprocess diagnostics.
+    if (stderr) process.stderr.write(stderr);
     const result = JSON.parse(stdout);
     return { ...result, directory: destination, cleanup };
   } catch (error) {

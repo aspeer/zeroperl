@@ -10,7 +10,7 @@ use File::Path qw(make_path);
 use JSON::PP;
 
 #  This is a build-time helper, never a WASM application module. JavaScript
-#  supplies one JSON request filename; stdout is a JSON result, stderr errors.
+#  supplies one JSON request filename; stdout is a JSON result, stderr warnings/errors.
 #  Inputs are read-only. The caller owns a fresh temporary output directory and
 #  removes it even on failure. See the adjacent .md for the request contract.
 #
@@ -34,7 +34,8 @@ sub main {
     my $native_hr=$inventory_hr->{'nativeModules'} || {};
     my $report_hr={schema => 1, runtime => $request_hr->{'runtime'},
         inventory_sha256 => sha256_hex(JSON::PP->new()->canonical()->encode([$embedded_hr, $inventory_hr])),
-        minify => $request_hr->{'minify'} ? JSON::PP::true : JSON::PP::false,
+        minify_requested => $request_hr->{'minify'},
+        minify => JSON::PP::false,
         files => [], input_bytes => 0, output_bytes => 0, documentation_bytes => 0};
     my (@candidate, @native);
 
@@ -149,17 +150,30 @@ sub main {
         $entry_hr->{'reason'}="host XS supplied by runtime: $companion";
     }
 
-    #  Use one known formatter version; never load the target's Config.pm in
-    #  host Perl or silently skip requested compaction when tooling is missing.
-    #  Basic/no-library npm applications never invoke this helper.
+    #  Auto mode makes the formatter optional, not the other staging checks.
+    #  Require the approved version for reproducible compaction. Missing/broken
+    #  installations and version mismatches warn and retain original bytes in
+    #  auto mode; explicit true remains strict. Errors while actually formatting
+    #  source still fail below. Never load the target's Config.pm in host Perl.
     #
-    if ($request_hr->{'minify'}) {
-        eval { require Perl::Tidy; 1 } or die "minification requires Perl::Tidy 20260826; " .
-            "install with cpanm Perl::Tidy\@20260826 or set webdyne.perlMinify=false\n";
-        die "minification requires Perl::Tidy 20260826 (found $Perl::Tidy::VERSION)\n"
-            unless $Perl::Tidy::VERSION eq '20260826';
-        $report_hr->{'perltidy_version'}=$Perl::Tidy::VERSION;
+    my $minify=$request_hr->{'minify'};
+    if ($minify) {
+        my $loaded=eval { require Perl::Tidy; 1 };
+        my $problem=$loaded ? ($Perl::Tidy::VERSION eq '20260826' ? '' :
+            "found Perl::Tidy $Perl::Tidy::VERSION") : "Perl::Tidy could not be loaded: $@";
+        if ($problem) {
+            my $message="minification requires Perl::Tidy 20260826 ($problem); " .
+                "install with cpanm Perl::Tidy\@20260826 or set webdyne.perlMinify=false";
+            die "$message\n" unless $minify eq 'auto';
+            $report_hr->{'minification_skipped'}=$message;
+            warn "Perl library minification skipped: $message\n";
+            $minify=0;
+        }
+        else {
+            $report_hr->{'perltidy_version'}=$Perl::Tidy::VERSION;
+        }
     }
+    $report_hr->{'minify'}=$minify ? JSON::PP::true : JSON::PP::false;
     my @omitted;
     my $documentation='';
     foreach my $path (sort(keys(%effective))) {
@@ -171,7 +185,7 @@ sub main {
             next;
         }
         my $content=$entry_hr->{'content'};
-        if ($request_hr->{'minify'} && $path=~/\.(?:pm|pl)\z/i) {
+        if ($minify && $path=~/\.(?:pm|pl)\z/i) {
             ($content, my $pod, my $status)=compact_source($content);
             $entry_hr->{'minification'}=$status;
             #  Retain removed documentation outside @INC, including any licence

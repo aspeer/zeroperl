@@ -166,8 +166,8 @@ async function readProject(projectRoot) {
   lifespanBindings(webdyne.lifespan);
   const cloudflare = assertObject(webdyne.cloudflare, "package.json webdyne.cloudflare");
   const extensions = extensionConfiguration(webdyne.extensions);
-  if (webdyne.perlMinify !== undefined && typeof webdyne.perlMinify !== "boolean") {
-    throw new Error("package.json webdyne.perlMinify must be a boolean");
+  if (webdyne.perlMinify !== undefined && webdyne.perlMinify !== "auto" && typeof webdyne.perlMinify !== "boolean") {
+    throw new Error('package.json webdyne.perlMinify must be a boolean or "auto"');
   }
   const libraries = webdyne.perlLibrary === undefined
     ? []
@@ -184,7 +184,7 @@ async function readProject(projectRoot) {
       appDirectory: webdyne.appDirectory ?? "app",
       entry: webdyne.entry ?? "app.psp",
       libraries,
-      minify: webdyne.perlMinify ?? true,
+      minify: webdyne.perlMinify ?? "auto",
       output: webdyne.outputDirectory ?? ".webdyne",
       wranglerConfig: cloudflare.wranglerConfig,
     },

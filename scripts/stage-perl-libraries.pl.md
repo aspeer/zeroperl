@@ -18,7 +18,7 @@ The request is a JSON object containing:
 - `embeddedFiles`: packaged paths and SHA-256 hashes of embedded runtime files.
 - `sourceInventory`: optional schema-1 `library-sources.json` from that same
   runtime. It records original source hashes and verified CPAN XS recipes.
-- `minify`: whether to compact retained `.pm`/`.pl` files.
+- `minify`: `"auto"`, `true` or `false`, controlling compaction of retained `.pm`/`.pl` files.
 - `runtime`: optional runtime package/version label for the report.
 
 On success stdout contains `{report, omittedEmbeddedFiles}` as JSON. Failures
@@ -58,8 +58,11 @@ by the CPAN recipe inventory is conservatively rejected.
 
 Host Perl 5.18 or later is supported. Minification requires exactly
 `Perl::Tidy 20260826` (`cpanm Perl::Tidy@20260826`). No modules are downloaded
-by the helper. The npm CLI enables minification for libraries by default;
-`webdyne.perlMinify: false` disables it. Host Perl is still required for library
+by the helper. The npm CLI defaults `webdyne.perlMinify` to `"auto"`: use the
+approved formatter when available, otherwise warn and stage without minification.
+A load failure or different version triggers this fallback; all other staging
+optimisations and checks still run. `true` requires the approved version and
+fails with installation guidance if unavailable; `false` disables minification. Host Perl is still required for library
 staging, but applications with no extra libraries retain their Node-only build.
 The lower-level `buildApplicationArchives` API defaults `minify` to false;
 callers select the transformation explicitly.
@@ -69,6 +72,9 @@ are retained byte-for-byte. This intentionally conservative rule protects
 runtime data, heredocs and line-sensitive code. It may also skip harmless
 shift operators or strings. Syntax/formatter errors stop the build; source
 is never evaluated to validate it. PSP pages are not passed to Perl::Tidy.
+
+Reports record `minify_requested`, effective boolean `minify`, and
+`minification_skipped` with the diagnostic when auto mode falls back.
 
 Each report contains source/output hashes and byte counts, actions and reasons,
 flattened paths, formatter version, runtime identity and inventory digest.

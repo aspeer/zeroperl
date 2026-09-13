@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createHash} from 'node:crypto';
-import {execFileSync} from 'node:child_process';
+import {execFileSync, spawnSync} from 'node:child_process';
 import {mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -135,6 +135,7 @@ test('minification can be disabled and rejects malformed source when enabled', (
   await put('Bad.pm', 'package Bad; sub { {{{');
   const result = await build({minify: false}); const report = await readFile(result.reportPath);
   await assert.rejects(build({minify: true}), /Perl::Tidy failed/);
+  await assert.rejects(build({minify: 'auto'}), /Perl::Tidy failed/);
   assert.deepEqual(await readFile(result.reportPath), report);
   assert.ok(!(await readdir(join(root, 'out'))).some(x => x.startsWith('.perl-stage-')));
 }));
@@ -179,10 +180,10 @@ test('different XS distribution versions fail even when the wrapper bytes match'
 }));
 
 
-test('CLI defaults to compact libraries and honours perlMinify=false', () => fixture(async ({root, put}) => {
+test('CLI defaults to auto and honours explicit minification modes', () => fixture(async ({root, put}) => {
   const original = 'package Example;\nsub answer {\n    return 42;\n}\n1;\n';
   await put('Example.pm', original);
-  for (const minify of [undefined, false]) {
+  for (const minify of [undefined, 'auto', true, false]) {
     await writeFile(join(root, 'package.json'), JSON.stringify({name: 'stage-cli', webdyne: {perlLibrary: 'lib', perlMinify: minify}}));
     await cloudflareMain(['build'], root);
     const result = {perlLibraryVfsArchive: join(root, '.webdyne/perl-lib-vfs.tar.gz')};
@@ -216,3 +217,48 @@ test('no-library builds do not require Perl on PATH', () => fixture(async ({root
   const code = `import {buildApplicationArchives} from ${JSON.stringify(builder)}; await buildApplicationArchives(${JSON.stringify({projectRoot: root, appDirectory: 'app', outputDirectory: join(root, 'empty')})});`;
   execFileSync(process.execPath, ['--input-type=module', '-e', code], {env: {...process.env, PATH: ''}});
 }));
+
+// Isolate dependency failures in child processes: the real host installation
+// and concurrent tests remain untouched. The @INC hook blocks only Perl::Tidy.
+for (const dependency of ['missing', 'wrong-version']) {
+  test(`CLI auto fallback with ${dependency} formatter keeps other staging rules`, () => fixture(async ({root, put}) => {
+    const source = 'package Example;\nsub answer {\n    return 42;\n}\n1;\n';
+    await put('foreign/.meta/Example/install.json', '{}');
+    await put('foreign/Example.pm', source);
+    await put('WebDyne/Install.pm', 'installer');
+    const hook = dependency === 'missing'
+      ? 'unshift(@INC, sub { die "simulated missing Perl::Tidy\\n" if $_[1] eq "Perl/Tidy.pm"; return; }); 1;'
+      : 'package Perl::Tidy; our $VERSION="0.001"; $INC{"Perl/Tidy.pm"}=__FILE__; 1;';
+    await writeFile(join(root, 'StageDependency.pm'), hook);
+    const run = () => spawnSync(process.execPath, ['--input-type=module', '-e',
+      `import {main} from ${JSON.stringify(new URL('../scripts/webdyne-cloudflare.mjs', import.meta.url).href)}; await main(['build'], ${JSON.stringify(root)});`],
+      {encoding: 'utf8', env: {...process.env, PERL5OPT: `-I${root} -MStageDependency`}});
+    for (const mode of [undefined, 'auto', true, false]) {
+      await writeFile(join(root, 'package.json'), JSON.stringify({name: 'fallback', webdyne: {perlLibrary: 'lib', perlMinify: mode}}));
+      const result = run();
+      if (mode === true) {
+        assert.notEqual(result.status, 0);
+        assert.match(result.stderr, /minification requires Perl::Tidy 20260826/);
+        continue;
+      }
+      assert.equal(result.status, 0, result.stderr);
+      const files = await payload({perlLibraryVfsArchive: join(root, '.webdyne/perl-lib-vfs.tar.gz')});
+      assert.deepEqual(files, {'perl5/lib/Example.pm': source});
+      const report = JSON.parse(await readFile(join(root, '.webdyne/perl-library-report.json')));
+      assert.equal(report.minify, false);
+      assert.equal(report.minify_requested, mode ?? 'auto');
+      if (mode === false) {
+        assert.equal(result.stderr, '');
+        assert.equal(report.minification_skipped, undefined);
+      } else {
+        assert.match(result.stderr, /Perl library minification skipped/);
+        assert.match(report.minification_skipped, /cpanm Perl::Tidy@20260826/);
+      }
+    }
+    await put('auto/Unknown/Unknown.so', 'unsupported native code');
+    await writeFile(join(root, 'package.json'), JSON.stringify({webdyne: {perlLibrary: 'lib'}}));
+    const rejected = run();
+    assert.notEqual(rejected.status, 0);
+    assert.match(rejected.stderr, /Native Perl artifacts/);
+  }));
+}
