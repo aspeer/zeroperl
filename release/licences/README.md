@@ -152,3 +152,15 @@ manifest overrides as the review target.
 
 Once these changes are on clean `main`, `make release` remains the command to bump
 the release version and create paired tags; run its printed push command to start CI.
+
+## Staging optimisation review for 1.0.16
+
+Reviewed the `pipeline/prepare-prefix.sh` changes that remove WebDyne's installer
+modules and record original source hashes outside the embedded filesystem.
+Compared the qualified development payload with the GitHub 1.0.15 npm artifact:
+no embedded paths were added; only the seven WebDyne installer paths and their
+seven architecture-prefixed counterparts were removed. All other non-generated
+payload hashes were unchanged. Differences in host-generated metadata are
+covered by the existing policy. The complete attribution archive checksum,
+selected source records and component list were unchanged; `evidence.diff`
+was empty. The inventory now records this reviewed payload and build input.

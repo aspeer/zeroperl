@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "perlVersion": "5.44.0",
-  "prefixSha256": "17dfa3be9f3466a4901e03872acba496b623e63154d8a4127da01785da4bfab5",
-  "configSha256": "83f0a533a60e0a4d214b12a7dd69d1b2663a350b4a5b1c9703e3f76e85434115",
+  "prefixSha256": "1fe968a4d0a7a3fd740feb18806cd11830aef189fe4efb6348930642af42cbb6",
+  "configSha256": "6bccbc7799dca801c07b12154edcb1da8539d4258cb2348fd610688b57862f97",
   "evidenceSha256": "a4944781ccb0870f55cefe75aec7d83827ea53b55c95e125af06d47d526664b0",
   "buildInputs": {
     "Dockerfile": "f477cd42f152d7f95afc31a1f822c051cd320f7c6770cebd9d75191503d29523",
@@ -11,7 +11,7 @@
     "pipeline/build-wasi-libs.sh": "e1ddcd3a230f6ca259e1d248797a84acf3436b703792bf9a89cc6b2e41a0fb2e",
     "pipeline/build-wasi-perl.sh": "4710b20f40ae5a63eb999e0bbb3661481da9a1023e9982d23a8494fca0a5eca7",
     "pipeline/build-wasm.sh": "4277485e04070759ce78eb8f62d05672aa2a8133dc47d677c5de6a9cba87a396",
-    "pipeline/prepare-prefix.sh": "5ff58f1385e467afa5aaf10943427d101b27b9f825467371ded70ccf055a1cd7",
+    "pipeline/prepare-prefix.sh": "be443e50b6494f1697b50cda965c4260661ca791c87add4ad2760da8b980f600",
     "release/defaults.mk": "f8460d6cdf8dc2324fe77b89ea3d371f1523555e5aa8456d12c0283170646a88",
     "stubs/Errno.pm": "c63eeddb7d52213ca9ef265e9b5096c845874ad7055d068d989b7947c86b550f",
     "stubs/POSIX.pm": "595020585b0fdc7ac4f9fb5320514320d85b1af6808673ab21de50befb14aef1",
@@ -15085,8 +15085,8 @@
     }
   ],
   "payloadIdentity": {
-    "paths": "54b74de986a1592256ef8cd87c6bc68cab9482829d69fcc26c529136798f1a7d",
-    "content": "856bc9fce9f4a6edc1c0c4980a944aa18e1814e24e0ebd4460fe6f314bf62ef4"
+    "paths": "180b7580700b3d20f1a890d6adcd26610ff6c3e85ed43b00518cf277481bf5c9",
+    "content": "9cba7fee6ec0c35f640185106aea4667397df72106bf215665066a2f7189ed55"
   },
   "profile": {
     "shrink": "off",
