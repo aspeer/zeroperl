@@ -278,7 +278,10 @@ the managed staging pipeline. For example:
 ```
 
 Automatically supplied npm extension and CPAN libraries continue to use managed
-staging. Managed staging requires host Perl 5.18 or newer and optionally
+staging. JavaScript checks for an executable Perl on `PATH` without launching
+a probe process. The Perl helper checks its required core modules at startup
+and reports missing or broken modules with installation guidance before
+processing files. Managed staging requires host Perl 5.18 or newer and optionally
 `cpanm Perl::Tidy@20260826` for minification. The default `"perlMinify": "auto"`
 warns and records skipped minification when Perl::Tidy cannot be loaded or its
 version differs. Other staging optimisations still run. Set `true` to require

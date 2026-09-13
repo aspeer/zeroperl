@@ -11,7 +11,7 @@ import { spawn } from "node:child_process";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildApplicationArchives } from "./build-vfs.mjs";
-import { readSourceInventory } from "./stage-perl-libraries.mjs";
+import { readSourceInventory, requireHostPerl } from "./stage-perl-libraries.mjs";
 import { installCpanDependencies } from "./install-cpan.mjs";
 import { defaultAssetsIgnore, readAssetsPolicy } from "./assets.mjs";
 import { lifespanCallbackName } from "../js/runtime/config.js";
@@ -293,6 +293,9 @@ async function build(projectRoot, project, options, assets) {
   const objects = durableObjects(project.cloudflare.durableObjects);
   configureDurableExtensions(objects, extensions);
   libraries.push(...extensions.map(({ perlLibrary }) => relative(projectRoot, perlLibrary)));
+  // Check executable availability before CPAN can start installing anything.
+  // Verbatim-only builds bypass this; Perl checks its modules when it runs.
+  if (libraries.length || await exists(resolve(projectRoot, "cpanfile"))) await requireHostPerl();
   const installedCpanLibrary = await installCpanDependencies({ projectRoot, outputDirectory });
   if (installedCpanLibrary) libraries.push(relative(projectRoot, installedCpanLibrary));
 

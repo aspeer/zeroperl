@@ -29,4 +29,8 @@ all core XS compiled into Perl; absence means staging must reject an unknown
 host binary. Recipe presence is trusted only within the existing build pipeline,
 which cross-compiles and links those extensions before publishing artifacts.
 
-Requires host Perl 5.18 or later and core Perl modules only.
+Requires host Perl 5.18 or later and core Perl modules only. An early `BEGIN`
+block checks the required modules before the normal `use` statements. If any
+cannot load, it lists all failed modules with installation guidance and the
+underlying errors, then exits with status 2 before reading target files. This
+also protects direct invocation from the container build pipeline.

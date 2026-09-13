@@ -323,7 +323,9 @@ rejected; file contents and relative paths are preserved, with normalised tar
 metadata. File/directory collisions fail instead of deleting a tree.
 
 Npm extension and CPAN libraries always use managed staging, requiring
-host Perl 5.18 or newer. Default \`webdyne.perlMinify: "auto"\` uses
+host Perl 5.18 or newer. A filesystem-only preflight checks for Perl on
+\`PATH\`; the Perl helper diagnoses missing or broken core modules at startup
+with installation guidance. Default \`webdyne.perlMinify: "auto"\` uses
 Perl::Tidy 20260826 if available; otherwise it warns, records the skipped
 minification, and continues the other staging optimisations. Install the optional
 formatter with \`cpanm Perl::Tidy@20260826\`. Set \`webdyne.perlMinify: true\`

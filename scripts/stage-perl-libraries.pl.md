@@ -72,7 +72,13 @@ Reports include verbatim files and their bytes alongside managed decisions.
 
 ## Minification and compatibility
 
-Host Perl 5.18 or later is supported. Minification requires exactly
+Host Perl 5.18 or later is supported. JavaScript checks for an executable Perl
+on `PATH` using filesystem operations only, before managed staging or CPAN
+installation. It does not launch a probe process or inspect modules. The
+standalone helper's early `BEGIN` block checks required core modules before
+its `use` statements. Load failures produce one diagnostic listing failed
+modules, installation guidance and original errors; the helper exits with
+status 2 before reading inputs. Perl::Tidy remains a separate optional check. Minification requires exactly
 `Perl::Tidy 20260826` (`cpanm Perl::Tidy@20260826`). No modules are downloaded
 by the helper. The npm CLI defaults `webdyne.perlMinify` to `"auto"`: use the
 approved formatter when available, otherwise warn and stage without minification.

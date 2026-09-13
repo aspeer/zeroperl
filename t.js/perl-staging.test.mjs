@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createHash} from 'node:crypto';
 import {execFileSync, spawnSync} from 'node:child_process';
-import {mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile} from 'node:fs/promises';
+import {chmod, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -10,7 +10,7 @@ import {gunzipSync} from 'node:zlib';
 import {unpackTar} from 'modern-tar';
 import {buildApplicationArchives} from '../scripts/build-vfs.mjs';
 import {main as cloudflareMain} from '../scripts/webdyne-cloudflare.mjs';
-import {readSourceInventory} from '../scripts/stage-perl-libraries.mjs';
+import {readSourceInventory, requireHostPerl} from '../scripts/stage-perl-libraries.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 async function fixture(run) {
@@ -360,4 +360,49 @@ test('verbatim binary data survives and file/directory conflicts preserve source
   assert.deepEqual(await readFile(join(root, 'lib/data.bin')), bytes);
   assert.deepEqual(await readFile(result.perlLibraryVfsArchive), archive);
   assert.ok(!(await readdir(join(root, 'out'))).some(name => /stage-/.test(name)));
+}));
+
+// Filesystem-only discovery must not execute the candidate, including when it
+// is not really a Perl binary. Actual invocation owns runtime-load failures.
+test('host Perl preflight checks PATH and executable files without launching them', () => fixture(async ({root}) => {
+  const executable = process.platform === 'win32' ? 'perl.exe' : 'perl';
+  await assert.rejects(requireHostPerl({PATH: ''}), /requires host Perl.*Install Perl 5.18.*PATH/s);
+  await mkdir(join(root, executable));
+  await assert.rejects(requireHostPerl({PATH: root}), /requires host Perl/);
+  await rm(join(root, executable), {recursive: true});
+  const marker = join(root, 'launched');
+  await writeFile(join(root, executable), `#!/bin/sh\ntouch '${marker}'\nexit 99\n`);
+  if (process.platform !== 'win32') {
+    await chmod(join(root, executable), 0o644);
+    await assert.rejects(requireHostPerl({PATH: root}), /requires host Perl/);
+  }
+  await chmod(join(root, executable), 0o755);
+  assert.equal(await requireHostPerl({PATH: root}), join(root, executable));
+  assert.ok(!(await readdir(root)).includes('launched'));
+}));
+
+for (const script of ['scripts/stage-perl-libraries.pl', 'tools/record-library-sources.pl']) {
+  test(`${script} reports multiple core-module load failures before reading inputs`, () => fixture(async ({root}) => {
+    await writeFile(join(root, 'MissingCore.pm'),
+      'unshift(@INC, sub { die "simulated broken core module $_[1]\\n" if $_[1] eq "JSON/PP.pm" || $_[1] eq "Digest/SHA.pm"; return; }); 1;');
+    const result = spawnSync('perl', [fileURLToPath(new URL(`../${script}`, import.meta.url)), 'nonexistent-input'], {
+      encoding: 'utf8', env: {...process.env, PERL5OPT: `-I${root} -MMissingCore`},
+    });
+    assert.equal(result.status, 2, result.stderr);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /host Perl could not load required core modules:\n  Digest::SHA\n  JSON::PP/);
+    assert.match(result.stderr, /Install a complete Perl distribution/);
+    assert.match(result.stderr, /Load errors:[\s\S]*simulated broken core module/);
+    assert.doesNotMatch(result.stderr, /usage:|nonexistent-input|BEGIN failed/);
+  }));
+}
+
+test('CPAN build without host Perl fails before creating an installation cache', () => fixture(async ({root}) => {
+  await writeFile(join(root, 'package.json'), '{}');
+  await writeFile(join(root, 'cpanfile'), "requires 'Example';\n");
+  const code = `import {main} from ${JSON.stringify(new URL('../scripts/webdyne-cloudflare.mjs', import.meta.url).href)}; await main(['build'], ${JSON.stringify(root)});`;
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', code], {encoding: 'utf8', env: {...process.env, PATH: ''}});
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /requires host Perl.*CPAN dependencies/s);
+  assert.ok(!(await readdir(root)).includes('.webdyne'));
 }));

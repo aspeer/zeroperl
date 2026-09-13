@@ -1,4 +1,30 @@
 #!/usr/bin/env perl
+
+#  Check core dependencies before any use statement can abort compilation.
+#  This bootstrap deliberately needs no modules itself. Collect load failures,
+#  including broken installations, and retain their original diagnostics.
+#  Keep this list aligned with the required use statements below; optional
+#  Perl::Tidy is handled separately by the staging minification policy.
+#
+BEGIN {
+    my (@missing, @errors);
+    foreach my $module (qw(strict warnings Config Cwd Digest::SHA File::Basename File::Find File::Path JSON::PP)) {
+        my $filename=$module;
+        $filename=~s{::}{/}g;
+        $filename.='.pm';
+        unless (eval { require $filename; 1 }) {
+            push(@missing, $module);
+            push(@errors, "$module: $@");
+        }
+    }
+    if (@missing) {
+        print STDERR "Cannot stage managed Perl libraries: host Perl could not load required core modules:\n  " .
+            join("\n  ", @missing) . "\n\nInstall a complete Perl distribution or your operating system's " .
+            "packages providing these modules, then retry.\n\nLoad errors:\n" . join("\n", @errors);
+        exit(2);
+    }
+}
+
 use strict;
 use warnings;
 use Config;
