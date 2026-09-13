@@ -24,6 +24,10 @@ test("npm packaging rejects a changed prefix even when file counts and sizes mat
     execFileSync("tar", ["-czf", join(root, "notices.tar.gz"), "-C", root, "third-party-notices"]);
     const noticeBytes = await readFile(join(root, "notices.tar.gz"));
     const noticeHash = createHash("sha256").update(noticeBytes).digest("hex");
+    await writeFile(join(prefix, "library-sources.json"), JSON.stringify({schema: 1, perlVersion: "5.44.0",
+      sourceFiles: {"Example.pm": "source-hash", "Removed.pm": "removed-hash"},
+      nativeModules: {"Example.pm": {distribution: "Example-1"}, "Removed.pm": {distribution: "Removed-1"}},
+    }));
     const prefixInventory = await directoryInventory(prefix);
     await writeFile(join(root, "manifest.json"), JSON.stringify({
       perlVersion: "5.44.0", buildNumber: 1,
@@ -41,9 +45,13 @@ test("npm packaging rejects a changed prefix even when file counts and sizes mat
     const args = ["tools/prepare-npm-package.mjs", "--source", root, "--destination", join(root, "package"),
       "--manifest", "manifest.json", "--wasm", "runtime.wasm", "--reactor", "reactor.wasm", "--notice-policy", join(root, "policy.json")];
     execFileSync(process.execPath, [...args, "--inventory-only", "true"], {stdio: "pipe"});
-    assert.deepEqual(await readdir(join(root, "package")), ["embedded-files.json"]);
+    assert.deepEqual(await readdir(join(root, "package")), ["embedded-files.json", "library-sources.json"]);
     assert.deepEqual(JSON.parse(await readFile(join(root, "package/embedded-files.json"), "utf8")), {
       "Example.pm": createHash("sha256").update("original").digest("hex"),
+    });
+    assert.deepEqual(JSON.parse(await readFile(join(root, "package/library-sources.json"), "utf8")), {
+      schema: 1, perlVersion: "5.44.0", sourceFiles: {"Example.pm": "source-hash"},
+      nativeModules: {"Example.pm": {distribution: "Example-1"}},
     });
     execFileSync(process.execPath, args, {stdio: "pipe"});
     // Compare the assembled source payload with CI's strict package allowlist

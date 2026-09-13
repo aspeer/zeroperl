@@ -86,7 +86,8 @@ settings understood by the CLI:
 | `entry` | `"app.psp"` | Default PSP page below that tree, or a `.pagi` entry application. Must exist when building. |
 | `static` | `true`; `init` sets `false` | Let WebDyne serve static files from its VFS. Leave false when Cloudflare serves your assets. |
 | `outputDirectory` | `".webdyne"` | Generated Worker, archives and default Wrangler configuration. Keep outside the application/assets tree. |
-| `perlLibrary` | None | A project-relative directory, or array of directories, containing additional Pure-Perl modules. |
+| `perlLibrary` | None | A project-relative directory, or array of directories, containing additional Perl libraries for staging. |
+| `perlMinify` | `true` | Compact staged `.pm`/`.pl` libraries using host Perl::Tidy 20260826; set `false` to retain source formatting. |
 | `extensions` | None | An object mapping direct npm dependency names to their options, or an array of package names with no options. |
 | `lifespan.startup` | None | Qualified Perl startup function, such as `My::App::startup`. |
 | `lifespan.shutdown` | None | Qualified shutdown function. Accepted by WebDyne, but the Worker does not yet dispatch shutdown. |
@@ -257,8 +258,37 @@ Put application modules in a directory such as `lib` and set
 A root `cpanfile` is installed with Carton, or cpanminus if Carton is unavailable,
 and cached below the output directory's `cpan/` until `cpanfile` or
 `cpanfile.snapshot` changes. Commit the snapshot for reproducible dependency
-selection. Only Pure-Perl additions are accepted; host XS binaries cannot run
-in WASM. Byte-identical copies of embedded modules are omitted.
+selection.
+
+Additional libraries (including npm extension libraries) are prepared by a
+host Perl helper, then archived by the Node builder. Install Perl 5.18 or newer
+and, for default minification, `cpanm Perl::Tidy@20260826`. Set
+`"perlMinify": false` in the `webdyne` configuration to disable minification;
+Perl remains required for staging libraries. Applications with no additional
+libraries retain the Node-only build path.
+
+Staging excludes installation metadata, standalone POD and WebDyne installer
+components. It flattens portable Perl files from recognised host architecture
+directories. Host binaries are never uploaded: a redundant CPAN XS installation
+is omitted only when the packaged runtime inventory proves a matching target
+implementation, distribution identity and unchanged Perl companion. Unsupported
+or incompatible XS dependencies fail the build. Older runtime inventories
+without that evidence remain conservative.
+
+Embedded duplicates are recognised using final file hashes or original source
+hashes captured before runtime minification. Modified application overrides
+are retained. Staging never modifies your sources or installed dependencies.
+Minification preserves comments and skips files with data sections, heredoc
+markers or line-sensitive code. Removed POD is retained in the archive as
+`/perl5/PERL-LIBRARY-DOCUMENTATION.txt`, outside the module search path, including
+its attribution and licence text. PSP files are not minified.
+
+Each successful build writes `.webdyne/perl-library-report.json` with per-file
+reasons, hashes, byte counts and formatter/runtime identity. The console reports
+net uncompressed savings, including retained documentation; actual compressed
+archive savings may be smaller. See
+[scripts/stage-perl-libraries.pl.md](scripts/stage-perl-libraries.pl.md) for the
+staging contract and conservative compatibility rules.
 
 Extensions must be direct npm dependencies and explicitly enabled in
 `webdyne.extensions`. Their manifests supply Perl modules and a static provider

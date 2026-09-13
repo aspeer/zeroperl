@@ -70,6 +70,12 @@ jobs:
         run: |
           npm --prefix tools ci
           npm ci --ignore-scripts
+      - name: Install pinned Perl library minifier
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cpanminus
+          cpanm --notest --local-lib-contained "$RUNNER_TEMP/perl-staging" Perl::Tidy@20260826
+          echo "PERL5LIB=$RUNNER_TEMP/perl-staging/lib/perl5" >> "$GITHUB_ENV"
       - name: Test release tooling and package contracts
         run: |
           node --test t.js/*.test.mjs
@@ -109,6 +115,7 @@ jobs:
           node tools/check-xs-magic.mjs "$wasm"
           node tools/check-asyncify-reentry.mjs "$wasm"
           node t/runtime/smoke-pagi-application.mjs "$wasm"
+          node t/runtime/smoke-perl-staging.mjs "$wasm"
           node t/runtime/smoke-lifespan-callbacks.mjs "$wasm"
           node --input-type=module - "$wasm" "$reactor" <<'NODE'
           import { readFile } from "node:fs/promises";
@@ -193,6 +200,7 @@ jobs:
             echo package/bin/pagi-runner.pl.md
             echo package/bin/webdyne-app.pl
             echo package/bin/webdyne-app.pl.md
+            echo package/library-sources.json
             echo package/embedded-files.json
             echo package/index.js
             echo package/js/provider/cloudflare.js
@@ -213,6 +221,9 @@ jobs:
             echo package/scripts/build-vfs.mjs
             echo package/scripts/durable-objects.mjs
             echo package/scripts/extensions.mjs
+            echo package/scripts/stage-perl-libraries.mjs
+            echo package/scripts/stage-perl-libraries.pl
+            echo package/scripts/stage-perl-libraries.pl.md
             echo package/scripts/install-cpan.mjs
             echo package/scripts/webdyne-cloudflare.mjs
             echo "package/zeroperl-webdyne-${RELEASE_ID}.wasm"

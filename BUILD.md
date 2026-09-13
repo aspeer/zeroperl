@@ -552,3 +552,21 @@ inventory. See [the review procedure](release/licences/README.md) when updating
 CPAN dependencies or adding an XS module; the new module's applicable notices
 must accompany its compiled code. The full extraction/audit material stays
 outside npm, while the reviewed legal texts remain in the installed package.
+
+## Application library source inventory
+
+`pipeline/prepare-prefix.sh` removes `WebDyne/Install.pm` and its companion
+installer directory, then runs `tools/record-library-sources.pl` before source
+minification. The resulting `library-sources.json` is added to the exported
+prefix only after SFS header generation. It is covered by the prefix checksum
+but does not occupy space in the WASM filesystem.
+
+The npm packager verifies that prefix and ships only source/capability entries
+whose files remain in the final payload. Host application staging uses these
+hashes to recognise embedded modules whose source was transformed during the
+runtime build. Existing artifacts without the sidecar still package normally,
+with an empty source inventory. No release or licence baseline is adopted by
+this staging process.
+
+See [tools/record-library-sources.pl.md](tools/record-library-sources.pl.md) and
+[scripts/stage-perl-libraries.pl.md](scripts/stage-perl-libraries.pl.md).

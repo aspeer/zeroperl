@@ -177,6 +177,17 @@ if [ "$ZEROPERL_SHRINK" = "full" ] && [ -x "$REPO_DIR/tools/unicore-strip.pl" ];
     perl "$REPO_DIR/tools/unicore-strip.pl" "/zeroperl/lib/$PERL_VERSION"
 fi
 
+# WebDyne's host/Apache installers are not runtime components. Apply the
+# same deployment exclusion used for application libraries, including the
+# top-level module. This changes the embedded payload, not the CPAN install.
+find /zeroperl/lib -type d -path '*/WebDyne/Install' -prune -exec rm -rf {} +
+find /zeroperl/lib -type f -path '*/WebDyne/Install.pm' -delete
+
+# Capture original source identities before trimming. Keep the inventory out
+# of SFS; copy it into the exported prefix only after header generation.
+perl "$REPO_DIR/tools/record-library-sources.pl" /zeroperl "$PERL_VERSION" \
+    "$REPO_DIR/tools/cpan-xs.json" > /build/webdyne-library-sources.json
+
 # Preserve upstream attribution before perltidy removes comments and POD.
 python3 "$REPO_DIR/tools/collect-notices.py"
 tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner \
@@ -226,3 +237,7 @@ if [ "$ZEROPERL_SFS_COMPRESS" = "true" ]; then
     SFS_COMPRESS_FLAG="--compress"
 fi
 node "$REPO_DIR/tools/sfs.js" -i /zeroperl -o "$REPO_DIR/gen/zeroperl.h" --prefix /zeroperl $SFS_COMPRESS_FLAG
+
+# This build-time sidecar is covered by the prefix artifact checksum but is
+# deliberately absent from the already generated WASM filesystem header.
+cp /build/webdyne-library-sources.json /zeroperl/library-sources.json

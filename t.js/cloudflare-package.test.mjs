@@ -165,6 +165,7 @@ test("application and Pure-Perl trees receive stable VFS roots", async () => {
       "app/assets/site.css",
     ]);
     assert.deepEqual(await archiveNames(result.perlLibraryVfsArchive), [
+      "perl5",
       "perl5/lib",
       "perl5/lib/Example.pm",
     ]);
@@ -240,6 +241,7 @@ test("declared npm extensions contribute Perl modules and static Worker imports"
 
     await cloudflareMain(["build"], root);
     assert.deepEqual(await archiveNames(join(root, ".webdyne/perl-lib-vfs.tar.gz")), [
+      "perl5",
       "perl5/lib",
       "perl5/lib/Example",
       "perl5/lib/Example/Extension.pm",

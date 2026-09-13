@@ -11,6 +11,7 @@ import { spawn } from "node:child_process";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildApplicationArchives } from "./build-vfs.mjs";
+import { readSourceInventory } from "./stage-perl-libraries.mjs";
 import { installCpanDependencies } from "./install-cpan.mjs";
 import { defaultAssetsIgnore, readAssetsPolicy } from "./assets.mjs";
 import { lifespanCallbackName } from "../js/runtime/config.js";
@@ -111,6 +112,7 @@ function parseArguments(argv, defaults) {
     appDirectory: defaults.appDirectory,
     entry: defaults.entry,
     libraries: [...defaults.libraries],
+    minify: defaults.minify,
     output: defaults.output,
     wranglerConfig: defaults.wranglerConfig,
     wranglerArguments: [],
@@ -164,6 +166,9 @@ async function readProject(projectRoot) {
   lifespanBindings(webdyne.lifespan);
   const cloudflare = assertObject(webdyne.cloudflare, "package.json webdyne.cloudflare");
   const extensions = extensionConfiguration(webdyne.extensions);
+  if (webdyne.perlMinify !== undefined && typeof webdyne.perlMinify !== "boolean") {
+    throw new Error("package.json webdyne.perlMinify must be a boolean");
+  }
   const libraries = webdyne.perlLibrary === undefined
     ? []
     : Array.isArray(webdyne.perlLibrary) ? webdyne.perlLibrary : [webdyne.perlLibrary];
@@ -179,6 +184,7 @@ async function readProject(projectRoot) {
       appDirectory: webdyne.appDirectory ?? "app",
       entry: webdyne.entry ?? "app.psp",
       libraries,
+      minify: webdyne.perlMinify ?? true,
       output: webdyne.outputDirectory ?? ".webdyne",
       wranglerConfig: cloudflare.wranglerConfig,
     },
@@ -289,8 +295,16 @@ async function build(projectRoot, project, options, assets) {
     libraryDirectories: libraries,
     outputDirectory,
     embeddedFiles: await readEmbeddedFiles(),
+    sourceInventory: await readSourceInventory(packageRoot),
+    minify: options.minify,
+    runtime: `${distributionName}@${distributionVersion}`,
     assets,
   });
+
+  if (archives.libraryReport) {
+    const report = archives.libraryReport;
+    console.log(`Perl libraries: ${report.input_bytes} → ${report.output_bytes} bytes (${report.saved_bytes} saved, including retained documentation); ${archives.reportPath}`);
+  }
 
   const extensionSource = extensionWorkerSource(extensions);
   const entrySource = `import { createCloudflareWorker } from ${JSON.stringify(`${distributionName}/cloudflare`)};

@@ -1,12 +1,11 @@
-import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { lstat, mkdir, readFile, realpath, readdir } from "node:fs/promises";
+import { lstat, mkdir, writeFile, realpath, readdir } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
 import { createGzip } from "node:zlib";
-import { dirname, extname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { packTar } from "modern-tar/fs";
 
-const nativeExtensions = new Set([".a", ".bundle", ".dll", ".dylib", ".o", ".so"]);
+import { stagePerlLibraries } from "./stage-perl-libraries.mjs";
 const excludedApplicationComponents = new Set([
   ".dev.vars",
   ".git",
@@ -27,19 +26,20 @@ async function checkedDirectory(root, requested, description) {
   if (!isInside(resolvedRoot, resolvedSource)) throw new Error(`${description} symlink escapes the project root: ${requested}`);
   const status = await lstat(source);
   if (!status.isDirectory()) throw new Error(`${description} is not a directory: ${requested}`);
-  return source;
+  return resolvedSource;
 }
 
-async function assertPurePerlTree(directory) {
-  for (const child of await readdir(directory, { withFileTypes: true })) {
-    const filename = join(directory, child.name);
-    if (child.isDirectory()) await assertPurePerlTree(filename);
-    else if (child.isSymbolicLink()) {
-      throw new Error(`Perl library symlinks are not portable: ${filename}`);
-    } else if (child.isFile() && nativeExtensions.has(extname(filename).toLowerCase())) {
-      throw new Error(`Native Perl artifacts cannot run in the WASM runtime: ${filename}`);
-    } else if (!child.isFile()) {
-      throw new Error(`Unsupported Perl library filesystem entry: ${filename}`);
+// Resolve existing ancestors as well as the not-yet-created output suffix.
+// This detects a symlinked output parent before any archive can touch sources.
+async function canonicalOutput(directory) {
+  let ancestor = resolve(directory);
+  const suffix = [];
+  while (true) {
+    try { return join(await realpath(ancestor), ...suffix); }
+    catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      suffix.unshift(basename(ancestor));
+      ancestor = dirname(ancestor);
     }
   }
 }
@@ -87,46 +87,6 @@ function applicationFilter(name) {
   return !components.some((component) => excludedApplicationComponents.has(component));
 }
 
-function perlLibraryFilter(duplicates, libraries) {
-  return (name) => {
-    const normalized = name.replaceAll("\\", "/");
-    const components = normalized.split("/");
-    const isEmbeddedDuplicate = libraries.some((root) =>
-      duplicates.has(relative(root, name).replaceAll("\\", "/")),
-    );
-    return !components.includes(".meta")
-      && !components.includes(".packlist")
-      && extname(normalized).toLowerCase() !== ".pod"
-      && !isEmbeddedDuplicate;
-  };
-}
-
-async function collectIdenticalEmbeddedFiles(libraryDirectories, embeddedFiles) {
-  const duplicates = new Set();
-  const overrides = new Set();
-  if (!embeddedFiles || Object.keys(embeddedFiles).length === 0) return duplicates;
-
-  async function visit(root, directory) {
-    for (const child of await readdir(directory, { withFileTypes: true })) {
-      const filename = join(directory, child.name);
-      if (child.isDirectory()) {
-        await visit(root, filename);
-      } else if (child.isFile()) {
-        const modulePath = relative(root, filename).replaceAll("\\", "/");
-        const embeddedHash = embeddedFiles[modulePath];
-        if (!embeddedHash) continue;
-        const installedHash = createHash("sha256").update(await readFile(filename)).digest("hex");
-        if (installedHash === embeddedHash) duplicates.add(modulePath);
-        else overrides.add(modulePath);
-      }
-    }
-  }
-
-  for (const directory of libraryDirectories) await visit(directory, directory);
-  for (const modulePath of overrides) duplicates.delete(modulePath);
-  return duplicates;
-}
-
 /**
  * Package a complete application tree and optional Pure-Perl libraries.
  * Repository `app/` becomes VFS `/app`; every library root becomes
@@ -140,6 +100,9 @@ export async function buildApplicationArchives({
   outputDirectory,
   embeddedFiles = {},
   assets,
+  sourceInventory = {},
+  minify = false,
+  runtime,
 }) {
   const root = resolve(projectRoot);
   const applicationRoot = await checkedDirectory(root, appDirectory, "WebDyne application directory");
@@ -147,8 +110,14 @@ export async function buildApplicationArchives({
   const libraries = [];
   for (const requested of libraryDirectories) {
     const library = await checkedDirectory(root, requested, "Perl library directory");
-    await assertPurePerlTree(library);
     libraries.push(library);
+  }
+
+  // Validate before writing even the application archive: a misconfigured
+  // output inside a source tree must not mutate that tree on a failed build.
+  const outputRoot = await canonicalOutput(outputDirectory);
+  for (const source of [applicationRoot, ...libraries]) {
+    if (isInside(source, outputRoot)) throw new Error("Generated output must be outside Perl libraries and application sources");
   }
 
   const appVfsArchive = resolve(outputDirectory, "app-vfs.tar.gz");
@@ -160,16 +129,27 @@ export async function buildApplicationArchives({
       && (stat.isDirectory() || !assets?.isPublic(name)),
   );
 
-  const duplicates = await collectIdenticalEmbeddedFiles(libraries, embeddedFiles);
-  await writeArchive(
-    libraries.map((source) => ({ type: "directory", source, target: "perl5/lib" })),
-    perlLibraryVfsArchive,
-    perlLibraryFilter(duplicates, libraries),
-  );
-
-  return {
-    appVfsArchive,
-    perlLibraryVfsArchive,
-    omittedEmbeddedFiles: [...duplicates].sort().map((path) => `perl5/lib/${path}`),
-  };
+  // Empty-library applications retain the Node-only build path. The stage is
+  // otherwise disposable; its report is published only after archive success.
+  let stage;
+  try {
+    if (libraries.length) stage = await stagePerlLibraries({
+      libraries, outputDirectory, embeddedFiles, sourceInventory, minify, runtime,
+    });
+    await writeArchive(
+      stage ? [{ type: "directory", source: stage.directory, target: "perl5" }] : [],
+      perlLibraryVfsArchive,
+    );
+    const reportPath = resolve(outputDirectory, "perl-library-report.json");
+    await writeFile(reportPath, `${JSON.stringify(stage?.report ?? {
+      schema: 1, files: [], input_bytes: 0, output_bytes: 0, saved_bytes: 0,
+    }, null, 2)}\n`);
+    return {
+      appVfsArchive, perlLibraryVfsArchive, reportPath,
+      libraryReport: stage?.report,
+      omittedEmbeddedFiles: stage?.omittedEmbeddedFiles ?? [],
+    };
+  } finally {
+    await stage?.cleanup();
+  }
 }

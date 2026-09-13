@@ -105,6 +105,19 @@ for (const field of ["files", "bytes", "sha256"]) {
   }
 }
 const embeddedFiles = await embeddedFileInventory(prefixPath, perlVersion);
+// The prefix checksum above authenticates the source inventory as part of the
+// same build. Intersect it with delivered files: removed modules must never be
+// advertised as supplied, even if they existed before trimming.
+const sourceInventory = { schema: 1, perlVersion, sourceFiles: {}, nativeModules: {} };
+try {
+  const recorded = JSON.parse(await readFile(resolve(prefixPath, "library-sources.json"), "utf8"));
+  if (recorded.schema !== 1 || recorded.perlVersion !== perlVersion) throw new Error("Invalid library source inventory");
+  sourceInventory.sourceFiles = Object.fromEntries(Object.entries(recorded.sourceFiles).filter(([path]) => Object.hasOwn(embeddedFiles, path)));
+  sourceInventory.nativeModules = Object.fromEntries(Object.entries(recorded.nativeModules).filter(([path]) => Object.hasOwn(sourceInventory.sourceFiles, path)));
+} catch (error) {
+  if (error.code !== "ENOENT") throw error;
+}
+
 
 const licenseDirectory = resolve(options["license-destination"] || resolve(destination, "..", "release-licenses"));
 if (licenseDirectory === destination || licenseDirectory.startsWith(destination + "/")) {
@@ -116,6 +129,7 @@ const noticePolicy = resolve(options["notice-policy"] || `release/licences/${per
 await mkdir(destination, { recursive: true });
 const runtimeNotices = resolve(destination, "THIRD-PARTY-LICENSES.txt");
 const embeddedInventoryPath = resolve(destination, "embedded-files.json");
+await writeFile(resolve(destination, "library-sources.json"), `${JSON.stringify(sourceInventory, null, 2)}\n`);
 await writeFile(embeddedInventoryPath, `${JSON.stringify(embeddedFiles, null, 2)}\n`);
 // Review tooling needs the same verified payload inventory as normal packaging.
 if (options["inventory-only"] === "true") process.exit(0);
@@ -196,6 +210,7 @@ const packageJson = {
   files: [
     "bin",
     "embedded-files.json",
+    "library-sources.json",
     "index.js",
     "js",
     "lib",
@@ -299,6 +314,16 @@ after changing server-side files or ignore rules, or restart \`npm run dev\`.
 Custom Wrangler configurations must include the \`enable_request_signal\`
 compatibility flag so disconnected SSE sessions stop promptly. Generated
 configurations include it automatically.
+
+Additional Perl libraries, including npm extension libraries, are staged by
+host Perl 5.18 or newer. Default minification requires Perl::Tidy 20260826:
+install it with \`cpanm Perl::Tidy@20260826\`, or set
+\`webdyne.perlMinify: false\` to retain source formatting. No-library apps
+still build with Node alone. The helper excludes installers and host artifacts,
+preserves application overrides, and reports per-file decisions in
+\`.webdyne/perl-library-report.json\`. Removed POD remains in the archive's
+\`/perl5/PERL-LIBRARY-DOCUMENTATION.txt\`; net size figures include it.
+See [the staging helper documentation](scripts/stage-perl-libraries.pl.md).
 
 Portable settings belong below \`package.json.webdyne\`. Use \`appDirectory\`
 to override the source \`app/\` directory, \`entry\` to override \`app.psp\`,
