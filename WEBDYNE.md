@@ -414,3 +414,17 @@ active. This is declarative static import selection, not executable build code.
 An empty/absent option selects the original provider. Runtime 1.0.10 also passes
 `lifecycle.asyncCleanup: true` to attachment hooks; async-cleanup extensions must
 reject older runtimes rather than silently discarding cleanup Promises.
+
+### Secrets Store bindings
+
+With the WebDyne::Cloudflare Secrets Store adapter, set extension option
+`secretsStoreBindings: ["API_KEY"]` and configure
+`webdyne.cloudflare.secretsStoreSecrets` as an array of
+`{ "binding": "API_KEY", "storeId": "YOUR_32_HEX_STORE_ID", "secretName": "upstream-api-key" }`.
+The generator validates these metadata fields and emits Wrangler
+`secrets_store_secrets` entries using `binding`, `store_id` and `secret_name`.
+Secret values are never accepted in this configuration. Duplicate binding names
+and unknown fields are rejected. No new compatibility flag is needed.
+Existing user-owned Wrangler files remain untouched; named environments must
+configure their own bindings. Local development requires locally provisioned
+dummy secrets, not production values.

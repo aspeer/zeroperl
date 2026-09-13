@@ -371,6 +371,26 @@ function cloudflareKVNamespaces(value) {
   });
 }
 
+// Bind individual account secrets; values never belong in deployment configuration.
+//
+function cloudflareSecretsStoreSecrets(value) {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new TypeError("webdyne.cloudflare.secretsStoreSecrets must be an array");
+  const bindings = new Set();
+  return value.map((entry, index) => {
+    const item = assertObject(entry, `webdyne.cloudflare.secretsStoreSecrets[${index}]`);
+    if (Object.keys(item).some(key => !["binding", "storeId", "secretName"].includes(key))
+      || !/^[A-Z_][A-Z0-9_]*$/.test(item.binding ?? "")
+      || typeof item.storeId !== "string" || !/^[a-f0-9]{32}$/i.test(item.storeId)
+      || typeof item.secretName !== "string" || !item.secretName.length || /\s/.test(item.secretName)
+      || bindings.has(item.binding)) {
+      throw new TypeError(`Invalid Secrets Store binding configuration at index ${index}`);
+    }
+    bindings.add(item.binding);
+    return { binding: item.binding, store_id: item.storeId, secret_name: item.secretName };
+  });
+}
+
 // Validate R2 deployment settings and translate them to Wrangler bucket bindings.
 //
 function cloudflareR2Buckets(value) {
@@ -448,6 +468,9 @@ export async function generatedWranglerConfig(projectRoot, project, options, out
       { type: "Text", globs: ["**/*.pl", "**/*.pm"], fallthrough: false },
       { type: "Data", globs: ["**/*.tar.gz"], fallthrough: false },
     ],
+    ...(project.cloudflare.secretsStoreSecrets === undefined
+      ? {}
+      : { secrets_store_secrets: cloudflareSecretsStoreSecrets(project.cloudflare.secretsStoreSecrets) }),
     ...(project.cloudflare.hyperdrive === undefined ? {} : { hyperdrive: cloudflareHyperdrive(project.cloudflare.hyperdrive) }),
     ...(project.cloudflare.d1Databases === undefined
       ? {}
