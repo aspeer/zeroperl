@@ -163,7 +163,7 @@ jobs:
           cp "$artifact_dir/SHA256SUMS-${RELEASE_ID}" "$distribution_dir/"
 
       - name: Attest qualified binaries and release archive
-        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
             output/${{ matrix.perl }}/zeroperl-webdyne-${{ env.RELEASE_ID }}.wasm
@@ -264,7 +264,7 @@ jobs:
           echo "NPM_ALIAS_TARBALL=$tarball" >> "$GITHUB_ENV"
 
       - name: Attest the npm package candidate
-        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
             dist/npm/${{ env.RELEASE_ID }}/tarball/*.tgz
