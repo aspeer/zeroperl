@@ -21,9 +21,9 @@ git push --atomic github main refs/tags/aspeer-zeroperl_1.0.1 refs/tags/v1.0.1
 ```
 
 Nothing is pushed, built or staged by make release itself. Use the command it
-prints for the actual version. The github remote points to GitHub; origin may
-point to Gitea. Publish the referenced zeroperl-ts implementation commit to its
-GitHub repository before pushing a runtime release, so CI can check it out.
+prints for the actual version. Publish the referenced zeroperl-ts implementation
+commit to its GitHub repository before pushing a runtime release, so CI can
+check it out.
 
 ## Version and Perl configuration
 

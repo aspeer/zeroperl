@@ -4,6 +4,26 @@ This is a fork of the original [6over3/zeroperl](https://github.com/6over3/zerop
 project. It supports a WASM implementation of WebDyne, primarily on Cloudflare
 Workers at this time, with the potential to support other WASM providers later.
 
+## GitHub Attestations
+
+The release workflow generates [GitHub artifact attestations](https://docs.github.com/en/actions/concepts/security/artifact-attestations)
+for runtime binaries and npm package archives. Install the
+[GitHub CLI](https://cli.github.com/) with `gh attestation` support and
+authenticate with `gh auth login`.
+
+Download the npm package with `npm pack`, replace `VERSION`, and verify the
+resulting archive with:
+
+```sh
+npm pack @webdyne/webdyne-zeroperl@VERSION
+gh attestation verify webdyne-webdyne-zeroperl-VERSION.tgz --repo aspeer/zeroperl
+```
+
+A successful verification confirms that the archive's checksum matches an
+attestation from this repository. Attestations cover artifacts produced by the
+attestation-enabled release workflow. Older releases and GitHub's automatically
+generated source-code archives are not covered.
+
 **WebDyne-specific installation and usage instructions are in
 [WEBDYNE.md](WEBDYNE.md).** See [BUILD.md](BUILD.md) for this fork's build process,
 CPAN snapshots and XS modules. Install the WebDyne runtime from npm as described
