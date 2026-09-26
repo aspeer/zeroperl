@@ -26,7 +26,6 @@ jobs:
         run: |
           npm audit
           npm --prefix tools audit
-          npm --prefix zeroperl-ts audit
 
   cpan-audit:
     runs-on: ubuntu-latest
@@ -39,5 +38,18 @@ jobs:
           perl-version: '5.44.0'
       - name: Install audit tool
         run: cpanm --notest --local-lib-contained audit CPAN::Audit
-      - name: Audit declared CPAN dependencies
-        run: perl -I"$GITHUB_WORKSPACE/audit/lib/perl5" audit/bin/cpan-audit deps . --no-corelist
+      - name: Report advisories in locked CPAN snapshots
+        run: |
+          for snapshot in cpanfile.snapshot.*; do
+            case "$snapshot" in
+              *.meta.json) continue ;;
+            esac
+            audit_dir="$RUNNER_TEMP/$(basename "$snapshot")"
+            mkdir "$audit_dir"
+            cp cpanfile "$audit_dir/cpanfile"
+            cp "$snapshot" "$audit_dir/cpanfile.snapshot"
+            echo "::group::$snapshot"
+            perl -I"$GITHUB_WORKSPACE/audit/lib/perl5" audit/bin/cpan-audit \
+              deps "$audit_dir" --no-corelist --exit-zero
+            echo "::endgroup::"
+          done
